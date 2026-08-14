@@ -3,6 +3,7 @@ import { bootstrapAuthedSession } from './helpers/webauthn'
 
 // OAuth-only 平台：密码登录已移除。用 WebAuthn 虚拟认证器以 provider
 // 身份登录，验证后端保护逻辑：服务商不能将自己从 org_id=1 中移除。
+// 注意：系统无种子数据，首个服务商组织由 OOBE 流程创建。
 test('服务商不能将自己从 org_id=1 中移除（WebAuthn 全真登录）', async ({ page }) => {
   const forbiddenResponses: string[] = []
   page.on('response', response => {

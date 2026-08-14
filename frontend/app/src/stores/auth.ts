@@ -5,8 +5,6 @@ import { ref, computed } from 'vue'
 import {
   beginLogin,
   finishLogin,
-  beginRegistration,
-  finishRegistration,
   getDingTalkAuthorizeURL,
   exchangeLoginSession,
   refreshAccessToken,
@@ -35,21 +33,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value)
   const userRole = computed(() => user.value?.role || '')
-
-  // ---- WebAuthn registration ----
-
-  async function registerPasskey(name: string) {
-    const begin = await beginRegistration(0, name)
-    const rawOptions = begin.data.options.publicKey || begin.data.options
-    const options = decodePublicKeyCreationOptions(rawOptions)
-    const credential = await navigator.credentials.create({
-      publicKey: options,
-    })
-    if (!credential) throw new Error('Passkey creation cancelled')
-    const serialized = serializeCreationCredential(credential as PublicKeyCredential)
-    await finishRegistration(begin.data.sessionId, serialized)
-    return begin.data.userId
-  }
 
   // ---- WebAuthn login ----
 
@@ -170,7 +153,6 @@ export const useAuthStore = defineStore('auth', () => {
     loginSessionId,
     isAuthenticated,
     userRole,
-    registerPasskey,
     loginWithPasskey,
     completeLoginWithToken,
     redirectToDingTalk,
@@ -184,20 +166,6 @@ export const useAuthStore = defineStore('auth', () => {
 })
 
 // ---- WebAuthn credential serialization helpers ----
-
-function serializeCreationCredential(cred: PublicKeyCredential): unknown {
-  const response = cred.response as AuthenticatorAttestationResponse
-  return {
-    id: cred.id,
-    rawId: arrayBufferToBase64Url(cred.rawId),
-    type: cred.type,
-    response: {
-      attestationObject: arrayBufferToBase64Url(response.attestationObject),
-      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
-    },
-    clientExtensionResults: {},
-  }
-}
 
 function serializeAssertionCredential(cred: PublicKeyCredential): unknown {
   const response = cred.response as AuthenticatorAssertionResponse
@@ -235,34 +203,14 @@ function base64UrlToBuffer(base64url: string): Uint8Array {
   return bytes
 }
 
-function decodePublicKeyCreationOptions(raw: any): PublicKeyCredentialCreationOptions {
-  return {
-    challenge: base64UrlToBuffer(raw.challenge),
-    rp: raw.rp,
-    user: {
-      ...raw.user,
-      id: base64UrlToBuffer(raw.user.id),
-    },
-    pubKeyCredParams: raw.pubKeyCredParams,
-    timeout: raw.timeout,
-    attestation: raw.attestation,
-    authenticatorSelection: raw.authenticatorSelection,
-    excludeCredentials: raw.excludeCredentials?.map((c: any) => ({
-      ...c,
-      id: base64UrlToBuffer(c.id),
-    })),
-    extensions: raw.extensions,
-  }
-}
-
 function decodePublicKeyRequestOptions(raw: any): PublicKeyCredentialRequestOptions {
   return {
-    challenge: base64UrlToBuffer(raw.challenge),
+    challenge: base64UrlToBuffer(raw.challenge) as BufferSource,
     timeout: raw.timeout,
     rpId: raw.rpId,
     allowCredentials: raw.allowCredentials?.map((c: any) => ({
       ...c,
-      id: base64UrlToBuffer(c.id),
+      id: base64UrlToBuffer(c.id) as BufferSource,
     })),
     userVerification: raw.userVerification,
     extensions: raw.extensions,

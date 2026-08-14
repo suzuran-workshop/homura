@@ -10,8 +10,15 @@
 
     <v-navigation-drawer permanent>
       <v-list>
-        <v-list-item to="/user" prepend-icon="mdi-view-dashboard" title="仪表盘" exact />
         <v-list-item to="/user/apps" prepend-icon="mdi-apps" title="应用启动台" />
+
+        <!-- Admin functions for provider/tenant_admin -->
+        <template v-if="authStore.userRole === 'provider' || authStore.userRole === 'tenant_admin'">
+          <v-divider class="my-2" />
+          <v-list-subheader>管理功能</v-list-subheader>
+          <v-list-item v-if="authStore.userRole === 'provider'" to="/provider/dashboard" prepend-icon="mdi-account-multiple" title="服务商管理" />
+          <v-list-item v-if="authStore.userRole === 'tenant_admin'" to="/tenant/dashboard" prepend-icon="mdi-shield-account" title="租户管理" />
+        </template>
       </v-list>
     </v-navigation-drawer>
 

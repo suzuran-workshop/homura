@@ -380,7 +380,7 @@ func (s *WorkflowService) resolveRoleAssignees(ctx context.Context, orgID int, r
 	var ids []int
 	for _, b := range bonds {
 		switch role {
-		case "org_admin":
+		case "tenant_admin":
 			if b.IsAdmin {
 				ids = append(ids, b.UserID)
 			}
@@ -388,8 +388,8 @@ func (s *WorkflowService) resolveRoleAssignees(ctx context.Context, orgID int, r
 			if b.IsDepartmentManager {
 				ids = append(ids, b.UserID)
 			}
-		case "provider_admin":
-			// provider_admin is a platform-level role not stored on the bond; skip.
+		case "provider":
+			// provider is a platform-level role not stored on the bond; skip.
 		}
 	}
 	if len(ids) == 0 {

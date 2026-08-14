@@ -21,7 +21,7 @@ func setupPermissionRouter(role string) *gin.Engine {
 }
 
 func TestRequireOrgAdminAllowsOrgAdmin(t *testing.T) {
-    r := setupPermissionRouter("org_admin")
+    r := setupPermissionRouter("tenant_admin")
     r.Use(middleware.RequireOrgAdmin())
     r.GET("/admin", func(c *gin.Context) { c.Status(200) })
 
@@ -33,7 +33,7 @@ func TestRequireOrgAdminAllowsOrgAdmin(t *testing.T) {
 }
 
 func TestRequireOrgAdminAllowsProviderAdmin(t *testing.T) {
-    r := setupPermissionRouter("provider_admin")
+    r := setupPermissionRouter("provider")
     r.Use(middleware.RequireOrgAdmin())
     r.GET("/admin", func(c *gin.Context) { c.Status(200) })
 
@@ -70,7 +70,7 @@ func TestRequireDeptManagerAllowsDeptManager(t *testing.T) {
 }
 
 func TestRequireDeptManagerAllowsOrgAdmin(t *testing.T) {
-    r := setupPermissionRouter("org_admin")
+    r := setupPermissionRouter("tenant_admin")
     r.Use(middleware.RequireDeptManager())
     r.GET("/manage", func(c *gin.Context) { c.Status(200) })
 
@@ -82,7 +82,7 @@ func TestRequireDeptManagerAllowsOrgAdmin(t *testing.T) {
 }
 
 func TestRequireDeptManagerAllowsProviderAdmin(t *testing.T) {
-    r := setupPermissionRouter("provider_admin")
+    r := setupPermissionRouter("provider")
     r.Use(middleware.RequireDeptManager())
     r.GET("/manage", func(c *gin.Context) { c.Status(200) })
 

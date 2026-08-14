@@ -19,7 +19,7 @@ onUnmounted(() => {
 
 function handleLogout() {
   authStore.logout()
-  if (router.currentRoute.value.path !== '/login' && router.currentRoute.value.path !== '/register') {
+  if (router.currentRoute.value.path !== '/login') {
     router.push('/login')
   }
 }

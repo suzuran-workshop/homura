@@ -13,6 +13,7 @@ CREATE TABLE orgs (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    dingtalk_corp_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -124,6 +125,7 @@ CREATE TABLE departments (
     manager_user_id INT REFERENCES users(id) ON DELETE SET NULL,
     description TEXT,
     sort_order INT DEFAULT 0,
+    dingtalk_dept_id BIGINT,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -175,61 +177,26 @@ CREATE TABLE dingtalk_sync_logs (
 -- 索引优化
 -- ============================================
 
+CREATE UNIQUE INDEX idx_orgs_name ON orgs(name);
+CREATE INDEX idx_users_phone ON users(phone);
+CREATE INDEX idx_oauth_tokens_org_id ON oauth_tokens(org_id);
+CREATE INDEX idx_oauth_sessions_user_id ON oauth_sessions(user_id);
 CREATE INDEX idx_org_user_bonds_org_id ON org_user_bonds(org_id);
 CREATE INDEX idx_org_user_bonds_user_id ON org_user_bonds(user_id);
 CREATE INDEX idx_org_user_bonds_dept_id ON org_user_bonds(department_id);
 CREATE INDEX idx_departments_org_id ON departments(org_id);
 CREATE INDEX idx_departments_parent_id ON departments(parent_id);
+CREATE UNIQUE INDEX idx_departments_dingtalk_dept_id
+    ON departments(org_id, dingtalk_dept_id)
+    WHERE dingtalk_dept_id IS NOT NULL;
 CREATE INDEX idx_audit_logs_org_user ON audit_logs(org_id, user_id);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
 CREATE INDEX idx_login_logs_user_id ON login_logs(user_id);
 CREATE INDEX idx_dingtalk_sync_logs_org ON dingtalk_sync_logs(org_id);
 
 -- ============================================
--- 示例数据（开发环境）
+-- 系统首次运行时无账户，由管理员通过 OOBE 模式初始化。
 -- ============================================
-
--- 插入默认组织（服务商）
-INSERT INTO orgs (id, name, description, created_at, updated_at)
-VALUES (1, '演示服务商', '用于演示的服务商组织（超级管理）', NOW(), NOW());
-
--- 插入租户组织
-INSERT INTO orgs (id, name, description, created_at, updated_at)
-VALUES (2, '演示租户', '用于演示的租户组织', NOW(), NOW());
-
--- 插入管理员用户（无密码，需注册 WebAuthn Passkey）
-INSERT INTO users (id, name, email, created_at, updated_at)
-VALUES (1, '服务商管理员', 'admin@example.com', NOW(), NOW());
-
--- 绑定管理员到服务商组织（is_admin = true → provider 角色）
-INSERT INTO org_user_bonds (org_id, user_id, is_admin, created_at, updated_at)
-VALUES (1, 1, true, NOW(), NOW());
-
--- 插入租户管理员
-INSERT INTO users (id, name, email, created_at, updated_at)
-VALUES (2, '租户管理员', 'tenant@example.com', NOW(), NOW());
-
--- 绑定租户管理员到租户组织（is_admin = true → tenant_admin 角色）
-INSERT INTO org_user_bonds (org_id, user_id, is_admin, created_at, updated_at)
-VALUES (2, 2, true, NOW(), NOW());
-
--- 插入普通用户
-INSERT INTO users (id, name, email, created_at, updated_at)
-VALUES (3, '普通用户', 'user@example.com', NOW(), NOW());
-
--- 绑定普通用户到租户组织（is_admin = false → user 角色）
-INSERT INTO org_user_bonds (org_id, user_id, is_admin, created_at, updated_at)
-VALUES (2, 3, false, NOW(), NOW());
-
--- 插入根部门
-INSERT INTO departments (id, org_id, name, level, sort_order, created_at, updated_at)
-VALUES (1, 2, '根部门', 1, 0, NOW(), NOW());
-
--- 同步序列到当前最大 id
-SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
-SELECT setval('orgs_id_seq', (SELECT MAX(id) FROM orgs));
-SELECT setval('org_user_bonds_id_seq', (SELECT MAX(id) FROM org_user_bonds));
-SELECT setval('departments_id_seq', (SELECT MAX(id) FROM departments));
 
 -- ============================================
 -- 应用运行时表（Spec 04）
@@ -272,11 +239,8 @@ CREATE TABLE IF NOT EXISTS application_deployments (
 CREATE INDEX IF NOT EXISTS idx_deployments_app_id ON application_deployments(application_id);
 
 -- ============================================
--- 首次登录说明：
--- 1. 启动后端 + 前端
--- 2. 访问前端注册页，用 email "admin@example.com" 注册 WebAuthn Passkey
---    （后端 /oauth/webauthn/register/begin 会匹配到 user_id=1）
--- 3. 注册成功后，用 WebAuthn 登录 → 自动选择组织 1 → 获得 provider 令牌
+-- 首次部署说明：
+-- 系统首次运行时无任何账户，管理员需通过 OOBE 模式初始化系统。
 -- ============================================
 
 -- ============================================
@@ -314,6 +278,7 @@ CREATE TABLE IF NOT EXISTS workflow_instances (
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_instances_org_id ON workflow_instances(org_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_instances_status ON workflow_instances(status);
+CREATE INDEX IF NOT EXISTS idx_workflow_instances_def_id ON workflow_instances(definition_id);
 
 -- 流程任务表（审批待办）
 CREATE TABLE IF NOT EXISTS workflow_tasks (
@@ -331,3 +296,19 @@ CREATE INDEX IF NOT EXISTS idx_workflow_tasks_org_id ON workflow_tasks(org_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_instance_id ON workflow_tasks(instance_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_assignee_id ON workflow_tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_status ON workflow_tasks(status);
+
+-- ============================================
+-- 数据工具表（Spec 05）
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS data_tables (
+    id SERIAL PRIMARY KEY,
+    app_id VARCHAR(64) NOT NULL,
+    org_id INT NOT NULL,
+    table_name VARCHAR(63) NOT NULL,
+    columns JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(app_id, table_name, org_id)
+);
+CREATE INDEX IF NOT EXISTS idx_data_tables_app_id ON data_tables(app_id);
+CREATE INDEX IF NOT EXISTS idx_data_tables_org_id ON data_tables(org_id);

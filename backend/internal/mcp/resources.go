@@ -652,7 +652,7 @@ Example — a 2-level leave approval with a condition branch:
     },
     {
       "name": "director_approve", "type": "approval",
-      "assignee": { "type": "role", "value": "org_admin" },
+      "assignee": { "type": "role", "value": "tenant_admin" },
       "on_approve": { "goto": "end_approved" },
       "on_reject":  { "goto": "end_rejected" }
     },
@@ -661,7 +661,7 @@ Example — a 2-level leave approval with a condition branch:
   ]
 }
 
-Assignee types: { "type": "user", "value": "<user_id>" } or { "type": "role", "value": "org_admin"|"dept_manager" }.
+Assignee types: { "type": "user", "value": "<user_id>" } or { "type": "role", "value": "tenant_admin"|"dept_manager" }.
 Conditions use simple expressions like "leaveDays > 3" (operators: > < >= <= == !=).
 
 ## Running a workflow

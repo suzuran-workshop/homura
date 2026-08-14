@@ -17,8 +17,9 @@ type User struct {
 	DingtalkUnionID *string `gorm:"column:dingtalk_unionid;index" json:"dingtalkUnionId,omitempty"`
 	DingtalkOpenID  *string `gorm:"column:dingtalk_openid" json:"dingtalkOpenId,omitempty"`
 
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	IsActive      bool      `gorm:"column:is_active;default:true" json:"isActive"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // TableName overrides the table name.

@@ -11,6 +11,7 @@ type Department struct {
 	ManagerUserID     *int      `json:"managerUserId"`
 	Description       string    `json:"description"`
 	DingtalkDeptID    *int64    `gorm:"column:dingtalk_dept_id;uniqueIndex:idx_departments_dingtalk_dept_id" json:"dingtalkDeptId,omitempty"`
+	SortOrder         int       `gorm:"column:sort_order;default:0" json:"sortOrder"`
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
 

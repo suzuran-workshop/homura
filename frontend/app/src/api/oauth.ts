@@ -2,29 +2,6 @@
 // OAuth IdP API client — WebAuthn (Passkey) + DingTalk OAuth + OAuth2 token.
 import apiClient from './client'
 
-// ---- WebAuthn registration ----
-
-export interface BeginRegistrationResponse {
-  sessionId: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  options: any
-  userId: number
-}
-
-export async function beginRegistration(userId: number, name: string) {
-  return apiClient.post<BeginRegistrationResponse>('/oauth/webauthn/register/begin', {
-    userId,
-    name,
-  })
-}
-
-export async function finishRegistration(sessionId: string, response: unknown) {
-  return apiClient.post<{ userId: number }>('/oauth/webauthn/register/finish', {
-    sessionId,
-    response,
-  })
-}
-
 // ---- WebAuthn login ----
 
 export interface BeginLoginResponse {

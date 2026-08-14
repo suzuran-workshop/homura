@@ -3,6 +3,7 @@ import { bootstrapAuthedSession } from './helpers/webauthn'
 
 // OAuth-only 平台：密码登录已移除。用 WebAuthn 虚拟认证器以 provider
 // 身份登录，验证服务商能访问组织管理设置页面（不被 403）。
+// 注意：系统无种子数据，组织列表可能为空（仅含 OOBE 创建的服务商组织）。
 test('服务商访问组织管理设置页面（WebAuthn 全真登录）', async ({ page }) => {
   page.on('console', msg => console.log(`[Browser] ${msg.text()}`))
   page.on('response', response => {
@@ -17,13 +18,13 @@ test('服务商访问组织管理设置页面（WebAuthn 全真登录）', async
   await page.goto('/provider/orgs')
   await page.waitForTimeout(2000)
 
-  // 查看组织列表（seed 数据含演示服务商、演示租户）
+  // 查看组织列表（至少包含服务商自身组织）
   const orgRows = page.locator('tbody tr')
   const orgCount = await orgRows.count()
   console.log(`[Test] 找到 ${orgCount} 个组织`)
   expect(orgCount).toBeGreaterThan(0)
 
-  // 直接导航到组织详情页面（超级管理员 org_id=1）
+  // 导航到当前服务商组织详情页（org_id=1，OOBE 自动创建）
   await page.goto('/provider/orgs/1')
   await page.waitForTimeout(2000)
 

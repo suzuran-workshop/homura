@@ -1,6 +1,7 @@
 // frontend/app/src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { checkOOBEStatus } from '../api/oobe'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -8,18 +9,35 @@ const router = createRouter({
     {
       path: '/',
       name: 'Home',
-      component: () => import('../views/Home.vue'),
+      beforeEnter: (_to, _from, next) => {
+        const authStore = useAuthStore()
+        if (!authStore.isAuthenticated) {
+          next('/login')
+          return
+        }
+        switch (authStore.userRole) {
+          case 'provider':
+            next('/user/apps')
+            break
+          case 'tenant_admin':
+            next('/user/apps')
+            break
+          default:
+            next('/user/apps')
+        }
+      },
+      component: () => import('../views/Home.vue'), // fallback, never reached
+    },
+    {
+      path: '/oobe',
+      name: 'OOBE',
+      component: () => import('../views/OOBE.vue'),
+      meta: { allowDuringOOBE: true },
     },
     {
       path: '/login',
       name: 'Login',
       component: () => import('../views/Login.vue'),
-      meta: { requiresGuest: true },
-    },
-    {
-      path: '/register',
-      name: 'Register',
-      component: () => import('../views/Register.vue'),
       meta: { requiresGuest: true },
     },
     {
@@ -101,17 +119,13 @@ const router = createRouter({
         },
       ],
     },
-    // User routes (用户端)
+    // User routes (用户端) — accessible to ALL authenticated users
     {
       path: '/user',
       component: () => import('../layouts/UserLayout.vue'),
-      meta: { requiresAuth: true, role: 'user' },
+      meta: { requiresAuth: true },
+      redirect: '/user/apps',
       children: [
-        {
-          path: '',
-          name: 'UserDashboard',
-          component: () => import('../views/user/Dashboard.vue'),
-        },
         {
           path: 'apps',
           name: 'UserApps',
@@ -135,8 +149,43 @@ const router = createRouter({
 })
 
 // Navigation guard for authentication and role-based access
+let oobeChecked = false
+let needOOBE = false
+
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // Check OOBE status once at app startup
+  if (!oobeChecked) {
+    try {
+      const resp = await checkOOBEStatus()
+      needOOBE = resp.data.needOOBE
+      oobeChecked = true
+    } catch (error) {
+      console.error('Failed to check OOBE status:', error)
+      // If check fails, assume system is initialized to avoid blocking
+      needOOBE = false
+      oobeChecked = true
+    }
+  }
+
+  // If system needs OOBE and not already on /oobe, redirect
+  if (needOOBE && to.path !== '/oobe') {
+    next('/oobe')
+    return
+  }
+
+  // If system is initialized and on /oobe, redirect to login
+  if (!needOOBE && to.path === '/oobe') {
+    next('/login')
+    return
+  }
+
+  // Allow OOBE page to proceed
+  if (to.meta.allowDuringOOBE) {
+    next()
+    return
+  }
 
   // Check if route requires guest (login page)
   if (to.meta.requiresGuest) {

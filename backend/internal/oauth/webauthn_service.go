@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -145,7 +146,7 @@ func (s *WebAuthnService) FinishRegistration(ctx context.Context, sessionID stri
 		CredentialID:    created.ID,
 		PublicKey:       created.PublicKey,
 		AttestationType: created.AttestationType,
-		AAGUID:          string(created.Authenticator.AAGUID),
+		AAGUID:          hex.EncodeToString(created.Authenticator.AAGUID),
 		SignCount:       created.Authenticator.SignCount,
 		Transports:      transportsJSON,
 		UserIDBytes:     sessionData.UserID,

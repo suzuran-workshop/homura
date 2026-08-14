@@ -386,7 +386,7 @@ func (t *WorkflowTools) handleCancel(ctx context.Context, request mcp.CallToolRe
 	}
 	userID, _ := mcpserver.GetUserIDFromContext(ctx)
 	role, _ := mcpserver.GetRoleFromContext(ctx)
-	isAdmin := role == "org_admin" || role == "provider_admin"
+	isAdmin := role == "tenant_admin" || role == "provider"
 
 	if err := t.wfService.CancelInstance(ctx, orgID, instID, userID, isAdmin); err != nil {
 		return mcpserver.CreateErrorResponse(fmt.Sprintf("failed to cancel instance: %v", err)), nil

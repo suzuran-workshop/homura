@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strconv"
 
@@ -50,7 +51,7 @@ func (u *WebAuthnUser) WebAuthnCredentials() []webauthn.Credential {
 			PublicKey:       c.PublicKey,
 			AttestationType: c.AttestationType,
 			Authenticator: webauthn.Authenticator{
-				AAGUID:    []byte(c.AAGUID),
+				AAGUID:    decodeAAGUID(c.AAGUID),
 				SignCount: c.SignCount,
 			},
 			Transport: transports,
@@ -66,4 +67,14 @@ func userIDFromHandle(handle []byte) (int, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// decodeAAGUID converts hex-encoded AAGUID string back to bytes.
+// If the string is not valid hex (e.g., already raw bytes), returns it as-is.
+func decodeAAGUID(aaguid string) []byte {
+	if decoded, err := hex.DecodeString(aaguid); err == nil && len(decoded) == 16 {
+		return decoded
+	}
+	// Fallback: treat as raw bytes (for backward compatibility)
+	return []byte(aaguid)
 }

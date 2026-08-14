@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,7 +31,53 @@ import (
 	"github.com/xrl/suzuran-cloud/internal/storage"
 )
 
+// loadEnvFile reads .env file and sets environment variables.
+// This must be called before any service initialization.
+func loadEnvFile() {
+	envFile := ".env"
+
+	// Try to find .env relative to executable
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		envFile = filepath.Join(exeDir, ".env")
+	}
+
+	file, err := os.Open(envFile)
+	if err != nil {
+		log.Printf("Warning: Could not open .env file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Remove quotes if present
+			value = strings.Trim(value, `"'`)
+			os.Setenv(key, value)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Printf("Warning: Error reading .env file: %v", err)
+	} else {
+		log.Println("Loaded environment from .env file")
+	}
+}
+
 func main() {
+	// Load environment variables from .env file (must be first)
+	loadEnvFile()
+
 	// Initialize database
 	db, err := initDatabase()
 	if err != nil {
@@ -184,6 +233,11 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// OOBE endpoints (Out-of-Box Experience — system initialization)
+	oobeHandler := handler.NewOOBEHandler(db)
+	r.GET("/oobe/status", oobeHandler.Status)
+	r.POST("/oobe/setup", oobeHandler.Setup)
+
 	// OAuth IdP routes (public — login/registration ceremonies + OAuth2 endpoints)
 	oauthGroup := r.Group("/oauth")
 	{
@@ -285,6 +339,7 @@ func main() {
 				{
 					appGroup.POST("", appHandler.Create)
 					appGroup.GET("", appHandler.List)
+					appGroup.POST("/seed", appHandler.SeedApps)
 					appGroup.GET("/:appId", appHandler.GetByID)
 					appGroup.PUT("/:appId", appHandler.Update)
 					appGroup.DELETE("/:appId", appHandler.Delete)

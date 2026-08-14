@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 // OAuth-only platform: password login is gone. This test verifies the login
-// page renders the WebAuthn (Passkey) and DingTalk entry points. A real
-// WebAuthn ceremony requires a virtual authenticator setup; that's covered
-// by backend unit tests for the ceremony itself.
+// page renders the WebAuthn (Passkey) and DingTalk entry points.
+// Self-registration is disabled — users must be created by an admin via OOBE.
 test('登录页渲染 OAuth 入口（WebAuthn + 钉钉）', async ({ page }) => {
   page.on('console', (msg) => console.log(`[Browser] ${msg.text()}`));
 
@@ -18,16 +17,8 @@ test('登录页渲染 OAuth 入口（WebAuthn + 钉钉）', async ({ page }) => 
   // 钉钉登录按钮
   await expect(page.getByRole('button', { name: '钉钉登录' })).toBeVisible();
 
-  // 注册入口
-  await expect(page.getByRole('link', { name: '注册 Passkey' })).toBeVisible();
+  // 注册入口已移除（自主注册不对普通用户开放）
+  await expect(page.getByRole('link', { name: '注册 Passkey' })).not.toBeVisible();
 
   console.log('✅ 登录页 OAuth 入口渲染正常喵！');
-});
-
-test('注册页可从登录页到达', async ({ page }) => {
-  await page.goto('http://localhost:5173/login');
-  await page.getByRole('link', { name: '注册 Passkey' }).click();
-  await page.waitForSelector('input[placeholder="输入用户名"]', { timeout: 5000 });
-  await expect(page.getByRole('button', { name: /创建 Passkey/ })).toBeVisible();
-  console.log('✅ 注册页可达喵！');
 });

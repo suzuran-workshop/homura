@@ -47,13 +47,6 @@
                   钉钉登录
                 </v-btn>
 
-                <!-- 注册入口 -->
-                <div class="text-center mt-6">
-                  <span class="text-body-2 text-grey-darken-1">还没有账号？</span>
-                  <v-btn variant="text" color="primary" to="/register">
-                    注册 Passkey
-                  </v-btn>
-                </div>
               </v-card-text>
             </v-card>
           </v-col>

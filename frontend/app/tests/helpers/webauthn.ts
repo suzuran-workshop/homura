@@ -1,4 +1,4 @@
-import type { Page, BrowserContext } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 /**
  * WebAuthn test helpers.
@@ -95,21 +95,81 @@ export async function settleAuth() {
 }
 
 /**
- * Register a passkey via the Register page UI. Returns after the registration
- * flow completes (assumes a virtual authenticator is already enabled).
+ * Register a passkey via backend API directly (no UI — register page is removed).
+ * The virtual authenticator must already be enabled on the page's context.
+ *
+ * When userId is 0, the backend creates a new user with the given name/email.
+ * When userId > 0, the backend adds a credential to an existing user.
+ *
+ * Returns the user ID assigned by the backend.
  */
-export async function registerPasskeyViaUI(
+export async function registerPasskeyViaAPI(
   page: import('playwright').Page,
   name: string,
   email: string,
-) {
-  await page.goto('/register')
-  await page.waitForSelector('input[placeholder="输入用户名"]', { timeout: 5000 })
-  await page.getByPlaceholder('输入用户名').fill(name)
-  await page.getByPlaceholder('输入邮箱').fill(email)
-  await page.getByRole('button', { name: /创建 Passkey/ }).click()
-  // Wait for the success alert before the auto-redirect to /login.
-  await page.waitForSelector('.v-alert--type-success', { timeout: 10000 })
+  userId = 0,
+): Promise<number> {
+  // Call register begin
+  const beginResp = await page.evaluate(async (args) => {
+    const res = await fetch('http://localhost:8888/oauth/webauthn/register/begin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: args.userId, name: args.name, email: args.email }),
+    })
+    return await res.json()
+  }, { userId, name, email })
+
+  // Decode the public key creation options from the response
+  const rawOptions = beginResp.options.publicKey || beginResp.options
+  const challengeBuffer = base64UrlToBuffer(rawOptions.challenge)
+  const options: PublicKeyCredentialCreationOptions = {
+    challenge: challengeBuffer,
+    rp: rawOptions.rp,
+    user: {
+      ...rawOptions.user,
+      id: base64UrlToBuffer(rawOptions.user.id),
+    },
+    pubKeyCredParams: rawOptions.pubKeyCredParams,
+    timeout: rawOptions.timeout,
+    attestation: rawOptions.attestation,
+    authenticatorSelection: rawOptions.authenticatorSelection,
+    excludeCredentials: rawOptions.excludeCredentials?.map((c: { id: string }) => ({
+      ...c,
+      id: base64UrlToBuffer(c.id),
+    })),
+    extensions: rawOptions.extensions,
+  }
+
+  // Create credential via virtual authenticator
+  const credential = await page.evaluate(async (opts) => {
+    return await navigator.credentials.create({ publicKey: opts }) as PublicKeyCredential
+  }, options as unknown as PublicKeyCredentialCreationOptions)
+
+  if (!credential) throw new Error('Passkey creation cancelled')
+
+  // Serialize and send finish
+  const response = credential.response as AuthenticatorAttestationResponse
+  const serialized = {
+    id: credential.id,
+    rawId: arrayBufferToBase64Url(credential.rawId),
+    type: credential.type,
+    response: {
+      attestationObject: arrayBufferToBase64Url(response.attestationObject),
+      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
+    },
+    clientExtensionResults: {},
+  }
+
+  const finishResp = await page.evaluate(async (args) => {
+    const res = await fetch('http://localhost:8888/oauth/webauthn/register/finish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: args.sessionId, response: args.serialized }),
+    })
+    return await res.json()
+  }, { sessionId: beginResp.sessionId, serialized })
+
+  return finishResp.userId as number
 }
 
 /**
@@ -133,18 +193,17 @@ export async function loginWithPasskeyViaUI(
 }
 
 /**
-/**
- * Full bootstrap: enable virtual authenticator, register a passkey for the
- * seeded provider user (admin@example.com, user_id=1, bound to org 1 with
- * is_admin=true → provider role), and log in.
+ * Full bootstrap: enable virtual authenticator, register a passkey for a user
+ * via the backend API (no UI), and log in.
  *
- * The seeded user must exist (run docs/sql/seed_demo_data.sql). Each test
- * run adds a fresh passkey to user_id=1; tests are serial (workers=1) so
- * there is no concurrent-credential race.
+ * Since seed data has been removed, this function creates a fresh user on first
+ * run by calling the backend register API (userId=0 creates a new user).
+ * Subsequent runs within the same test suite will reuse the user if it already
+ * exists (backend matches by email).
  *
  * Returns the authenticator handle so the test can remove it in afterEach.
  *
- * @param role 'provider' (default, seeded) | 'tenant' | 'user'
+ * @param role 'provider' (default) | 'tenant' | 'user'
  */
 export async function bootstrapAuthedSession(
   page: import('playwright').Page,
@@ -152,8 +211,8 @@ export async function bootstrapAuthedSession(
 ): Promise<VirtualAuthenticator> {
   const auth = await enableVirtualAuthenticator(page)
   const target = SEED_USERS[role]
-  // Register a passkey for the seeded user (matched by email).
-  await registerPasskeyViaUI(page, target.name, target.email)
+  // Register a passkey via backend API (no UI — register page is removed).
+  await registerPasskeyViaAPI(page, target.name, target.email)
   // Log in — Login.vue auto-selects the first available org and exchanges
   // for tokens, then routes by role.
   await loginWithPasskeyViaUI(page, target.email)
@@ -165,3 +224,23 @@ const SEED_USERS = {
   tenant: { name: '租户管理员', email: 'tenant@example.com' },
   user: { name: '普通用户', email: 'user@example.com' },
 } as const
+
+// ---- base64url encoding helpers for WebAuthn credential serialization ----
+
+function arrayBufferToBase64Url(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  const base64 = btoa(bin)
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64UrlToBuffer(base64url: string): Uint8Array {
+  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = base64.length % 4
+  const padded = pad ? base64 + '='.repeat(4 - pad) : base64
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}

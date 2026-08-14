@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { bootstrapAuthedSession } from './helpers/webauthn'
 
+// OAuth-only 平台：密码登录已移除。本测试用 WebAuthn 虚拟认证器以
+// provider 身份登录（通过 OOBE 自动创建的首个服务商管理员），验证组织管理 CRUD。
+// 注意：系统首次运行时无种子数据，首个用户由 OOBE 流程创建。
 test('组织管理 CRUD 测试（WebAuthn 全真登录）', async ({ page }) => {
   page.on('console', msg => console.log(`[Browser] ${msg.text()}`))
   // 自动接受删除确认框（window.confirm）
@@ -25,8 +28,9 @@ test('组织管理 CRUD 测试（WebAuthn 全真登录）', async ({ page }) => 
   await expect(navOrgs).toHaveClass(/v-list-item--active/)
   await expect(navDashboard).not.toHaveClass(/v-list-item--active/)
 
-  // 3. 当前所属组织（演示服务商）的删除按钮应禁用，且有「当前」标识
-  const currentRow = page.locator('tr').filter({ hasText: '演示服务商' })
+  // 3. 当前所属组织的删除按钮应禁用，且有「当前」标识
+  // （首个服务商组织由 OOBE 自动创建，名称由管理员在 OOBE 时指定）
+  const currentRow = page.locator('tr').filter({ hasText: '当前' })
   await expect(currentRow).toBeVisible()
   await expect(currentRow.locator('.v-chip', { hasText: '当前' })).toBeVisible()
   await expect(currentRow.getByRole('button', { name: '删除' })).toBeDisabled()
