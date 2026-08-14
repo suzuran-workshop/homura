@@ -18,6 +18,7 @@ func RegisterAllTools(
 	rateLimiter *mcpserver.RateLimiter,
 	auditService *service.AuditService,
 	workflowService *service.WorkflowService,
+	dataService *service.DataService,
 ) {
 	// Register organization tools
 	orgTools := NewOrgTools(orgService, rateLimiter, auditService)
@@ -45,5 +46,11 @@ func RegisterAllTools(
 	if workflowService != nil {
 		workflowTools := NewWorkflowTools(workflowService, rateLimiter, auditService)
 		workflowTools.RegisterTools(server)
+	}
+
+	// Register data tools (only if the data service is configured)
+	if dataService != nil {
+		dataTools := NewDataTools(dataService, rateLimiter, auditService)
+		dataTools.RegisterTools(server)
 	}
 }

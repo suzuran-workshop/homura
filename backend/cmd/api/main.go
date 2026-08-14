@@ -107,6 +107,10 @@ func main() {
 	var notificationSvc *service.NotificationService // in-app channel not yet wired; notifications are no-op until configured
 	workflowSvc := service.NewWorkflowService(wfDefRepo, wfInstRepo, wfTaskRepo, bondRepo, notificationSvc)
 
+	// Initialize data service for app-owned tables
+	dataRepo := repository.NewDataRepository(db)
+	dataSvc := service.NewDataService(dataRepo)
+
 	// Initialize DingTalk sync service (only when configured)
 	var syncHandler *provider.DingTalkSyncHandler
 	if dtCfg := dingtalk.NewConfig(); dtCfg.AppKey != "" {
@@ -139,6 +143,7 @@ func main() {
 		mcpRateLimiter,
 		auditSvc,
 		workflowSvc,
+		dataSvc,
 	)
 	mcpServer.RegisterPrompts()
 
@@ -385,6 +390,7 @@ func initDatabase() (*gorm.DB, error) {
 			&model.WorkflowDefinition{},
 			&model.WorkflowInstance{},
 			&model.WorkflowTask{},
+			&model.DataTable{},
 		); err != nil {
 			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 		}

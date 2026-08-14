@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DataTable",
+  "description": "应用数据表元数据",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "表元数据 ID"
+    },
+    "app_id": {
+      "type": "string",
+      "description": "应用 ID"
+    },
+    "org_id": {
+      "type": "integer",
+      "description": "组织 ID"
+    },
+    "table_name": {
+      "type": "string",
+      "description": "逻辑表名（不含应用前缀）"
+    },
+    "columns": {
+      "type": "array",
+      "description": "列定义数组",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "列名"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["text", "integer", "boolean", "timestamp", "jsonb", "numeric", "date"],
+            "description": "列类型"
+          },
+          "nullable": {
+            "type": "boolean",
+            "description": "是否允许 NULL"
+          },
+          "primaryKey": {
+            "type": "boolean",
+            "description": "是否为主键"
+          },
+          "defaultValue": {
+            "description": "默认值"
+          }
+        },
+        "required": ["name", "type"]
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间"
+    }
+  },
+  "required": ["id", "app_id", "org_id", "table_name", "columns"]
+}

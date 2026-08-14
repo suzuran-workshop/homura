@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Suzuran Cloud MCP Tools",
   "description": "平台通过 MCP Server 暴露的所有数据访问工具。应用通过 POST /mcp 调用，每次调用需携带 OAuth access token。",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "transport": {
     "endpoint": "POST /mcp",
     "protocol": "JSON-RPC 2.0",
@@ -31,7 +31,9 @@
     "org.read", "org.write",
     "file.read", "file.write",
     "audit.read", "audit.write",
-    "workflow.read", "workflow.write"
+    "workflow.read", "workflow.write",
+    "data.read", "data.write",
+    "data.read", "data.write"
   ],
   "tools": [
     {
@@ -481,6 +483,202 @@
           "comment": { "type": "string", "description": "拒绝意见（可选）" }
         },
         "required": ["orgId", "taskId"]
+      }
+    },
+    {
+      "name": "data.create_table",
+      "description": "为应用创建业务数据表。表名自动添加应用 ID 前缀实现隔离，自动添加 id/org_id/created_at/updated_at 列",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名（小写字母、数字、下划线，最长 63 字符）" },
+          "columns": {
+            "type": "array",
+            "description": "列定义数组",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "description": "列名" },
+                "type": { "type": "string", "enum": ["text", "integer", "boolean", "timestamp", "jsonb", "numeric", "date"], "description": "列类型" },
+                "nullable": { "type": "boolean", "description": "是否允许 NULL（默认 true）" },
+                "primaryKey": { "type": "boolean", "description": "是否为主键" },
+                "defaultValue": { "description": "默认值" }
+              },
+              "required": ["name", "type"]
+            }
+          }
+        },
+        "required": ["orgId", "tableName", "columns"]
+      }
+    },
+    {
+      "name": "data.drop_table",
+      "description": "删除应用拥有的业务数据表",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" }
+        },
+        "required": ["orgId", "tableName"]
+      }
+    },
+    {
+      "name": "data.list_tables",
+      "description": "列出应用拥有的所有业务数据表",
+      "required_scope": "data.read",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" }
+        },
+        "required": ["orgId"]
+      }
+    },
+    {
+      "name": "data.describe_table",
+      "description": "获取表的列定义信息",
+      "required_scope": "data.read",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" }
+        },
+        "required": ["orgId", "tableName"]
+      }
+    },
+    {
+      "name": "data.insert",
+      "description": "向表中插入一行数据",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "data": { "type": "object", "description": "要插入的数据（键值对）" }
+        },
+        "required": ["orgId", "tableName", "data"]
+      }
+    },
+    {
+      "name": "data.batch_insert",
+      "description": "批量插入多行数据",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "rows": {
+            "type": "array",
+            "description": "数据行数组",
+            "items": { "type": "object" }
+          }
+        },
+        "required": ["orgId", "tableName", "rows"]
+      }
+    },
+    {
+      "name": "data.query",
+      "description": "查询表中的数据，支持过滤、排序、分页",
+      "required_scope": "data.read",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "where": { "type": "object", "description": "过滤条件（键值对，所有条件用 AND 组合）" },
+          "orderBy": { "type": "string", "description": "排序列名" },
+          "limit": { "type": "integer", "description": "最大返回行数（默认 100）" },
+          "offset": { "type": "integer", "description": "跳过行数（默认 0）" }
+        },
+        "required": ["orgId", "tableName"]
+      }
+    },
+    {
+      "name": "data.update",
+      "description": "更新表中符合条件的的行",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "where": { "type": "object", "description": "过滤条件" },
+          "data": { "type": "object", "description": "要更新的数据" }
+        },
+        "required": ["orgId", "tableName", "where", "data"]
+      }
+    },
+    {
+      "name": "data.delete",
+      "description": "删除表中符合条件的行",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "where": { "type": "object", "description": "过滤条件" }
+        },
+        "required": ["orgId", "tableName", "where"]
+      }
+    },
+    {
+      "name": "data.count",
+      "description": "统计符合条件的行数",
+      "required_scope": "data.read",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "where": { "type": "object", "description": "过滤条件" }
+        },
+        "required": ["orgId", "tableName"]
+      }
+    },
+    {
+      "name": "data.add_column",
+      "description": "向现有表添加新列",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "tableName": { "type": "string", "description": "表名" },
+          "column": {
+            "type": "object",
+            "description": "列定义",
+            "properties": {
+              "name": { "type": "string", "description": "列名" },
+              "type": { "type": "string", "description": "列类型" },
+              "nullable": { "type": "boolean", "description": "是否允许 NULL" },
+              "defaultValue": { "description": "默认值" }
+            },
+            "required": ["name", "type"]
+          }
+        },
+        "required": ["orgId", "tableName", "column"]
+      }
+    },
+    {
+      "name": "data.exec_raw",
+      "description": "执行参数化的原始 SQL 查询（仅限应用自己的表）",
+      "required_scope": "data.write",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "integer", "description": "组织 ID" },
+          "sql": { "type": "string", "description": "SQL 语句，使用 $1, $2 等占位符" },
+          "params": { "type": "array", "description": "占位符参数值数组", "items": {} }
+        },
+        "required": ["orgId", "sql"]
       }
     }
   ]
