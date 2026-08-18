@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -229,4 +230,47 @@ func (s *ApplicationService) GetAppLogs(ctx context.Context, id string, tail int
 // GetDeployments returns deployment history for an application.
 func (s *ApplicationService) GetDeployments(ctx context.Context, id string) ([]*model.ApplicationDeployment, error) {
 	return s.deployRepo.ListByApplicationID(ctx, id)
+}
+
+// UpdateCode replaces the code package of an existing application.
+// The zip must contain an app.json manifest at its root; the manifest's
+// version (if present) is synced onto the application record.
+func (s *ApplicationService) UpdateCode(ctx context.Context, id string, zipData []byte) (*model.Application, error) {
+	app, err := s.appRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get application: %w", err)
+	}
+	if app == nil {
+		return nil, errors.New("application not found")
+	}
+	if len(zipData) == 0 {
+		return nil, errors.New("empty package")
+	}
+	if len(zipData) > MaxZipSize {
+		return nil, fmt.Errorf("package too large: %d bytes (max %d)", len(zipData), MaxZipSize)
+	}
+	if app.SourceKey == "" {
+		return nil, errors.New("application has no code package; import it first")
+	}
+	if s.storage == nil {
+		return nil, errors.New("object storage unavailable")
+	}
+
+	manifest, err := parseAppZip(zipData)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := bytes.NewReader(zipData)
+	if _, err := s.storage.UploadFileRaw(ctx, app.SourceKey, reader, "application/zip", int64(len(zipData))); err != nil {
+		return nil, fmt.Errorf("failed to store app package: %w", err)
+	}
+
+	if manifest.Version != "" && manifest.Version != app.Version {
+		app.Version = manifest.Version
+		if err := s.appRepo.Update(ctx, app); err != nil {
+			return nil, fmt.Errorf("failed to update application: %w", err)
+		}
+	}
+	return app, nil
 }

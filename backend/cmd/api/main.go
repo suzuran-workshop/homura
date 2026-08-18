@@ -194,6 +194,7 @@ func main() {
 		workflowSvc,
 		dataSvc,
 		appService,
+		distService,
 	)
 	mcpServer.RegisterPrompts()
 

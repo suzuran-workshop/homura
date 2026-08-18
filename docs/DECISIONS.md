@@ -326,3 +326,31 @@ Agent å¼€å‘åº”ç”¨éœ€è¦ä¸€ä¸ª SDK æ¥æ¥å…¥å¹³å°ã€‚SDK çš„æŠ€æœ¯é€‰å‹æœ‰ä¸‰ç§
 **±£Áô SeedApps + APPS_DIR**£ºÆ½Ì¨ÒÀÀµËŞÖ÷»úÂ·¾¶£¬¶àÊµÀı/ÈİÆ÷»¯²¿Êğ²»¿ÉĞĞ¡£·ÅÆú¡£
 
 **ImageBuild ´ò°ü¾µÏñ**£º²¿ÊğÊ±¹¹½¨¾µÏñ¸ü³¹µ×£¬µ«ÒıÈë¹¹½¨¶ÓÁĞ/×¢²á±í¸´ÔÓ¶È£»¹ÒÔØ + »ù´¡¾µÏñÒÑÂú×ãÉ³ÏäÔËĞĞĞèÇó£¬Ôİ»º¡£
+
+## 2026-08-18: open-suzuran ¡ª Agent Ö±Á¬Æ½Ì¨£¨MCP Ó¦ÓÃ¹¤¾ß¼¯£©
+
+### ±³¾°
+
+Æ½Ì¨ÊÇ AI Ô­ÉúµÄ¶à×â»§ SaaS£ºAgent ÊÇÓ¦ÓÃµÄÖ÷ÒªÉú²úÕß¡£Àà±ÈÒË´îµÄ openyida ¹¤¾ßÁ´£¬·şÎñÉÌ Agent ĞèÒªÒ»¸öÖ±´ïÍ¨µÀÀ´·¢²¼¡¢ĞŞ¸Ä¡¢¹ÜÀíÓ¦ÓÃÓë×éÖ¯£¬¶ø²»ÊÇÖ»Í¨¹ıÇ°¶ËÃÅ»§¡£
+
+### ¾ö²ß
+
+1. **MCP ¼´·şÎñÉÌÍ¨µÀ**£ºAgent Í¨¹ı MCP server£¨/mcp£¬Bearer token£©Ö±½Ó²Ù×÷Æ½Ì¨¡£¹¤¾ß°´Óò×éÖ¯£ºorg/user/dept£¨×éÖ¯¹ÜÀí£©¡¢data.*£¨Êı¾İ£©¡¢workflow.*£¨Á÷³Ì£©¡¢file.*£¨ÎÄ¼ş£©¡¢audit.*£¨Éó¼Æ£©¡¢app.*£¨Ó¦ÓÃ£©¡£
+2. **Ó¦ÓÃ¹¤¾ß²¹Æë**£¨Ô­Ö»ÓĞ app.import£©£ºapp.list/get/update/delete/update_code£¨·¢²¼ÓëĞŞ¸Ä£©+ app.deploy/start/stop/restart/status/logs/deployments£¨ÉúÃüÖÜÆÚ£©+ app.distribute/undistribute/list_distributions/set_admin/remove_admin£¨·Ö·¢Óë¹ÜÀí£©¡£
+3. **È¨ÏŞÄ£ĞÍ**£º
+   - ¶ÁÀà¹¤¾ß£¨list/get/status/logs/deployments£©scope org.read£¬handler ÄÚĞ£Ñéµ÷ÓÃÕß¶Ô app µÄ org ¹éÊô£¨requireAppOrg£©£»
+   - Ğ´Àà¹¤¾ß scope org.write£»
+   - ¿ç×éÖ¯²Ù×÷£¨distribute/set_admin µÈ£©¶îÍâ RequireRole(provider)¡ª¡ª²ÎÊıÃüÃû targetOrgId ÒÔ±Ü¿ª WrapToolHandler µÄ orgId Ğ£Ñé£¨¸ÃĞ£ÑéÖ»ÔÊĞí²Ù×÷×Ô¼ºµÄ org£©¡£
+4. **²¿Êğ×¢Èëµ÷ÓÃÕß token**£ºMCP ÈÏÖ¤ÉÏÏÂÎÄĞÂÔöÔ­Ê¼ Bearer token£¨GetTokenFromContext£©£¬app.deploy ½«Æä×¢ÈëÈİÆ÷ OAUTH_TOKEN£¬Ó¦ÓÃ¼´¿É»Øµ÷ MCP ÈÏÖ¤¡£
+5. **app.update_code**£ºzip ¸²¸Ç MinIO object£¨Í¬ sourceKey£©£¬manifest version Í¬²½µ½Ó¦ÓÃ¼ÇÂ¼£»²¿ÊğºóÉúĞ§¡£
+
+### Ô­Òò
+
+1. ·şÎñÉÌÈÕ³£ÔËÓª£¨ÉÏ¼Ü¡¢¸Ä°æ¡¢·Ö·¢¡¢ÅÅÕÏ£©Ó¦¿ÉÓÉ Agent Ò»¾ä»°Íê³É£¬²»ÒÀÀµÃÅ»§µã»÷¡£
+2. ·Ö·¢/Éè¹ÜÀíÔ±ÌìÈ»¿ç org£¨provider ¹ÜÀí×â»§£©£¬²»ÄÜÌ×ÓÃ"Ö»ÄÜ²Ù×÷×Ô¼ºµÄ org"µÄÍ¨ÓÃĞ£Ñé¡£
+
+### ºó¹û
+
+- MCP ¹¤¾ß×ÜÊı 47 ¡ú 64£¨App Tools 1 ¡ú 18£©
+- ÉÏÏÂÎÄĞÂÔö token£»WrapToolHandler ĞĞÎª²»±ä
+- ºóĞø£ºAgent ²à skill °ü£¨open-suzuran£©°ü×°¹¤¾ßÁ´Îª¹¤×÷Á÷£¨ÈçÒË´î openyida ĞÎÌ¬£©

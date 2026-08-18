@@ -435,13 +435,15 @@ The platform injects these environment variables into your container:
 - MCP_ENDPOINT: URL of the MCP server (http://backend:8888/mcp)
 - OAUTH_TOKEN: OAuth token for MCP authentication
 
-## Available MCP Tools (24 total)
+## Available MCP Tools (64 total)
 
 Organization: org.get, org.list, org.create, org.update, org.delete
 Users: user.list_members, user.create_member, user.update_member, user.remove_member
 Departments: dept.list, dept.get, dept.tree, dept.create, dept.update, dept.delete, dept.set_manager
 Files: file.upload, file.download, file.delete, file.list, file.presigned_url
-Apps: app.import
+Apps: app.import, app.list, app.get, app.update, app.delete, app.update_code, app.deploy, app.start, app.stop, app.restart, app.status, app.logs, app.deployments, app.distribute, app.undistribute, app.list_distributions, app.set_admin, app.remove_admin
+Data: data.create_table, data.drop_table, data.list_tables, data.describe_table, data.query, data.insert, data.batch_insert, data.update, data.delete, data.count, data.add_column, data.exec_raw
+Workflow: workflow.define, workflow.get_definition, workflow.list_definitions, workflow.archive, workflow.start, workflow.get_instance, workflow.list_instances, workflow.cancel, workflow.list_tasks, workflow.approve, workflow.reject
 Audit: audit.query, audit.log`,
 					},
 				},
@@ -452,18 +454,18 @@ Audit: audit.query, audit.log`,
 	// Prompt: MCP tools catalog
 	catalogPrompt := mcp.NewPrompt(
 		"mcp-tools-catalog",
-		mcp.WithPromptDescription("Complete catalog of all 24 MCP tools organized by category"),
+		mcp.WithPromptDescription("Complete catalog of all 64 MCP tools organized by category"),
 	)
 
 	s.server.AddPrompt(catalogPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{
-			Description: "Complete catalog of all 24 MCP tools organized by category",
+			Description: "Complete catalog of all 64 MCP tools organized by category",
 			Messages: []mcp.PromptMessage{
 				{
 					Role: mcp.RoleAssistant,
 					Content: mcp.TextContent{
 						Type: "text",
-						Text: `# MCP Tools Catalog (24 tools)
+						Text: `# MCP Tools Catalog (64 tools)
 
 ## Organization Tools (5) — scope: org.read / org.write
 - org.get — Get organization details by ID [org.read]
@@ -510,9 +512,43 @@ Audit: audit.query, audit.log`,
 - file.presigned_url — Generate presigned access URL [file.read]
   Required: objectKey
 
-## App Tools (1) — scope: org.write
-- app.import — Import an application from a base64 zip (must contain app.json)
+## App Tools (18) — scope: org.read / org.write
+- app.import — Import an application from a base64 zip (must contain app.json) [org.write]
   Required: orgId, zipBase64
+- app.list — List applications owned by an organization [org.read]
+  Required: orgId
+- app.get — Get application details by ID [org.read]
+  Required: appId
+- app.update — Update application metadata (only provided fields) [org.write]
+  Required: appId
+- app.delete — Delete an application and its container [org.write]
+  Required: appId
+- app.update_code — Replace the code package of an existing application [org.write]
+  Required: appId, zipBase64
+- app.deploy — Deploy an application into a sandbox container [org.write]
+  Required: appId
+- app.start — Start a stopped application container [org.write]
+  Required: appId
+- app.stop — Stop a running application container [org.write]
+  Required: appId
+- app.restart — Restart an application container [org.write]
+  Required: appId
+- app.status — Get runtime status of an application container [org.read]
+  Required: appId
+- app.logs — Get recent container logs [org.read]
+  Required: appId; Optional: tail
+- app.deployments — List deployment history [org.read]
+  Required: appId
+- app.distribute — Distribute an application to an organization [org.write]
+  Required: appId, orgId
+- app.undistribute — Remove an application distribution [org.write]
+  Required: appId, orgId
+- app.list_distributions — List distributions with admins [org.read]
+  Required: appId
+- app.set_admin — Grant app-admin rights for (app, org) [org.write]
+  Required: appId, orgId, userId
+- app.remove_admin — Revoke app-admin rights for (app, org) [org.write]
+  Required: appId, orgId, userId
 
 ## Audit Tools (2) — scope: audit.read / audit.write
 - audit.query — Query audit logs with filters [audit.read]

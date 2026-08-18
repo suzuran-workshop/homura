@@ -129,6 +129,16 @@
 - [x] 前端「导入应用」对话框（provider 启动台）
 - [x] MCP resources/prompt 工具目录更新（23 → 24）
 
+### open-suzuran：MCP app.* 工具集（2026-08-18，✅ 已完成）
+- [x] app.list / app.get（org.read，org 归属校验）
+- [x] app.update（元数据：name/version/runtime/entrypoint/port/配额/mcpScopes）
+- [x] app.update_code（Service.UpdateCode：zip 覆盖 MinIO object + manifest version 同步）
+- [x] app.delete（级联清理分发/管理员）
+- [x] app.deploy / app.start / app.stop / app.restart / app.status / app.logs / app.deployments（生命周期；部署注入调用者 token 为 OAUTH_TOKEN）
+- [x] app.distribute / app.undistribute / app.list_distributions / app.set_admin / app.remove_admin（provider 角色校验，targetOrgId 参数）
+- [x] MCP 认证上下文注入原始 Bearer token（server.go contextKeyToken + GetTokenFromContext）
+- [x] 工具目录文档更新（64 tools，App Tools 18）
+
 ## ❌ 已移除（低代码资产）
 
 - ~~FormDefinition、FormSubmission、FormDistribution~~
