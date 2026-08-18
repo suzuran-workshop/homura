@@ -90,9 +90,17 @@ orgHandler := provider.NewOrgHandler(orgService)
 
 ### 鉴权
 
-- **OAuth-only**：只支持 WebAuthn 和钉钉 OAuth 登录，不支持密码登录
+- **多方法登录**：用户名/密码（bcrypt，主方式）+ WebAuthn + 钉钉 OAuth
 - **Token 管理**：access_token（JWT，短期）+ refresh_token（长期，可撤销）
 - **Token 存储**：前端使用 httpOnly cookie，不用 localStorage
+
+### 角色模型
+
+- **仅两种角色**：`provider`（org 1 成员，服务商）与 `tenant`（其他组织成员）
+- **禁止**引入 tenant_admin / dept_manager 角色及其门户（已在 2026-08-18 废除）
+- **应用管理员**：per (组织, 应用)，存 `application_admins` 表，由服务商门户【应用分发】设置；拥有该组织下该应用数据的全部读写权限（REST `/api/data/*`）
+- **服务商隐式应用管理员**：provider 不需要 application_admins 记录
+- **应用分发**：多对多（`application_distributions`），一个应用可分发到多个组织，数据行按 `org_id` 隔离
 
 ### 多租户隔离
 
@@ -153,10 +161,11 @@ orgHandler := provider.NewOrgHandler(orgService)
 - ❌ 可视化工作流编辑器
 - ❌ 报表设计器
 - ❌ JSON schema 动态表单渲染
-- ❌ 密码登录（SHA256、bcrypt、argon2）
+- ❌ 明文/弱哈希存密码（必须 bcrypt）
 - ❌ 第三方 IdP 集成（Keycloak、Authentik）
 - ❌ 应用直接连数据库（必须走 MCP）
 - ❌ 应用间直接 HTTP 调用（必须通过 MCP 中转）
+- ❌ 重新引入 tenant_admin / dept_manager 角色或租户管理门户
 
 ## 📝 文档规范
 

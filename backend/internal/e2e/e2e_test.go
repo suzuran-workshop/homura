@@ -16,7 +16,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/xrl/suzuran-cloud/internal/handler/provider"
-	"github.com/xrl/suzuran-cloud/internal/handler/tenant"
 	"github.com/xrl/suzuran-cloud/internal/middleware"
 	"github.com/xrl/suzuran-cloud/internal/model"
 	"github.com/xrl/suzuran-cloud/internal/pkg/jwt"
@@ -61,7 +60,7 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 	userSvc := service.NewUserService(userRepo, bondRepo)
 
 	orgHandler := provider.NewOrgHandler(orgService)
-	deptHandler := tenant.NewDepartmentHandler(deptService, userSvc)
+	deptHandler := provider.NewOrgMemberHandler(deptService, userSvc)
 
 	r.Use(middleware.CORS())
 
@@ -75,18 +74,16 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 			providerGroup.POST("/orgs", orgHandler.Create)
 			providerGroup.PUT("/orgs/:orgId", orgHandler.Update)
 			providerGroup.DELETE("/orgs/:orgId", orgHandler.Delete)
-		}
 
-		tenantGroup := protected.Group("/tenant")
-		{
-			depts := tenantGroup.Group("/departments")
+			// Organization department management (provider-operated)
+			orgDepts := providerGroup.Group("/orgs/:orgId/departments")
 			{
-				depts.GET("", deptHandler.ListDepts)
-				depts.GET("/tree", deptHandler.DeptTree)
-				depts.POST("", deptHandler.CreateDept)
-				depts.PUT("/:deptId", deptHandler.UpdateDept)
-				depts.DELETE("/:deptId", deptHandler.DeleteDept)
-				depts.POST("/:deptId/manager", deptHandler.SetDeptManager)
+				orgDepts.GET("", deptHandler.ListDepts)
+				orgDepts.GET("/tree", deptHandler.DeptTree)
+				orgDepts.POST("", deptHandler.CreateDept)
+				orgDepts.PUT("/:deptId", deptHandler.UpdateDept)
+				orgDepts.DELETE("/:deptId", deptHandler.DeleteDept)
+				orgDepts.POST("/:deptId/manager", deptHandler.SetDeptManager)
 			}
 		}
 	}
@@ -163,8 +160,9 @@ func TestE2E_ProviderOrgManagementFlow(t *testing.T) {
 	t.Logf("✅ Provider org management flow completed")
 }
 
-// E2E Test 2: Tenant Department Management Flow
-func TestE2E_TenantDepartmentManagementFlow(t *testing.T) {
+// E2E Test 2: Provider Department Management Flow
+// Department management is provider-operated; tenant_admin role no longer exists.
+func TestE2E_ProviderDepartmentManagementFlow(t *testing.T) {
 	db := setupE2ETestDB(t)
 	defer func() {
 		db.Exec("DELETE FROM departments")
@@ -173,24 +171,24 @@ func TestE2E_TenantDepartmentManagementFlow(t *testing.T) {
 		db.Exec("DELETE FROM users")
 	}()
 
-	user := createTestUser(t, db, "Tenant Admin")
+	user := createTestUser(t, db, "Provider Admin")
 	org := createTestOrg(t, db, "Tenant Org", "Tenant Organization")
 	createTestBond(t, db, org.ID, user.ID, true)
 
 	router := setupRouter(db)
-	token := generateJWTToken(t, user.ID, org.ID, "tenant_admin")
+	token := generateJWTToken(t, user.ID, org.ID, "provider")
 
 	// Create a department
 	w := httptest.NewRecorder()
 	deptData := map[string]interface{}{"name": "Engineering", "level": 1}
-	req := httptest.NewRequest("POST", "/api/tenant/departments", bytes.NewReader(mustJSON(t, deptData)))
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/provider/orgs/%d/departments", org.ID), bytes.NewReader(mustJSON(t, deptData)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-Org-ID", fmt.Sprintf("%d", org.ID))
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusCreated, w.Code, "Failed to create department: %s", w.Body.String())
-	t.Logf("✅ Tenant department management flow completed")
+	t.Logf("✅ Provider department management flow completed")
 }
 
 // E2E Test 3: Multi-Tenant Isolation

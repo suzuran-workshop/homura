@@ -66,10 +66,27 @@
         详情
         <v-icon end>mdi-chevron-right</v-icon>
       </v-btn>
+      <v-btn
+        v-if="showData"
+        size="small"
+        variant="text"
+        @click.stop="$emit('data', app)"
+      >
+        数据管理
+        <v-icon end>mdi-database</v-icon>
+      </v-btn>
     </v-card-actions>
     <v-card-actions v-else class="px-5 pb-4">
       <v-btn disabled size="small" block variant="outlined">
         应用未运行
+      </v-btn>
+      <v-btn
+        v-if="showData"
+        size="small"
+        variant="text"
+        @click.stop="$emit('data', app)"
+      >
+        数据管理
       </v-btn>
     </v-card-actions>
   </v-card>
@@ -83,11 +100,13 @@ const props = defineProps<{
   app: Application
   disabled?: boolean
   showDetails?: boolean
+  showData?: boolean
 }>()
 
 defineEmits<{
   open: [app: Application]
   details: [app: Application]
+  data: [app: Application]
 }>()
 
 const statusColor = computed(() => {

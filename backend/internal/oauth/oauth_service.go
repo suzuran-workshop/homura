@@ -185,25 +185,20 @@ func (s *OAuthService) issueTokens(ctx context.Context, userID, orgID int, clien
 	}, nil
 }
 
-// resolveRoleAndScopes determines the user's role (provider/tenant_admin/user)
+// resolveRoleAndScopes determines the user's role (provider/tenant)
 // for the given org and merges requested scopes with the org's allowed scopes.
+//
+// Role model (2026-08):
+//   - provider: member of the provider org (id=1) — platform-level operator,
+//     implicitly an app admin of every distributed app.
+//   - tenant: everyone else; has access only to apps distributed to their org.
 func (s *OAuthService) resolveRoleAndScopes(ctx context.Context, userID, orgID int, requestedScope string) (string, []string) {
-	role := "user"
-	bond, err := s.bondRepo.GetByOrgAndUser(ctx, orgID, userID)
-	if err == nil && bond != nil && bond.IsAdmin {
-		// Super admin org (id=1) → provider role.
-		if orgID == 1 {
-			role = "provider"
-		} else {
-			// Check if user is admin in org 1 (super admin across all orgs).
-			if superBond, e := s.bondRepo.GetByOrgAndUser(ctx, 1, userID); e == nil && superBond != nil && superBond.IsAdmin {
-				role = "provider"
-			} else {
-				role = "tenant_admin"
-			}
-		}
-	}
-	if orgID == 1 && role == "user" {
+	role := "tenant"
+	if orgID == 1 {
+		// Provider org members are providers when acting in org 1.
+		role = "provider"
+	} else if superBond, e := s.bondRepo.GetByOrgAndUser(ctx, 1, userID); e == nil && superBond != nil {
+		// Provider org members keep the provider role across all orgs.
 		role = "provider"
 	}
 	scopes := parseScopes(requestedScope)

@@ -242,6 +242,31 @@ CREATE TABLE IF NOT EXISTS application_deployments (
 CREATE INDEX IF NOT EXISTS idx_deployments_app_id ON application_deployments(application_id);
 
 -- ============================================
+-- 应用分发 + 应用管理员（2026-08）
+-- 一个应用可分发到多个组织；每个 (应用, 组织) 可有多个应用管理员。
+-- 服务商（org 1 成员）天然是任何应用的管理员，无需记录。
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS application_distributions (
+    id SERIAL PRIMARY KEY,
+    app_id VARCHAR(64) NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    org_id INT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_dist_app_org ON application_distributions(app_id, org_id);
+
+CREATE TABLE IF NOT EXISTS application_admins (
+    id SERIAL PRIMARY KEY,
+    app_id VARCHAR(64) NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    org_id INT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_admins_app_org_user ON application_admins(app_id, org_id, user_id);
+
+-- ============================================
 -- 首次部署说明：
 -- 系统首次运行时无任何账户，管理员需通过 OOBE 模式初始化系统。
 -- ============================================

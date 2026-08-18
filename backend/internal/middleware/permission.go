@@ -5,30 +5,16 @@ import (
 )
 
 // Role names used in JWT claims:
-//   "provider"     — 服务商管理员（org_id=1 且 is_admin=true）
-//   "tenant_admin" — 租户管理员（is_admin=true）
-//   "user"         — 普通用户
+//   "provider" — 服务商（provider org id=1 的成员，隐含所有应用管理员身份）
+//   "tenant"   — 租户（其他组织的普通用户，只能访问分发到本组织的应用）
 //
-// All permission checks should use these three names.
+// All permission checks should use these two names.
 
-// RequireOrgAdmin allows provider and tenant admins.
-func RequireOrgAdmin() gin.HandlerFunc {
+// RequireProvider allows only provider-role callers (service provider portal).
+func RequireProvider() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
-		if role != "provider" && role != "tenant_admin" {
-			c.JSON(403, gin.H{"error": "insufficient permissions"})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
-// RequireDeptManager allows provider admins, tenant admins, and dept managers.
-func RequireDeptManager() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		role, _ := c.Get("role")
-		if role != "provider" && role != "tenant_admin" && role != "dept_manager" {
+		if role != "provider" {
 			c.JSON(403, gin.H{"error": "insufficient permissions"})
 			c.Abort()
 			return

@@ -17,6 +17,7 @@ export interface Application {
   routes?: Record<string, unknown>
   status: string // created, running, stopped, error, deleted
   containerId?: string
+  isAdmin?: boolean // caller is an app admin for this (org, app)
   createdAt: string
   updatedAt: string
 }

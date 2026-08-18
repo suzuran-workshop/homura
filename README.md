@@ -69,7 +69,7 @@ npm run dev
 | MinIO Console | `9001` | 对象存储管理界面 |
 | Frontend | `3000` | 三端门户（provider/tenant/user） |
 
-## 🚀 当前状态（2026-08-04）
+## 🚀 当前状态（2026-08-18）
 
 项目已从低代码平台成功转型为 AI 原生应用平台。
 
@@ -77,17 +77,20 @@ npm run dev
 - ✅ 多租户基座（org/user/bond/dept + JWT + tenant 中间件）
 - ✅ 三层架构（handler/service/repository/model）
 - ✅ 基础 API（组织管理、用户管理、部门管理）
-- ✅ OAuth IdP（WebAuthn + 钉钉 OAuth，无密码登录）
+- ✅ 认证 IdP（用户名/密码为主，WebAuthn + 钉钉 OAuth 补充）
+- ✅ 角色体系（仅 provider/tenant；应用管理员 per 组织 × 应用）
+- ✅ 应用分发（多对多：一个应用分发到多个组织）+ 应用管理员设置
+- ✅ 数据管理 API（REST，应用管理员/provider 可读写分发应用数据）
 - ✅ MCP Server（23 个 tools + 9 个 prompts + 4 个 schema resources）
 - ✅ 应用运行时（Docker 容器管理，生命周期管理，沙箱隔离，资源配额，OAUTH_TOKEN 注入）
-- ✅ 应用启动台前端（三端共用 OA start page）
-- ✅ Skill/MCP 契约文档（v1.0.0，含示例应用）
+- ✅ 应用启动台前端（按分发关系展示，含数据管理入口）
+- ✅ Skill/MCP 契约文档（v1.1.0，含示例应用）
 - ✅ **@suzuran/sdk v1.0.0**（零依赖 Node.js SDK，MCP 客户端 + HTTP 路由 + 生命周期管理）
 
 **待建设**：
 - ⏳ 应用详情页增强（部署历史、日志查看 UI）
-- ⏳ 单元测试补充
-- ⏳ 跨应用数据查询场景示例
+- ⏳ MCP 工具独立集成测试
+- ⏳ workflow 通知接入（in-app channel）
 
 ## 📚 文档
 
@@ -99,7 +102,7 @@ npm run dev
 
 ## 🛡️ 安全
 
-- **OAuth-only**：只支持 WebAuthn 和钉钉 OAuth，不支持密码登录
+- **角色**：仅 provider（org 1 成员）与 tenant；应用管理员（per 组织 × 应用）拥有应用数据全部读写权限，服务商隐式拥有
 - **多租户隔离**：所有业务表有 `org_id` 字段，查询自动加 `WHERE org_id = ?`
 - **审计日志**：所有数据操作都有记录（谁、什么时候、做了什么）
 

@@ -13,7 +13,7 @@ import (
 // It accepts an OrgIDResolver so provider (from URL param) and tenant (from context)
 // can share the same logic.
 //
-// Authorization is handled entirely by middleware (RequireOrgAdmin / RequireDeptManager)
+// Authorization is handled entirely by middleware (RequireProvider)
 // mounted on the route group — this handler performs no role checks of its own.
 type OrgMgmtHandler struct {
 	resolveOrgID OrgIDResolver

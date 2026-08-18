@@ -17,7 +17,6 @@ import (
 
 	"github.com/xrl/suzuran-cloud/internal/handler"
 	"github.com/xrl/suzuran-cloud/internal/handler/provider"
-	"github.com/xrl/suzuran-cloud/internal/handler/tenant"
 	"github.com/xrl/suzuran-cloud/internal/mcp"
 	mcptools "github.com/xrl/suzuran-cloud/internal/mcp/tools"
 	"github.com/xrl/suzuran-cloud/internal/middleware"
@@ -125,8 +124,6 @@ func main() {
 	oauthHandler := oauth.NewHandler(webAuthnSvc, dingTalkSvc, oauthSvc, passwordSvc)
 	orgHandler := provider.NewOrgHandler(orgService)
 	orgMemberHandler := provider.NewOrgMemberHandler(deptService, userService)
-	deptHandler := tenant.NewDepartmentHandler(deptService, userService)
-	userHandler := tenant.NewUserHandler(userService)
 	fileHandler := handler.NewFileHandler(minioClient)
 	systemHandler := handler.NewSystemHandler(db)
 	logHandler := handler.NewLogHandler("logs/app.log", 1000)
@@ -145,6 +142,13 @@ func main() {
 		appService = service.NewApplicationService(appRepo, deployRepo, runtimeManager)
 	}
 	appHandler := provider.NewAppHandler(appService)
+	distService := service.NewDistributionService(appRepo, orgRepo, userRepo, bondRepo)
+	distHandler := provider.NewDistributionHandler(distService)
+
+	// Data management (app admins + providers; auth enforced in-handler)
+	dataRepo := repository.NewDataRepository(db)
+	dataSvc := service.NewDataService(dataRepo)
+	dataHandler := handler.NewDataHandler(dataSvc, distService)
 
 	// Audit log query handler (for MCP call log viewer + general audit)
 	auditSvc := service.NewAuditService(db)
@@ -156,10 +160,6 @@ func main() {
 	wfTaskRepo := repository.NewWorkflowTaskRepository(db)
 	var notificationSvc *service.NotificationService // in-app channel not yet wired; notifications are no-op until configured
 	workflowSvc := service.NewWorkflowService(wfDefRepo, wfInstRepo, wfTaskRepo, bondRepo, notificationSvc)
-
-	// Initialize data service for app-owned tables
-	dataRepo := repository.NewDataRepository(db)
-	dataSvc := service.NewDataService(dataRepo)
 
 	// Initialize DingTalk sync service (only when configured)
 	var syncHandler *provider.DingTalkSyncHandler
@@ -276,9 +276,9 @@ func main() {
 	auditMW := middleware.NewAuditMiddleware(service.NewAuditService(db))
 	protected.Use(auditMW.RecordOperations())
 	{
-		// System monitoring routes (require org_admin or provider_admin)
+		// System monitoring routes (require provider)
 		systemGroup := protected.Group("/system")
-		systemGroup.Use(middleware.RequireOrgAdmin())
+		systemGroup.Use(middleware.RequireProvider())
 		{
 			systemGroup.GET("/metrics", systemHandler.GetSystemMetrics)
 			systemGroup.GET("/database/metrics", systemHandler.GetDatabaseMetrics)
@@ -286,28 +286,62 @@ func main() {
 		}
 
 		// Generic application list route (accessible by all authenticated users).
-		// Returns apps for the caller's org — serves as the OA-style start page for
-		// both providers (all apps they manage) and tenant users (apps distributed to them).
+		// Providers see the whole app library; tenants see apps distributed to their org.
 		protected.GET("/apps", func(c *gin.Context) {
 			orgID := c.GetInt("org_id")
-			apps, err := appRepo.ListByOrgID(c.Request.Context(), orgID)
+			role := c.GetString("role")
+			userID := c.GetInt("user_id")
+			var apps []*model.Application
+			var err error
+			if role == "provider" {
+				apps, err = distService.ListAllApps(c.Request.Context())
+			} else {
+				apps, err = distService.ListAppsForOrg(c.Request.Context(), orgID)
+			}
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			// Mask container IDs for non-provider roles
-			role := c.GetString("role")
 			if role != "provider" {
 				for _, a := range apps {
 					a.ContainerID = ""
 				}
 			}
-			c.JSON(http.StatusOK, gin.H{"apps": apps})
+			// Annotate app-admin capability (provider is implicitly an admin of everything)
+			type appView struct {
+				*model.Application
+				IsAdmin bool `json:"isAdmin"`
+			}
+			views := make([]appView, 0, len(apps))
+			for _, a := range apps {
+				isAdmin := true
+				if role != "provider" {
+					admin, err := distService.IsAppAdmin(c.Request.Context(), userID, orgID, a.ID)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+					isAdmin = admin
+				}
+				views = append(views, appView{Application: a, IsAdmin: isAdmin})
+			}
+			c.JSON(http.StatusOK, gin.H{"apps": views})
 		})
 
-		// Provider portal routes (require org_admin or provider_admin)
+		// App data management (app admins per org + providers; authorization in-handler)
+		dataGroup := protected.Group("/data")
+		{
+			dataGroup.GET("/orgs/:orgId/apps/:appId/tables", dataHandler.ListTables)
+			dataGroup.GET("/orgs/:orgId/apps/:appId/tables/:tableName/rows", dataHandler.ListRows)
+			dataGroup.POST("/orgs/:orgId/apps/:appId/tables/:tableName/rows", dataHandler.InsertRow)
+			dataGroup.PUT("/orgs/:orgId/apps/:appId/tables/:tableName/rows/:rowId", dataHandler.UpdateRow)
+			dataGroup.DELETE("/orgs/:orgId/apps/:appId/tables/:tableName/rows/:rowId", dataHandler.DeleteRow)
+		}
+
+		// Provider portal routes (require provider)
 		providerGroup := protected.Group("/provider")
-		providerGroup.Use(middleware.RequireOrgAdmin())
+		providerGroup.Use(middleware.RequireProvider())
 		{
 			providerGroup.GET("/orgs", orgHandler.List)
 			providerGroup.POST("/orgs", orgHandler.Create)
@@ -356,35 +390,23 @@ func main() {
 					appGroup.GET("/:appId/logs", appHandler.Logs)
 					appGroup.GET("/:appId/deployments", appHandler.Deployments)
 				}
+
+				// App distribution (multi-tenant sharing + app admins)
+				distGroup := providerGroup.Group("/apps/:appId/distributions")
+				{
+					distGroup.GET("", distHandler.List)
+					distGroup.POST("", distHandler.Distribute)
+					distGroup.DELETE("/:orgId", distHandler.Undistribute)
+					distGroup.POST("/:orgId/admins", distHandler.SetAdmin)
+					distGroup.DELETE("/:orgId/admins/:userId", distHandler.RemoveAdmin)
+				}
 			}
 
 			// Audit log queries (MCP call log viewer + general audit)
 			providerGroup.GET("/audit/logs", auditHandler.ListLogs)
-		}
 
-		// Tenant admin routes (require dept_manager or higher)
-		tenantGroup := protected.Group("/tenant")
-		tenantGroup.Use(middleware.RequireDeptManager())
-		{
-			tenantGroup.GET("/users", userHandler.ListMembers)
-			tenantGroup.POST("/users", userHandler.CreateMember)
-			tenantGroup.PUT("/users/:userId", userHandler.UpdateMember)
-			tenantGroup.DELETE("/users/:userId", userHandler.RemoveMember)
-			tenantGroup.POST("/users/:userId/reset-password", userHandler.ResetPassword)
-
-			// Department routes
-			depts := tenantGroup.Group("/departments")
-			{
-				depts.GET("", deptHandler.ListDepts)
-				depts.GET("/tree", deptHandler.DeptTree)
-				depts.POST("", deptHandler.CreateDept)
-				depts.PUT("/:deptId", deptHandler.UpdateDept)
-				depts.DELETE("/:deptId", deptHandler.DeleteDept)
-				depts.POST("/:deptId/manager", deptHandler.SetDeptManager)
-			}
-
-			// File upload routes
-			files := tenantGroup.Group("/files")
+			// File upload routes (provider-operated; app data files)
+			files := providerGroup.Group("/files")
 			{
 				files.POST("/upload", fileHandler.Upload)
 				files.GET("/:key/download", fileHandler.Download)
@@ -452,6 +474,8 @@ func initDatabase() (*gorm.DB, error) {
 			&model.WorkflowInstance{},
 			&model.WorkflowTask{},
 			&model.DataTable{},
+			&model.ApplicationDistribution{},
+			&model.ApplicationAdmin{},
 		); err != nil {
 			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 		}

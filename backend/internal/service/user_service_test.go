@@ -35,8 +35,8 @@ func seedOrg(t *testing.T, db *gorm.DB) *model.Org {
 	return org
 }
 
-// OAuth-only platform: members authenticate via WebAuthn/DingTalk, no password.
-// CreateMember signature is (orgID, phone, name, email, position, isAdmin, deptID, isDeptMgr).
+// Members authenticate via username/password; WebAuthn/DingTalk are supplementary.
+// CreateMember signature is (orgID, phone, name, email, username, password, position, isAdmin, deptID, isDeptMgr).
 
 func TestUserService_CreateMember_NewPhone(t *testing.T) {
 	db := setupUserTestDB(t)
@@ -47,7 +47,7 @@ func TestUserService_CreateMember_NewPhone(t *testing.T) {
 	svc := NewUserService(userRepo, bondRepo)
 
 	ctx := context.Background()
-	m, err := svc.CreateMember(ctx, org.ID, "13800138000", "Alice", "a@b.com", "Engineer", false, nil, false)
+	m, err := svc.CreateMember(ctx, org.ID, "13800138000", "Alice", "a@b.com", "alice", "secret123", "Engineer", false, nil, false)
 	require.NoError(t, err)
 	require.NotNil(t, m)
 
@@ -58,10 +58,13 @@ func TestUserService_CreateMember_NewPhone(t *testing.T) {
 	assert.False(t, m.IsAdmin)
 	assert.False(t, m.IsDepartmentManager)
 
-	// User created with no password (OAuth-only)
+	// User created with username + bcrypt password
 	user, err := userRepo.GetByPhone(ctx, "13800138000")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", user.Name)
+	require.NotNil(t, user.Username)
+	assert.Equal(t, "alice", *user.Username)
+	require.NotNil(t, user.PasswordHash)
 }
 
 func TestUserService_CreateMember_ExistingPhone_AutoJoin(t *testing.T) {
@@ -78,7 +81,7 @@ func TestUserService_CreateMember_ExistingPhone_AutoJoin(t *testing.T) {
 	svc := NewUserService(userRepo, bondRepo)
 
 	ctx := context.Background()
-	m, err := svc.CreateMember(ctx, org.ID, "13900139000", "", "", "", true, nil, false)
+	m, err := svc.CreateMember(ctx, org.ID, "13900139000", "", "", "", "", "", true, nil, false)
 	require.NoError(t, err)
 	require.NotNil(t, m)
 
@@ -104,7 +107,7 @@ func TestUserService_CreateMember_AlreadyInOrg(t *testing.T) {
 	svc := NewUserService(userRepo, bondRepo)
 
 	ctx := context.Background()
-	m, err := svc.CreateMember(ctx, org.ID, "13700137000", "", "", "", false, nil, false)
+	m, err := svc.CreateMember(ctx, org.ID, "13700137000", "", "", "", "", "", false, nil, false)
 	require.NoError(t, err)
 	require.NotNil(t, m)
 	assert.Equal(t, bond.ID, m.BondID)

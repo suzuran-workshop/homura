@@ -17,7 +17,7 @@ interface User {
   id: number
   name?: string
   email?: string
-  role?: 'provider' | 'tenant_admin' | 'user'
+  role?: 'provider' | 'tenant'
   orgId?: number
 }
 
@@ -80,12 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Determine role based on the selected org from availableOrgs.
-  function determineRole(orgId: number): 'provider' | 'tenant_admin' | 'user' {
-    const match = availableOrgs.value.find(o => o.orgId === orgId)
-    if (!match) return 'user'
-    if (orgId === 1 && match.isAdmin) return 'provider'
-    if (match.isAdmin) return 'tenant_admin'
-    return 'user'
+  // Roles are now: provider (org 1 members) and tenant (everyone else).
+  function determineRole(orgId: number): 'provider' | 'tenant' {
+    if (orgId === 1) return 'provider'
+    return 'tenant'
   }
 
   // ---- DingTalk OAuth ----
@@ -111,7 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Keep for backward compatibility (used by Login.vue old path).
-  function selectOrgAndMintToken(orgId: number, role: 'provider' | 'tenant_admin' | 'user') {
+  function selectOrgAndMintToken(orgId: number, role: 'provider' | 'tenant') {
     const u = user.value || { id: 0 }
     u.orgId = orgId
     u.role = role

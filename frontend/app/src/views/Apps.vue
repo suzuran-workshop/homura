@@ -64,7 +64,14 @@
             md="4"
             lg="3"
           >
-            <AppCard :app="app" :show-details="isProvider" @open="openApp" @details="showDetails" />
+            <AppCard
+              :app="app"
+              :show-details="isProvider"
+              :show-data="!!app.isAdmin"
+              @open="openApp"
+              @details="showDetails"
+              @data="openData"
+            />
           </v-col>
         </v-row>
       </div>
@@ -84,7 +91,14 @@
             md="4"
             lg="3"
           >
-            <AppCard :app="app" disabled :show-details="isProvider" @details="showDetails" />
+            <AppCard
+              :app="app"
+              disabled
+              :show-details="isProvider"
+              :show-data="!!app.isAdmin"
+              @details="showDetails"
+              @data="openData"
+            />
           </v-col>
         </v-row>
       </div>
@@ -96,10 +110,12 @@
 import { onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApplicationStore } from '../stores/application'
+import { useAuthStore } from '../stores/auth'
 import AppCard from '../components/AppCard.vue'
 import type { Application } from '../api/application'
 
 const appStore = useApplicationStore()
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -118,5 +134,10 @@ function openApp(app: Application) {
 
 function showDetails(app: Application) {
   router.push(`/provider/apps/${app.id}`)
+}
+
+function openData(app: Application) {
+  const orgId = authStore.user?.orgId
+  router.push({ path: `/user/data/${app.id}`, query: orgId ? { orgId } : {} })
 }
 </script>

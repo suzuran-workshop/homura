@@ -102,6 +102,21 @@
 - [x] Lint 配置（golangci-lint + ESLint + Prettier）
 - [x] 过期文档清理（DEMO_ACCOUNTS.md / API_INTEGRATION.md 重写为 OAuth 现状）
 
+### 角色体系收敛 + 应用分发（2026-08-18，✅ 已完成）
+- [x] 角色收敛为 provider/tenant（删除 tenant_admin/dept_manager 角色分支、RequireDeptManager 中间件）
+- [x] JWT 角色解析简化（org 1 成员 = provider，其余 = tenant；is_admin 不再影响角色）
+- [x] 租户门户删除（/tenant 路由、TenantLayout、tenant 目录页面）
+- [x] ApplicationDistribution 模型 + repository（多对多分发）
+- [x] ApplicationAdmin 模型 + repository（per 组织 × 应用的管理员）
+- [x] DistributionService（分发/取消分发/设管理员/权限判定/租户应用列表）
+- [x] 分发 REST API（provider 门户：list/distribute/undistribute/admins CRUD）
+- [x] 数据管理 REST API（/api/data/*，授权 = provider 或应用管理员，复用 DataService）
+- [x] /api/apps 按分发关系返回 + isAdmin 标记
+- [x] 前端【应用分发】页面（provider 门户）
+- [x] 前端数据管理页面（应用管理员 + provider）
+- [x] 迁移 002_app_distribution.sql + init.sql 更新
+- [x] workflow assignee 角色型指派废除（仅 user 类型）
+
 ## ❌ 已移除（低代码资产）
 
 - ~~FormDefinition、FormSubmission、FormDistribution~~

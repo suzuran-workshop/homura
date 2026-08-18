@@ -19,9 +19,6 @@ const router = createRouter({
           case 'provider':
             next('/user/apps')
             break
-          case 'tenant_admin':
-            next('/user/apps')
-            break
           default:
             next('/user/apps')
         }
@@ -79,6 +76,11 @@ const router = createRouter({
           component: () => import('../views/provider/AppDetail.vue'),
         },
         {
+          path: 'distribution',
+          name: 'AppDistribution',
+          component: () => import('../views/provider/AppDistribution.vue'),
+        },
+        {
           path: 'mcp/tools',
           name: 'ProviderMCPTools',
           component: () => import('../views/provider/MCPTools.vue'),
@@ -87,35 +89,6 @@ const router = createRouter({
           path: 'mcp/logs',
           name: 'ProviderMCPLogs',
           component: () => import('../views/provider/MCPLogs.vue'),
-        },
-      ],
-    },
-    // Tenant admin routes (租户管理端)
-    {
-      path: '/tenant',
-      component: () => import('../layouts/TenantLayout.vue'),
-      redirect: '/tenant/dashboard',
-      meta: { requiresAuth: true, role: 'tenant_admin' },
-      children: [
-        {
-          path: 'dashboard',
-          name: 'TenantDashboard',
-          component: () => import('../views/tenant/Dashboard.vue'),
-        },
-        {
-          path: 'users',
-          name: 'UserManagement',
-          component: () => import('../views/tenant/UserManagement.vue'),
-        },
-        {
-          path: 'departments',
-          name: 'DepartmentManagement',
-          component: () => import('../views/tenant/DepartmentManagement.vue'),
-        },
-        {
-          path: 'apps',
-          name: 'TenantApps',
-          component: () => import('../views/Apps.vue'),
         },
       ],
     },
@@ -130,6 +103,11 @@ const router = createRouter({
           path: 'apps',
           name: 'UserApps',
           component: () => import('../views/Apps.vue'),
+        },
+        {
+          path: 'data/:appId',
+          name: 'AppDataManager',
+          component: () => import('../views/DataManager.vue'),
         },
       ],
     },

@@ -639,7 +639,7 @@ Example — a 2-level leave approval with a condition branch:
     { "name": "submit", "type": "start", "next": "manager_approve" },
     {
       "name": "manager_approve", "type": "approval",
-      "assignee": { "type": "role", "value": "dept_manager" },
+      "assignee": { "type": "user", "value": 5 },
       "on_approve": { "goto": "check_days" },
       "on_reject":  { "goto": "end_rejected" }
     },
@@ -652,7 +652,7 @@ Example — a 2-level leave approval with a condition branch:
     },
     {
       "name": "director_approve", "type": "approval",
-      "assignee": { "type": "role", "value": "tenant_admin" },
+      "assignee": { "type": "user", "value": 8 },
       "on_approve": { "goto": "end_approved" },
       "on_reject":  { "goto": "end_rejected" }
     },
@@ -661,7 +661,7 @@ Example — a 2-level leave approval with a condition branch:
   ]
 }
 
-Assignee types: { "type": "user", "value": "<user_id>" } or { "type": "role", "value": "tenant_admin"|"dept_manager" }.
+Assignee types: { "type": "user", "value": "<user_id>" } (role-based assignees are not available in the current role model).
 Conditions use simple expressions like "leaveDays > 3" (operators: > < >= <= == !=).
 
 ## Running a workflow
@@ -676,7 +676,7 @@ Conditions use simple expressions like "leaveDays > 3" (operators: > < >= <= == 
 
 - All workflow.* tools require the 'workflow.read' or 'workflow.write' scope.
 - Only the assignee of a task may approve/reject it.
-- Only the instance creator or an org_admin may cancel a running instance.
+- Only the instance creator or a provider may cancel a running instance.
 - Workflow state is org-scoped (org_id isolation) and audited automatically.`,
 					},
 				},

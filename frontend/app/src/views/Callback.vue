@@ -109,8 +109,6 @@ async function selectOrg(orgId: number) {
     const role = authStore.userRole
     if (role === 'provider') {
       router.push('/provider/dashboard')
-    } else if (role === 'tenant_admin') {
-      router.push('/tenant/dashboard')
     } else {
       router.push('/user')
     }
