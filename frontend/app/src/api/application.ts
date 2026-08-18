@@ -17,6 +17,7 @@ export interface Application {
   routes?: Record<string, unknown>
   status: string // created, running, stopped, error, deleted
   containerId?: string
+  sourceKey?: string
   isAdmin?: boolean // caller is an app admin for this (org, app)
   createdAt: string
   updatedAt: string
@@ -61,6 +62,13 @@ export function updateApp(id: string, data: Partial<CreateAppRequest>) {
 
 export function deleteApp(id: string) {
   return apiClient.delete(`/api/provider/apps/${id}`)
+}
+
+// Import an application from a code zip (must contain app.json at its root).
+export function importApp(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiClient.post<Application>('/api/provider/apps/import', form)
 }
 
 export function deployApp(id: string) {

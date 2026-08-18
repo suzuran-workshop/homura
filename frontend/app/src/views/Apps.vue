@@ -8,6 +8,17 @@
       </h1>
       <v-spacer />
       <v-btn
+        v-if="isProvider"
+        color="primary"
+        variant="tonal"
+        prepend-icon="mdi-upload"
+        class="mr-2"
+        :loading="importing"
+        @click="importDialog = true"
+      >
+        导入应用
+      </v-btn>
+      <v-btn
         color="primary"
         variant="text"
         prepend-icon="mdi-refresh"
@@ -17,6 +28,44 @@
         刷新
       </v-btn>
     </div>
+
+    <!-- 导入应用对话框 -->
+    <v-dialog v-model="importDialog" max-width="560">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon class="mr-2" color="primary">mdi-package-variant-closed</v-icon>
+          导入应用
+        </v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey-darken-1 mb-4">
+            上传应用代码 zip 包（根目录须含 app.json 清单）。导入后代码存储于平台，
+            不依赖本地目录，清库后可通过重新导入恢复。
+          </p>
+          <v-file-input
+            v-model="importFile"
+            label="选择 zip 包"
+            accept=".zip,application/zip"
+            prepend-icon="mdi-package-variant"
+            :loading="importing"
+          />
+          <v-alert v-if="importError" type="error" closable class="mt-2">
+            {{ importError }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="importDialog = false">取消</v-btn>
+          <v-btn
+            color="primary"
+            :disabled="!importFile || importing"
+            :loading="importing"
+            @click="doImport"
+          >
+            导入
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- 错误提示 -->
     <v-alert
@@ -107,17 +156,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApplicationStore } from '../stores/application'
 import { useAuthStore } from '../stores/auth'
 import AppCard from '../components/AppCard.vue'
-import type { Application } from '../api/application'
+import { importApp, type Application } from '../api/application'
 
 const appStore = useApplicationStore()
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+
+const importDialog = ref(false)
+const importFile = ref<File | null>(null)
+const importing = ref(false)
+const importError = ref('')
 
 // Provider portal shows a "details" link to AppDetail; tenant/user portals don't.
 const isProvider = computed(() => route.path.startsWith('/provider'))
@@ -139,5 +193,22 @@ function showDetails(app: Application) {
 function openData(app: Application) {
   const orgId = authStore.user?.orgId
   router.push({ path: `/user/data/${app.id}`, query: orgId ? { orgId } : {} })
+}
+
+async function doImport() {
+  if (!importFile.value) return
+  importing.value = true
+  importError.value = ''
+  try {
+    const app = await importApp(importFile.value)
+    importDialog.value = false
+    importFile.value = null
+    appStore.fetchApps()
+    router.push(`/provider/apps/${app.data.id}`)
+  } catch (e: any) {
+    importError.value = e.response?.data?.error || '导入失败，请检查 zip 包格式'
+  } finally {
+    importing.value = false
+  }
 }
 </script>
