@@ -136,11 +136,10 @@ func main() {
 		log.Printf("Warning: Failed to init Docker client: %v (app runtime disabled)", err)
 	}
 	var runtimeManager *runtime.RuntimeManager
-	var appService *service.ApplicationService
 	if dockerClient != nil {
-		runtimeManager = runtime.NewRuntimeManager(dockerClient, appRepo, deployRepo)
-		appService = service.NewApplicationService(appRepo, deployRepo, runtimeManager)
+		runtimeManager = runtime.NewRuntimeManager(dockerClient, appRepo, deployRepo, minioClient)
 	}
+	appService := service.NewApplicationService(appRepo, deployRepo, runtimeManager, minioClient)
 	appHandler := provider.NewAppHandler(appService)
 	distService := service.NewDistributionService(appRepo, orgRepo, userRepo, bondRepo)
 	distHandler := provider.NewDistributionHandler(distService)
@@ -194,6 +193,7 @@ func main() {
 		auditSvc,
 		workflowSvc,
 		dataSvc,
+		appService,
 	)
 	mcpServer.RegisterPrompts()
 
@@ -376,10 +376,10 @@ func main() {
 			if appHandler != nil {
 				appGroup := providerGroup.Group("/apps")
 				{
-					appGroup.POST("", appHandler.Create)
-					appGroup.GET("", appHandler.List)
-					appGroup.POST("/seed", appHandler.SeedApps)
-					appGroup.GET("/:appId", appHandler.GetByID)
+appGroup.POST("", appHandler.Create)
+			appGroup.GET("", appHandler.List)
+			appGroup.POST("/import", appHandler.Import)
+			appGroup.GET("/:appId", appHandler.GetByID)
 					appGroup.PUT("/:appId", appHandler.Update)
 					appGroup.DELETE("/:appId", appHandler.Delete)
 					appGroup.POST("/:appId/deploy", appHandler.Deploy)

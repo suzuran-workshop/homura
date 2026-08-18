@@ -85,6 +85,8 @@ orgHandler := provider.NewOrgHandler(orgService)
 - 应用通过 MCP Server 访问数据，不能直接连数据库
 - 应用间不能直接 HTTP 调用，必须通过 MCP 中转
 - 平台管理应用的生命周期（创建、部署、启停、升级、销毁）
+- 应用代码包通过 **导入** 进入平台（zip 上传，REST 或 MCP `app.import`），存对象存储（key = `orgs/<orgID>/apps/<appID>/code.zip`），部署时拉取解压挂载
+- **禁止**应用代码依赖宿主路径（无 APPS_DIR 类配置）；清库后通过对象存储中的代码包重新导入恢复
 
 ## 🛡️ 安全规范
 

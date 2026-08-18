@@ -219,6 +219,7 @@ CREATE TABLE IF NOT EXISTS applications (
     db_conn_quota INT DEFAULT 10,
     mcp_scopes JSONB,
     routes JSONB,
+    source_key VARCHAR(500),
     status VARCHAR(20) DEFAULT 'created',
     container_id VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),

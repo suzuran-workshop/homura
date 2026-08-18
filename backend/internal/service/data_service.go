@@ -68,7 +68,7 @@ func (s *DataService) DropTable(ctx context.Context, appID string, orgID int, ta
 		return fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 
 	if err := s.repo.ExecDropTable(physicalTableName); err != nil {
 		return fmt.Errorf("failed to drop physical table: %w", err)
@@ -98,7 +98,7 @@ func (s *DataService) Insert(ctx context.Context, appID string, orgID int, table
 		return 0, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecInsert(physicalTableName, orgID, data)
 }
 
@@ -109,7 +109,7 @@ func (s *DataService) BatchInsert(ctx context.Context, appID string, orgID int, 
 		return nil, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecBatchInsert(physicalTableName, orgID, rows)
 }
 
@@ -120,7 +120,7 @@ func (s *DataService) Query(ctx context.Context, appID string, orgID int, tableN
 		return nil, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecQuery(physicalTableName, orgID, where, orderBy, limit, offset)
 }
 
@@ -131,7 +131,7 @@ func (s *DataService) Update(ctx context.Context, appID string, orgID int, table
 		return 0, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecUpdate(physicalTableName, orgID, where, data)
 }
 
@@ -142,7 +142,7 @@ func (s *DataService) Delete(ctx context.Context, appID string, orgID int, table
 		return 0, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecDelete(physicalTableName, orgID, where)
 }
 
@@ -153,7 +153,7 @@ func (s *DataService) Count(ctx context.Context, appID string, orgID int, tableN
 		return 0, fmt.Errorf("table not found or access denied: %w", err)
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecCount(physicalTableName, orgID, where)
 }
 
@@ -168,7 +168,7 @@ func (s *DataService) AddColumn(ctx context.Context, appID string, orgID int, ta
 		return err
 	}
 
-	physicalTableName := fmt.Sprintf("%s_%s", metadata.AppID, tableName)
+	physicalTableName := fmt.Sprintf("%s_%s", sanitizeAppID(metadata.AppID), tableName)
 	return s.repo.ExecAddColumn(physicalTableName, col)
 }
 

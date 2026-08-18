@@ -47,6 +47,24 @@ func (r *ApplicationRepository) Update(ctx context.Context, app *model.Applicati
 	return r.db.WithContext(ctx).Save(app).Error
 }
 
+// ExistsByName checks whether an app with the given name exists in an org.
+func (r *ApplicationRepository) ExistsByName(ctx context.Context, orgID int, name string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Application{}).
+		Where("org_id = ? AND name = ?", orgID, name).
+		Count(&count).Error
+	return count > 0, err
+}
+
+// UpdateSourceKey sets the object key of the app's code package.
+func (r *ApplicationRepository) UpdateSourceKey(ctx context.Context, id, sourceKey string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.Application{}).
+		Where("id = ?", id).
+		Update("source_key", sourceKey).Error
+}
+
 func (r *ApplicationRepository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&model.Application{}, "id = ?", id).Error
 }

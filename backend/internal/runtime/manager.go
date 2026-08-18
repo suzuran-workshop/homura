@@ -2,9 +2,15 @@
 package runtime
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,14 +19,16 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/xrl/suzuran-cloud/internal/model"
 	"github.com/xrl/suzuran-cloud/internal/repository"
+	"github.com/xrl/suzuran-cloud/internal/storage"
 )
 
 // RuntimeManager manages the lifecycle of application containers via the Docker API.
 type RuntimeManager struct {
-	docker     DockerClient
-	appRepo    *repository.ApplicationRepository
-	deployRepo *repository.ApplicationDeploymentRepository
+	docker      DockerClient
+	appRepo     *repository.ApplicationRepository
+	deployRepo  *repository.ApplicationDeploymentRepository
 	platformNet string // "suzuran-net"
+	storage     storage.FileStorage
 }
 
 // NewRuntimeManager creates a new RuntimeManager.
@@ -28,12 +36,14 @@ func NewRuntimeManager(
 	dockerClient DockerClient,
 	appRepo *repository.ApplicationRepository,
 	deployRepo *repository.ApplicationDeploymentRepository,
+	storage storage.FileStorage,
 ) *RuntimeManager {
 	return &RuntimeManager{
 		docker:      dockerClient,
 		appRepo:     appRepo,
 		deployRepo:  deployRepo,
 		platformNet: "suzuran-net",
+		storage:     storage,
 	}
 }
 
@@ -60,22 +70,29 @@ func (m *RuntimeManager) DeployApp(ctx context.Context, app *model.Application) 
 		return deployment, fmt.Errorf("failed to pull image %s: %w", app.Runtime, err)
 	}
 
-	// 2. Create sandbox (network)
+	// 2. Prepare the code package (download + extract the imported zip)
+	codeDir, err := m.prepareCodePackage(ctx, app)
+	if err != nil {
+		_ = m.deployRepo.UpdateStatus(ctx, deployment.ID, "failed")
+		return deployment, fmt.Errorf("failed to prepare code package: %w", err)
+	}
+
+	// 3. Create sandbox (network)
 	sandbox, err := m.CreateSandbox(ctx, app)
 	if err != nil {
 		_ = m.deployRepo.UpdateStatus(ctx, deployment.ID, "failed")
 		return deployment, fmt.Errorf("failed to create sandbox: %w", err)
 	}
 
-	// 3. Create and start the container
-	containerID, err := m.createAndStartContainer(ctx, app, sandbox)
+	// 4. Create and start the container
+	containerID, err := m.createAndStartContainer(ctx, app, sandbox, codeDir)
 	if err != nil {
 		_ = m.DestroySandbox(ctx, sandbox)
 		_ = m.deployRepo.UpdateStatus(ctx, deployment.ID, "failed")
 		return deployment, fmt.Errorf("failed to create container: %w", err)
 	}
 
-	// 4. Update records
+	// 5. Update records
 	_ = m.deployRepo.UpdateContainerID(ctx, deployment.ID, containerID)
 	_ = m.deployRepo.UpdateStatus(ctx, deployment.ID, "running")
 	_ = m.appRepo.UpdateStatus(ctx, app.ID, "running", containerID)
@@ -233,8 +250,92 @@ func (m *RuntimeManager) pullImage(ctx context.Context, image string) error {
 	return nil
 }
 
+// prepareCodePackage downloads the app's imported zip from object storage
+// and extracts it to a local cache directory (data/app-packages/<appID>).
+// Returns the extracted directory.
+func (m *RuntimeManager) prepareCodePackage(ctx context.Context, app *model.Application) (string, error) {
+	if app.SourceKey == "" {
+		return "", fmt.Errorf("application has no code package; import it first")
+	}
+	if m.storage == nil {
+		return "", fmt.Errorf("object storage unavailable")
+	}
+
+	reader, _, err := m.storage.DownloadFile(ctx, app.SourceKey)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	zipData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read package: %w", err)
+	}
+
+	cacheDir := filepath.Join("data", "app-packages", app.ID)
+	if err := os.RemoveAll(cacheDir); err != nil {
+		return "", fmt.Errorf("failed to clean cache dir: %w", err)
+	}
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create cache dir: %w", err)
+	}
+
+	if err := extractZip(zipData, cacheDir); err != nil {
+		return "", err
+	}
+	return cacheDir, nil
+}
+
+// extractZip extracts a zip into dir with path-traversal protection.
+func extractZip(zipData []byte, dir string) error {
+	zr, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+	if err != nil {
+		return fmt.Errorf("invalid zip package: %w", err)
+	}
+
+	for _, f := range zr.File {
+		clean := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
+		if strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || clean == ".." {
+			return fmt.Errorf("package contains unsafe path: %s", f.Name)
+		}
+
+		dest := filepath.Join(dir, clean)
+		if !strings.HasPrefix(dest, filepath.Clean(dir)+string(os.PathSeparator)) && dest != filepath.Clean(dir) {
+			return fmt.Errorf("package entry escapes target dir: %s", f.Name)
+		}
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		if _, err := io.Copy(out, rc); err != nil {
+			out.Close()
+			rc.Close()
+			return err
+		}
+		out.Close()
+		rc.Close()
+	}
+	return nil
+}
+
 // createAndStartContainer creates and starts a Docker container for the application.
-func (m *RuntimeManager) createAndStartContainer(ctx context.Context, app *model.Application, sandbox *Sandbox) (string, error) {
+// codeDir is the host directory with the app code, mounted at /workspace.
+func (m *RuntimeManager) createAndStartContainer(ctx context.Context, app *model.Application, sandbox *Sandbox, codeDir string) (string, error) {
 	env := []string{
 		fmt.Sprintf("APP_ID=%s", app.ID),
 		fmt.Sprintf("ORG_ID=%d", app.OrgID),
@@ -243,7 +344,8 @@ func (m *RuntimeManager) createAndStartContainer(ctx context.Context, app *model
 		fmt.Sprintf("OAUTH_TOKEN=%s", app.OAuthToken),
 	}
 
-	cmd := strings.Fields(app.Entrypoint)
+	// Run the entrypoint from the mounted code directory.
+	cmd := []string{"sh", "-c", fmt.Sprintf("cd /workspace && %s", app.Entrypoint)}
 
 	hostConfig := container.HostConfig{
 		Resources: container.Resources{
@@ -251,6 +353,9 @@ func (m *RuntimeManager) createAndStartContainer(ctx context.Context, app *model
 			Memory:   parseMemoryQuota(app.MemoryQuota),
 		},
 		SecurityOpt: []string{"no-new-privileges"},
+	}
+	if codeDir != "" {
+		hostConfig.Binds = []string{fmt.Sprintf("%s:/workspace", codeDir)}
 	}
 
 	appNetName := fmt.Sprintf("app-%s-net", app.ID)

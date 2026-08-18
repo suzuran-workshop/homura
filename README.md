@@ -80,6 +80,7 @@ npm run dev
 - ✅ 认证 IdP（用户名/密码为主，WebAuthn + 钉钉 OAuth 补充）
 - ✅ 角色体系（仅 provider/tenant；应用管理员 per 组织 × 应用）
 - ✅ 应用分发（多对多：一个应用分发到多个组织）+ 应用管理员设置
+- ✅ 应用导入（zip 上传，代码包存对象存储，不依赖宿主路径；REST + MCP `app.import` 双通道）
 - ✅ 数据管理 API（REST，应用管理员/provider 可读写分发应用数据）
 - ✅ MCP Server（23 个 tools + 9 个 prompts + 4 个 schema resources）
 - ✅ 应用运行时（Docker 容器管理，生命周期管理，沙箱隔离，资源配额，OAUTH_TOKEN 注入）

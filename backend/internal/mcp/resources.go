@@ -435,12 +435,13 @@ The platform injects these environment variables into your container:
 - MCP_ENDPOINT: URL of the MCP server (http://backend:8888/mcp)
 - OAUTH_TOKEN: OAuth token for MCP authentication
 
-## Available MCP Tools (23 total)
+## Available MCP Tools (24 total)
 
 Organization: org.get, org.list, org.create, org.update, org.delete
 Users: user.list_members, user.create_member, user.update_member, user.remove_member
 Departments: dept.list, dept.get, dept.tree, dept.create, dept.update, dept.delete, dept.set_manager
 Files: file.upload, file.download, file.delete, file.list, file.presigned_url
+Apps: app.import
 Audit: audit.query, audit.log`,
 					},
 				},
@@ -451,18 +452,18 @@ Audit: audit.query, audit.log`,
 	// Prompt: MCP tools catalog
 	catalogPrompt := mcp.NewPrompt(
 		"mcp-tools-catalog",
-		mcp.WithPromptDescription("Complete catalog of all 23 MCP tools organized by category"),
+		mcp.WithPromptDescription("Complete catalog of all 24 MCP tools organized by category"),
 	)
 
 	s.server.AddPrompt(catalogPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{
-			Description: "Complete catalog of all 23 MCP tools organized by category",
+			Description: "Complete catalog of all 24 MCP tools organized by category",
 			Messages: []mcp.PromptMessage{
 				{
 					Role: mcp.RoleAssistant,
 					Content: mcp.TextContent{
 						Type: "text",
-						Text: `# MCP Tools Catalog (23 tools)
+						Text: `# MCP Tools Catalog (24 tools)
 
 ## Organization Tools (5) — scope: org.read / org.write
 - org.get — Get organization details by ID [org.read]
@@ -508,6 +509,10 @@ Audit: audit.query, audit.log`,
   Required: orgId
 - file.presigned_url — Generate presigned access URL [file.read]
   Required: objectKey
+
+## App Tools (1) — scope: org.write
+- app.import — Import an application from a base64 zip (must contain app.json)
+  Required: orgId, zipBase64
 
 ## Audit Tools (2) — scope: audit.read / audit.write
 - audit.query — Query audit logs with filters [audit.read]

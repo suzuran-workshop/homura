@@ -19,6 +19,7 @@ func RegisterAllTools(
 	auditService *service.AuditService,
 	workflowService *service.WorkflowService,
 	dataService *service.DataService,
+	appService *service.ApplicationService,
 ) {
 	// Register organization tools
 	orgTools := NewOrgTools(orgService, rateLimiter, auditService)
@@ -52,5 +53,11 @@ func RegisterAllTools(
 	if dataService != nil {
 		dataTools := NewDataTools(dataService, rateLimiter, auditService)
 		dataTools.RegisterTools(server)
+	}
+
+	// Register app tools (only if the app service is configured)
+	if appService != nil {
+		appTools := NewAppTools(appService, rateLimiter, auditService)
+		appTools.RegisterTools(server)
 	}
 }

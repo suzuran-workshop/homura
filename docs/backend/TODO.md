@@ -117,6 +117,18 @@
 - [x] 迁移 002_app_distribution.sql + init.sql 更新
 - [x] workflow assignee 角色型指派废除（仅 user 类型）
 
+### 应用导入（zip 上传，2026-08-18，✅ 已完成）
+- [x] Application 模型 + source_key 字段（迁移 003 + init.sql）
+- [x] FileStorage.DownloadFile / UploadFileRaw（指定 key 上传，org 前缀隔离）
+- [x] Service：ImportApp（zip 安全解析：路径穿越/zip 炸弹防护 + app.json 清单校验 + 重名拒绝）
+- [x] REST：POST /api/provider/apps/import（multipart，50MB 上限）
+- [x] MCP tool：app.import（Agent 通道，zipBase64，scope org.write）
+- [x] 部署闭环：对象存储拉包 → 解压缓存 → 挂载 /workspace → entrypoint 执行
+- [x] 删除 SeedApps 本地目录扫描（/seed 路由移除）
+- [x] scripts/import-apps.ps1（从 suzuran-dlc-edu/apps 批量迁移，开发辅助）
+- [x] 前端「导入应用」对话框（provider 启动台）
+- [x] MCP resources/prompt 工具目录更新（23 → 24）
+
 ## ❌ 已移除（低代码资产）
 
 - ~~FormDefinition、FormSubmission、FormDistribution~~

@@ -9,6 +9,7 @@ import (
 	"github.com/xrl/suzuran-cloud/internal/model"
 	"github.com/xrl/suzuran-cloud/internal/repository"
 	"github.com/xrl/suzuran-cloud/internal/runtime"
+	"github.com/xrl/suzuran-cloud/internal/storage"
 )
 
 // CreateAppRequest is the request body for creating an application.
@@ -42,6 +43,7 @@ type ApplicationService struct {
 	appRepo    *repository.ApplicationRepository
 	deployRepo *repository.ApplicationDeploymentRepository
 	runtime    *runtime.RuntimeManager
+	storage    storage.FileStorage
 }
 
 // NewApplicationService creates a new ApplicationService.
@@ -49,8 +51,9 @@ func NewApplicationService(
 	appRepo *repository.ApplicationRepository,
 	deployRepo *repository.ApplicationDeploymentRepository,
 	rt *runtime.RuntimeManager,
+	storage storage.FileStorage,
 ) *ApplicationService {
-	return &ApplicationService{appRepo: appRepo, deployRepo: deployRepo, runtime: rt}
+	return &ApplicationService{appRepo: appRepo, deployRepo: deployRepo, runtime: rt, storage: storage}
 }
 
 // CreateApp creates a new application.

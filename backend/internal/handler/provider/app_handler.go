@@ -1,14 +1,11 @@
 package provider
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/xrl/suzuran-cloud/internal/model"
 	"github.com/xrl/suzuran-cloud/internal/service"
 )
 
@@ -173,101 +170,33 @@ func (h *AppHandler) Deployments(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deployments": deployments})
 }
 
-// SeedApps handles POST /api/provider/apps/seed
-// Scans the apps/ directory, reads app.json manifests, and creates Application records.
-// Skips apps that already exist (by name).
-func (h *AppHandler) SeedApps(c *gin.Context) {
+// Import handles POST /api/provider/apps/import
+// Uploads an application code zip (must contain app.json at its root).
+// The package is stored in object storage, so apps do not depend on
+// host filesystem paths and survive database resets.
+func (h *AppHandler) Import(c *gin.Context) {
 	orgID := c.GetInt("org_id")
 
-	// Default apps directory (can be overridden via APPS_DIR env var)
-	appsDir := os.Getenv("APPS_DIR")
-	if appsDir == "" {
-		appsDir = "../../apps"
-	}
+	// Limit request body to the maximum package size.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, service.MaxZipSize)
 
-	// Scan apps directory
-	entries, err := os.ReadDir(appsDir)
+	file, _, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read apps directory: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required: " + err.Error()})
+		return
+	}
+	defer file.Close()
+
+	zipData, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read package: " + err.Error()})
 		return
 	}
 
-	// Get existing apps to avoid duplicates
-	existingApps, _ := h.appService.ListApps(c.Request.Context(), orgID)
-	existingNames := make(map[string]bool)
-	for _, app := range existingApps {
-		existingNames[app.Name] = true
+	app, err := h.appService.ImportApp(c.Request.Context(), orgID, zipData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	var created []string
-	var skipped []string
-	var failed []map[string]string
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		appPath := filepath.Join(appsDir, entry.Name())
-		manifestPath := filepath.Join(appPath, "app.json")
-
-		// Check if app.json exists
-		manifestData, err := os.ReadFile(manifestPath)
-		if err != nil {
-			continue // Skip directories without app.json
-		}
-
-		// Parse manifest
-		var manifest struct {
-			Name        string            `json:"name"`
-			Version     string            `json:"version"`
-			Runtime     string            `json:"runtime"`
-			Entrypoint  string            `json:"entrypoint"`
-			Port        int               `json:"port"`
-			Resources   map[string]string `json:"resources"`
-			MCPScopes   []string          `json:"mcp_scopes"`
-			Routes      []model.Route     `json:"routes"`
-		}
-
-		if err := json.Unmarshal(manifestData, &manifest); err != nil {
-			failed = append(failed, map[string]string{
-				"app":   entry.Name(),
-				"error": "Invalid manifest: " + err.Error(),
-			})
-			continue
-		}
-
-		// Skip if already exists
-		if existingNames[manifest.Name] {
-			skipped = append(skipped, manifest.Name)
-			continue
-		}
-
-		// Create app
-		req := service.CreateAppRequest{
-			Name:        manifest.Name,
-			Version:     manifest.Version,
-			Runtime:     manifest.Runtime,
-			Entrypoint:  manifest.Entrypoint,
-			Port:        manifest.Port,
-			CPUQuota:    manifest.Resources["cpu"],
-			MemoryQuota: manifest.Resources["memory"],
-			MCPScopes:   manifest.MCPScopes,
-		}
-
-		if _, err := h.appService.CreateApp(c.Request.Context(), orgID, req); err != nil {
-			failed = append(failed, map[string]string{
-				"app":   manifest.Name,
-				"error": err.Error(),
-			})
-		} else {
-			created = append(created, manifest.Name)
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"created": created,
-		"skipped": skipped,
-		"failed":  failed,
-	})
+	c.JSON(http.StatusCreated, app)
 }

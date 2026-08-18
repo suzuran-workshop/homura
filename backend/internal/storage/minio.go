@@ -69,6 +69,35 @@ func (c *MinIOClient) UploadFile(ctx context.Context, orgID int, fileName string
 	}, nil
 }
 
+// UploadFileRaw uploads content to an explicit object key (used for app packages).
+func (c *MinIOClient) UploadFileRaw(ctx context.Context, objectKey string, reader io.Reader, contentType string, size int64) (*UploadResult, error) {
+	info, err := c.client.PutObject(ctx, c.bucket, objectKey, reader, size, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+	return &UploadResult{
+		ObjectKey:  objectKey,
+		Size:       info.Size,
+		UploadedAt: time.Now(),
+	}, nil
+}
+
+// DownloadFile streams an object from MinIO. Returns the reader and object size.
+func (c *MinIOClient) DownloadFile(ctx context.Context, objectKey string) (io.ReadCloser, int64, error) {
+	obj, err := c.client.GetObject(ctx, c.bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to download file: %w", err)
+	}
+	st, err := obj.Stat()
+	if err != nil {
+		obj.Close()
+		return nil, 0, fmt.Errorf("failed to stat file: %w", err)
+	}
+	return obj, st.Size, nil
+}
+
 // GetPresignedURL generates a presigned URL for download
 func (c *MinIOClient) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	reqParams := make(url.Values)
