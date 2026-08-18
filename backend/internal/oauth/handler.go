@@ -10,16 +10,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler exposes the OAuth2 + WebAuthn + DingTalk HTTP endpoints.
+// Handler exposes the OAuth2 + WebAuthn + DingTalk + Password HTTP endpoints.
 type Handler struct {
 	webAuthn *WebAuthnService
 	dingTalk *DingTalkService
 	oauth    *OAuthService
+	password *PasswordService
 }
 
 // NewHandler creates a new OAuth handler.
-func NewHandler(webAuthn *WebAuthnService, dingTalk *DingTalkService, oauth *OAuthService) *Handler {
-	return &Handler{webAuthn: webAuthn, dingTalk: dingTalk, oauth: oauth}
+func NewHandler(webAuthn *WebAuthnService, dingTalk *DingTalkService, oauth *OAuthService, password *PasswordService) *Handler {
+	return &Handler{webAuthn: webAuthn, dingTalk: dingTalk, oauth: oauth, password: password}
 }
 
 // --- WebAuthn registration ---
@@ -294,6 +295,37 @@ func (h *Handler) Revoke(c *gin.Context) {
 // GET /.well-known/openid-configuration
 func (h *Handler) Metadata(c *gin.Context) {
 	c.JSON(http.StatusOK, h.oauth.Metadata())
+}
+
+// --- Password login ---
+
+// PasswordLogin
+// POST /oauth/password/login
+// Authenticates with username+password and returns a sessionId + availableOrgs,
+// identical to the WebAuthn FinishLogin response shape.
+func (h *Handler) PasswordLogin(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	loginSessionID, err := h.password.Login(c.Request.Context(), req.Username, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	lr, _ := loadLoginSession(loginSessionID)
+	resp := gin.H{"sessionId": loginSessionID}
+	if lr != nil {
+		resp["userId"] = lr.UserID
+		resp["availableOrgs"] = lr.AvailableOrgs
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // silence unused imports if redirect parsing moves out later.

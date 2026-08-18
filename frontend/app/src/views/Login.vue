@@ -20,24 +20,63 @@
                   {{ successMessage }}
                 </v-alert>
 
+                <!-- 用户名/密码登录（主要方式） -->
+                <v-form ref="form" @submit.prevent="handlePasswordLogin">
+                  <v-text-field
+                    v-model="username"
+                    label="用户名"
+                    prepend-inner-icon="mdi-account"
+                    required
+                    :rules="[rules.required]"
+                    autocomplete="username"
+                    autocapitalize="off"
+                    class="mb-3"
+                  />
+
+                  <v-text-field
+                    v-model="password"
+                    :type="showPassword ? 'text' : 'password'"
+                    label="密码"
+                    prepend-inner-icon="mdi-lock"
+                    :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                    required
+                    :rules="[rules.required, rules.minLength]"
+                    autocomplete="current-password"
+                    class="mb-4"
+                    @click:append-inner="showPassword = !showPassword"
+                  />
+
+                  <v-btn
+                    type="submit"
+                    color="primary"
+                    size="x-large"
+                    block
+                    :loading="loading"
+                  >
+                    登录
+                  </v-btn>
+                </v-form>
+
+                <v-divider class="my-6">或使用其他方式登录</v-divider>
+
                 <!-- WebAuthn 登录 -->
                 <v-btn
-                  color="primary"
-                  size="x-large"
+                  color="secondary"
+                  size="large"
                   block
-                  :loading="loading"
+                  variant="outlined"
+                  :loading="passkeyLoading"
                   prepend-icon="mdi-fingerprint"
+                  class="mb-3"
                   @click="handlePasskeyLogin"
                 >
                   使用 Passkey 登录
                 </v-btn>
 
-                <v-divider class="my-6">或</v-divider>
-
                 <!-- 钉钉 OAuth 登录 -->
                 <v-btn
                   color="info"
-                  size="x-large"
+                  size="large"
                   block
                   variant="outlined"
                   :loading="dingtalkLoading"
@@ -64,14 +103,62 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
+const form = ref()
+const username = ref('')
+const password = ref('')
+const showPassword = ref(false)
 const loading = ref(false)
+const passkeyLoading = ref(false)
 const dingtalkLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+// 验证规则
+const rules = {
+  required: (v: string) => !!v || '必填',
+  minLength: (v: string) => v.length >= 6 || '密码至少 6 位',
+}
+
+// 用户名/密码登录
+const handlePasswordLogin = async () => {
+  const { valid } = await form.value.validate()
+  if (!valid) return
+
+  loading.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    // Step 1: 使用用户名/密码登录，获取 sessionId + availableOrgs
+    const result = await authStore.loginWithUsernamePassword(username.value, password.value)
+
+    // Step 2: 如果有可用组织，选择第一个并换取 token
+    if (result.availableOrgs.length > 0) {
+      const org = result.availableOrgs[0]
+      await authStore.completeLoginWithToken(result.sessionId, org.orgId)
+      successMessage.value = `已登录组织：${org.orgName}`
+    }
+
+    // Step 3: 根据角色路由
+    const role = authStore.userRole
+    if (role === 'provider') {
+      router.push('/provider/dashboard')
+    } else if (role === 'tenant_admin') {
+      router.push('/tenant/dashboard')
+    } else {
+      router.push('/user')
+    }
+  } catch (error: any) {
+    console.error('Password login failed:', error)
+    errorMessage.value = error.response?.data?.error || error.message || '用户名或密码错误'
+  } finally {
+    loading.value = false
+  }
+}
+
 // WebAuthn 登录流程：begin（空 identifier = discoverable）→ 浏览器弹窗 → finish → 拿 sessionId → 选组织 → 拿 token
 const handlePasskeyLogin = async () => {
-  loading.value = true
+  passkeyLoading.value = true
   errorMessage.value = ''
   successMessage.value = ''
 
@@ -99,7 +186,7 @@ const handlePasskeyLogin = async () => {
     console.error('Passkey login failed:', error)
     errorMessage.value = error.response?.data?.error || error.message || 'Passkey 登录失败'
   } finally {
-    loading.value = false
+    passkeyLoading.value = false
   }
 }
 

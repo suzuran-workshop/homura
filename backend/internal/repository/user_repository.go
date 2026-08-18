@@ -59,3 +59,19 @@ func (r *UserRepository) List(ctx context.Context) ([]*model.User, error) {
 	err := r.db.WithContext(ctx).Order("id ASC").Find(&users).Error
 	return users, err
 }
+
+// GetByUsername finds a user by their normalized username.
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).Where("username = ?", username).First(&user).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &user, err
+}
+
+// UpdatePassword sets a new bcrypt hash for the given user.
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
+		Update("password_hash", passwordHash).Error
+}

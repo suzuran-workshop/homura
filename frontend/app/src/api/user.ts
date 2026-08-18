@@ -5,6 +5,7 @@ export interface Member {
   userId: number
   phone: string
   name: string
+  username?: string
   email: string
   position: string
   bondId: string
@@ -16,6 +17,7 @@ export interface Member {
 export interface MemberRequest {
   phone: string
   name: string
+  username: string
   password: string
   email?: string
   position?: string
@@ -38,4 +40,10 @@ export function updateMember(orgId: number, userId: number, data: Partial<Member
 
 export function removeMember(orgId: number, userId: number) {
   return apiClient.delete<{ message: string }>(`/api/provider/orgs/${orgId}/users/${userId}`)
+}
+
+export function resetPassword(orgId: number, userId: number, newPassword: string) {
+  return apiClient.post<{ message: string }>(`/api/provider/orgs/${orgId}/users/${userId}/reset-password`, {
+    newPassword,
+  })
 }

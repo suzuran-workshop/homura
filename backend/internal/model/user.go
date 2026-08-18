@@ -2,7 +2,8 @@ package model
 
 import "time"
 
-// User represents a user account with OAuth (WebAuthn / DingTalk) integration.
+// User represents a user account. Supports password login (primary)
+// with WebAuthn/DingTalk as supplementary methods.
 type User struct {
 	ID           int       `gorm:"primaryKey" json:"id"`
 	Phone        string    `gorm:"index" json:"phone,omitempty"`
@@ -11,6 +12,10 @@ type User struct {
 	Name         string    `json:"name"`
 	AvatarURL    string    `gorm:"column:avatar_url" json:"avatarUrl,omitempty"`
 	Position     string    `json:"position,omitempty"`
+
+	// Username/password authentication (NULL for OAuth-only accounts)
+	Username     *string `gorm:"column:username" json:"username,omitempty"`
+	PasswordHash *string `gorm:"column:password_hash" json:"-"` // never serialize
 
 	// DingTalk integration (pointers so unset values are NULL, avoiding unique-constraint collisions)
 	DingtalkUserID  *string `gorm:"column:dingtalk_userid;uniqueIndex" json:"dingtalkUserId,omitempty"`

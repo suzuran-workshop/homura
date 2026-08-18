@@ -5,20 +5,23 @@ import (
 	"errors"
 
 	"github.com/xrl/suzuran-cloud/internal/model"
+	"github.com/xrl/suzuran-cloud/internal/pkg/password"
+	"github.com/xrl/suzuran-cloud/internal/pkg/username"
 	"github.com/xrl/suzuran-cloud/internal/repository"
 )
 
 // MemberView is the API-facing view of an organization member (user + bond fields).
 type MemberView struct {
-	UserID              int    `json:"userId"`
-	Phone               string `json:"phone"`
-	Name                string `json:"name"`
-	Email               string `json:"email"`
-	Position            string `json:"position"`
-	BondID              int    `json:"bondId"`
-	IsAdmin             bool   `json:"isAdmin"`
-	IsDepartmentManager bool   `json:"isDepartmentManager"`
-	DepartmentID        *int   `json:"departmentId"`
+	UserID              int     `json:"userId"`
+	Phone               string  `json:"phone"`
+	Name                string  `json:"name"`
+	Email               string  `json:"email"`
+	Username            *string `json:"username,omitempty"`
+	Position            string  `json:"position"`
+	BondID              int     `json:"bondId"`
+	IsAdmin             bool    `json:"isAdmin"`
+	IsDepartmentManager bool    `json:"isDepartmentManager"`
+	DepartmentID        *int    `json:"departmentId"`
 }
 
 // UserService handles organization member operations.
@@ -51,6 +54,7 @@ func (s *UserService) ListMembers(ctx context.Context, orgID int) ([]MemberView,
 			v.Phone = b.User.Phone
 			v.Name = b.User.Name
 			v.Email = b.User.Email
+			v.Username = b.User.Username
 			v.Position = b.User.Position
 		}
 		views = append(views, v)
@@ -59,8 +63,8 @@ func (s *UserService) ListMembers(ctx context.Context, orgID int) ([]MemberView,
 }
 
 // CreateMember creates a user (if new phone) and adds them to the organization.
-// Note: OAuth-only platform — members authenticate via WebAuthn/DingTalk, no password.
-func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, email, position string, isAdmin bool, deptID *int, isDeptMgr bool) (*MemberView, error) {
+// Members authenticate via username/password, with WebAuthn/DingTalk as supplementary.
+func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, email, usernameStr, plaintextPassword, position string, isAdmin bool, deptID *int, isDeptMgr bool) (*MemberView, error) {
 	existing, err := s.userRepo.GetByPhone(ctx, phone)
 	if err != nil {
 		return nil, err
@@ -79,12 +83,31 @@ func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, 
 		}
 		user = existing
 	} else {
-		// Create new user (no password — OAuth-only)
+		// Validate username
+		uname := username.Normalize(usernameStr)
+		if err := username.Validate(uname); err != nil {
+			return nil, err
+		}
+
+		// Check username uniqueness
+		if existingByUsername, _ := s.userRepo.GetByUsername(ctx, uname); existingByUsername != nil {
+			return nil, errors.New("username already taken")
+		}
+
+		// Hash password
+		hash, err := password.Hash(plaintextPassword)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create new user with username and password
 		user = &model.User{
-			Phone:    phone,
-			Name:     name,
-			Email:    email,
-			Position: position,
+			Phone:        phone,
+			Name:         name,
+			Email:        email,
+			Position:     position,
+			Username:     &uname,
+			PasswordHash: &hash,
 		}
 		if err := s.userRepo.Create(ctx, user); err != nil {
 			return nil, err
@@ -106,8 +129,7 @@ func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, 
 }
 
 // UpdateMember updates user fields and/or bond fields for a member.
-// Note: OAuth-only platform — no password updates; members set up their own
-// WebAuthn credential or bind DingTalk to authenticate.
+// Note: Password updates are handled separately via ResetPassword.
 func (s *UserService) UpdateMember(ctx context.Context, orgID, userID int, name, email, position string, isAdmin *bool, deptID *int, isDeptMgr *bool) (*MemberView, error) {
 	bond, err := s.bondRepo.GetByOrgAndUser(ctx, orgID, userID)
 	if err != nil {
@@ -205,10 +227,26 @@ func (s *UserService) singleMemberView(_ context.Context, bond *model.OrgUserBon
 		Phone:               user.Phone,
 		Name:                user.Name,
 		Email:               user.Email,
+		Username:            user.Username,
 		Position:            user.Position,
 		BondID:              bond.ID,
 		IsAdmin:             bond.IsAdmin,
 		IsDepartmentManager: bond.IsDepartmentManager,
 		DepartmentID:        bond.DepartmentID,
 	}, nil
+}
+
+// ResetPassword sets a new password for an existing user.
+func (s *UserService) ResetPassword(ctx context.Context, userID int, newPassword string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return errors.New("user not found")
+	}
+
+	hash, err := password.Hash(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.userRepo.UpdatePassword(ctx, userID, hash)
 }

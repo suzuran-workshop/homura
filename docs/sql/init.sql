@@ -18,7 +18,7 @@ CREATE TABLE orgs (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 用户表（全局）— OAuth-only，无密码字段
+-- 用户表（全局）— 支持用户名/密码登录，WebAuthn/钉钉作为补充
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     phone VARCHAR(20),
@@ -26,6 +26,8 @@ CREATE TABLE users (
     email_verified BOOLEAN DEFAULT FALSE,
     name VARCHAR(255),
     position VARCHAR(255),
+    username VARCHAR(50),
+    password_hash VARCHAR(255),
     dingtalk_userid VARCHAR(100) UNIQUE,
     dingtalk_unionid VARCHAR(100),
     dingtalk_openid VARCHAR(100),
@@ -36,6 +38,7 @@ CREATE TABLE users (
 );
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_dingtalk_unionid ON users(dingtalk_unionid);
+CREATE UNIQUE INDEX idx_users_username ON users(username) WHERE username IS NOT NULL;
 
 -- WebAuthn 凭证表（Passkey 注册）
 CREATE TABLE webauthn_credentials (

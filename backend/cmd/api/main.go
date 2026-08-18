@@ -119,9 +119,10 @@ func main() {
 	}
 	dingTalkSvc := oauth.NewDingTalkService(oauthCfg, userRepo, bondRepo, orgRepo)
 	oauthSvc := oauth.NewOAuthService(oauthCfg, tokenRepo, sessionRepo, clientRepo, userRepo, bondRepo, orgRepo)
+	passwordSvc := oauth.NewPasswordService(userRepo, bondRepo, orgRepo)
 
 	// Initialize handlers with dependency injection
-	oauthHandler := oauth.NewHandler(webAuthnSvc, dingTalkSvc, oauthSvc)
+	oauthHandler := oauth.NewHandler(webAuthnSvc, dingTalkSvc, oauthSvc, passwordSvc)
 	orgHandler := provider.NewOrgHandler(orgService)
 	orgMemberHandler := provider.NewOrgMemberHandler(deptService, userService)
 	deptHandler := tenant.NewDepartmentHandler(deptService, userService)
@@ -253,6 +254,9 @@ func main() {
 		oauthGroup.GET("/dingtalk/authorize", oauthHandler.DingTalkAuthorize)
 		oauthGroup.GET("/dingtalk/callback", oauthHandler.DingTalkCallback)
 
+		// Password login (primary login method)
+		oauthGroup.POST("/password/login", oauthHandler.PasswordLogin)
+
 		// Session token exchange (login → token bridge)
 		oauthGroup.POST("/session/token", oauthHandler.SessionToken)
 
@@ -326,6 +330,7 @@ func main() {
 				orgUsers.POST("", orgMemberHandler.CreateMember)
 				orgUsers.PUT("/:userId", orgMemberHandler.UpdateMember)
 				orgUsers.DELETE("/:userId", orgMemberHandler.RemoveMember)
+				orgUsers.POST("/:userId/reset-password", orgMemberHandler.ResetPassword)
 			}
 
 			// DingTalk organization sync (only mounted when configured)
@@ -365,6 +370,7 @@ func main() {
 			tenantGroup.POST("/users", userHandler.CreateMember)
 			tenantGroup.PUT("/users/:userId", userHandler.UpdateMember)
 			tenantGroup.DELETE("/users/:userId", userHandler.RemoveMember)
+			tenantGroup.POST("/users/:userId/reset-password", userHandler.ResetPassword)
 
 			// Department routes
 			depts := tenantGroup.Group("/departments")

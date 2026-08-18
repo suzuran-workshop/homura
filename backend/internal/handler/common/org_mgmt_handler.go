@@ -171,19 +171,21 @@ func (h *OrgMgmtHandler) CreateMember(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Phone     string `json:"phone"`
-		Name      string `json:"name"`
-		Email     string `json:"email"`
-		Position  string `json:"position"`
-		IsAdmin   bool   `json:"isAdmin"`
-		DeptID    *int   `json:"departmentId"`
-		IsDeptMgr bool   `json:"isDepartmentManager"`
+		Phone    string `json:"phone"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required,min=6"`
+		Position string `json:"position"`
+		IsAdmin   bool  `json:"isAdmin"`
+		DeptID    *int  `json:"departmentId"`
+		IsDeptMgr bool  `json:"isDepartmentManager"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	member, err := h.userService.CreateMember(c.Request.Context(), orgID, req.Phone, req.Name, req.Email, req.Position, req.IsAdmin, req.DeptID, req.IsDeptMgr)
+	member, err := h.userService.CreateMember(c.Request.Context(), orgID, req.Phone, req.Name, req.Email, req.Username, req.Password, req.Position, req.IsAdmin, req.DeptID, req.IsDeptMgr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -238,4 +240,23 @@ func (h *OrgMgmtHandler) RemoveMember(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "removed"})
+}
+
+// ResetPassword
+// POST /api/provider/orgs/:orgId/users/:userId/reset-password
+// POST /api/tenant/users/:userId/reset-password
+func (h *OrgMgmtHandler) ResetPassword(c *gin.Context) {
+	userID, _ := strconv.Atoi(c.Param("userId"))
+	var req struct {
+		NewPassword string `json:"newPassword" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.userService.ResetPassword(c.Request.Context(), userID, req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "password reset successful"})
 }

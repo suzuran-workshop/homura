@@ -22,6 +22,19 @@ export interface LoginResult {
   availableOrgs: OrgChoice[]
 }
 
+// ---- Password login ----
+
+export interface PasswordLoginRequest {
+  username: string
+  password: string
+}
+
+export async function loginWithPassword(data: PasswordLoginRequest) {
+  return apiClient.post<LoginResult>('/oauth/password/login', data)
+}
+
+// ---- WebAuthn login ----
+
 export async function beginLogin() {
   return apiClient.post<BeginLoginResponse>('/oauth/webauthn/login/begin', {})
 }

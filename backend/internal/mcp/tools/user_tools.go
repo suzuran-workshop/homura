@@ -223,6 +223,8 @@ func (t *UserTools) handleCreateMember(ctx context.Context, request mcp.CallTool
 	}
 
 	email := mcpserver.GetOptionalStringArg(request.Params.Arguments, "email", "")
+	usernameStr := mcpserver.GetOptionalStringArg(request.Params.Arguments, "username", "")
+	passwordStr := mcpserver.GetOptionalStringArg(request.Params.Arguments, "password", "")
 	position := mcpserver.GetOptionalStringArg(request.Params.Arguments, "position", "")
 	isAdmin := mcpserver.GetOptionalBoolArg(request.Params.Arguments, "isAdmin", false)
 	isDepartmentManager := mcpserver.GetOptionalBoolArg(request.Params.Arguments, "isDepartmentManager", false)
@@ -236,7 +238,7 @@ func (t *UserTools) handleCreateMember(ctx context.Context, request mcp.CallTool
 		}
 	}
 
-	member, err := t.userService.CreateMember(ctx, orgID, phone, name, email, position, isAdmin, deptID, isDepartmentManager)
+	member, err := t.userService.CreateMember(ctx, orgID, phone, name, email, usernameStr, passwordStr, position, isAdmin, deptID, isDepartmentManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create member: %w", err)
 	}

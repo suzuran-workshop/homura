@@ -20,6 +20,7 @@
         <thead>
           <tr>
             <th class="text-left">姓名</th>
+            <th class="text-left">用户名</th>
             <th class="text-left">手机</th>
             <th class="text-left">部门</th>
             <th class="text-left">职位</th>
@@ -30,6 +31,7 @@
         <tbody>
           <tr v-for="m in members" :key="m.userId">
             <td class="font-weight-medium">{{ m.name }}</td>
+            <td>{{ m.username || '—' }}</td>
             <td>{{ m.phone }}</td>
             <td>{{ deptName(m.departmentId) }}</td>
             <td>{{ m.position || '—' }}</td>
@@ -40,6 +42,7 @@
             </td>
             <td class="text-right">
               <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-pencil" @click="openEditDialog(m)">编辑</v-btn>
+              <v-btn size="small" variant="text" color="warning" prepend-icon="mdi-lock-reset" @click="openResetPasswordDialog(m)">重置密码</v-btn>
               <v-btn size="small" variant="text" color="error" prepend-icon="mdi-delete" @click="onRemove(m)">移除</v-btn>
             </td>
           </tr>
@@ -54,7 +57,8 @@
         <v-card-text>
           <v-text-field v-model="form.phone" label="手机号" variant="outlined" :disabled="!!editing" :rules="[v => !!v?.trim() || '请输入手机号']" class="mb-3" />
           <v-text-field v-model="form.name" label="姓名" variant="outlined" :rules="[v => !!v?.trim() || '请输入姓名']" class="mb-3" />
-          <v-text-field v-model="form.password" :label="editing ? '密码（留空不改）' : '密码'" variant="outlined" :type="showPwd ? 'text' : 'password'" :append-inner-icon="showPwd ? 'mdi-eye' : 'mdi-eye-off'" @click:append-inner="showPwd = !showPwd" :rules="editing ? [] : [v => !!v || '请输入密码']" class="mb-3" />
+          <v-text-field v-model="form.username" label="用户名" variant="outlined" :disabled="!!editing" placeholder="user-name" prepend-inner-icon="mdi-account" :rules="[v => !!v?.trim() || '请输入用户名', v => /^[a-z][a-z-]{2,49}$/.test(v) || '3-50位小写字母和连字符，以字母开头']" autocapitalize="off" class="mb-3" />
+          <v-text-field v-model="form.password" :label="editing ? '密码（留空不改）' : '密码'" variant="outlined" :type="showPwd ? 'text' : 'password'" :append-inner-icon="showPwd ? 'mdi-eye' : 'mdi-eye-off'" @click:append-inner="showPwd = !showPwd" :rules="editing ? [] : [v => !!v || '请输入密码', v => v.length >= 6 || '密码至少6位']" class="mb-3" />
           <v-text-field v-model="form.email" label="邮箱" variant="outlined" class="mb-3" />
           <v-text-field v-model="form.position" label="职位" variant="outlined" class="mb-3" />
           <v-select v-model="form.departmentId" :items="deptOptions" item-title="title" item-value="value" label="部门" variant="outlined" clearable class="mb-3" />
@@ -71,6 +75,31 @@
       </v-card>
     </v-dialog>
 
+    <!-- 重置密码对话框 -->
+    <v-dialog v-model="showResetPasswordDialog" max-width="400">
+      <v-card>
+        <v-card-title class="text-h5">重置密码</v-card-title>
+        <v-card-text>
+          <p class="mb-4">为成员 <strong>{{ resetPasswordMember?.name }}</strong> 设置新密码：</p>
+          <v-text-field
+            v-model="newPassword"
+            label="新密码"
+            variant="outlined"
+            :type="showResetPwd ? 'text' : 'password'"
+            :append-inner-icon="showResetPwd ? 'mdi-eye' : 'mdi-eye-off'"
+            @click:append-inner="showResetPwd = !showResetPwd"
+            :rules="[v => !!v || '请输入新密码', v => v.length >= 6 || '密码至少6位']"
+            autofocus
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showResetPasswordDialog = false">取消</v-btn>
+          <v-btn color="primary" :loading="resettingPassword" @click="onResetPassword">确认重置</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :timeout="2000" color="success">{{ snackbarMsg }}</v-snackbar>
   </div>
 </template>
@@ -78,7 +107,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { listDepartments, type Department } from '../../api/department'
-import { listMembers, createMember, updateMember, removeMember, type Member, type MemberRequest } from '../../api/user'
+import { listMembers, createMember, updateMember, removeMember, resetPassword, type Member, type MemberRequest } from '../../api/user'
 
 const props = defineProps<{ orgId: number }>()
 
@@ -96,6 +125,7 @@ const showPwd = ref(false)
 const form = ref({
   phone: '',
   name: '',
+  username: '',
   password: '',
   email: '',
   position: '',
@@ -103,6 +133,12 @@ const form = ref({
   isAdmin: false,
   isDepartmentManager: false,
 })
+
+const showResetPasswordDialog = ref(false)
+const resettingPassword = ref(false)
+const resetPasswordMember = ref<Member | null>(null)
+const newPassword = ref('')
+const showResetPwd = ref(false)
 
 const deptOptions = computed(() =>
   departments.value.map(d => ({ title: d.name, value: d.id }))
@@ -139,6 +175,7 @@ function resetForm() {
   form.value = {
     phone: '',
     name: '',
+    username: '',
     password: '',
     email: '',
     position: '',
@@ -160,6 +197,7 @@ function openEditDialog(m: Member) {
   form.value = {
     phone: m.phone,
     name: m.name,
+    username: m.username || '',
     password: '',
     email: m.email || '',
     position: m.position || '',
@@ -169,6 +207,33 @@ function openEditDialog(m: Member) {
   }
   showPwd.value = false
   showFormDialog.value = true
+}
+
+function openResetPasswordDialog(m: Member) {
+  resetPasswordMember.value = m
+  newPassword.value = ''
+  showResetPwd.value = false
+  showResetPasswordDialog.value = true
+}
+
+async function onResetPassword() {
+  if (!resetPasswordMember.value || !newPassword.value) return
+  if (newPassword.value.length < 6) {
+    error.value = '密码至少6位'
+    return
+  }
+
+  resettingPassword.value = true
+  error.value = ''
+  try {
+    await resetPassword(props.orgId, resetPasswordMember.value.userId, newPassword.value)
+    showSnack(`已重置「${resetPasswordMember.value.name}」的密码`)
+    showResetPasswordDialog.value = false
+  } catch (e: any) {
+    error.value = e.response?.data?.error || '重置密码失败'
+  } finally {
+    resettingPassword.value = false
+  }
 }
 
 async function onSave() {
@@ -190,6 +255,7 @@ async function onSave() {
       await createMember(props.orgId, {
         phone: form.value.phone.trim(),
         name: form.value.name.trim(),
+        username: form.value.username.trim(),
         password: form.value.password,
         email: form.value.email || undefined,
         position: form.value.position || undefined,

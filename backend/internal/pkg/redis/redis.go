@@ -18,7 +18,7 @@ func InitClient() error {
 
 	password := os.Getenv("REDIS_PASSWORD")
 
-	Client = redis.NewClient(&redis.Options{
+	c := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
 		DB:       0,
@@ -27,7 +27,14 @@ func InitClient() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	return Client.Ping(ctx).Err()
+	if err := c.Ping(ctx).Err(); err != nil {
+		// Keep Client nil so in-memory fallbacks activate everywhere.
+		Client = nil
+		return err
+	}
+
+	Client = c
+	return nil
 }
 
 func Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {

@@ -26,7 +26,7 @@
                   <v-stepper-window>
                     <!-- Step 1: Create first admin user -->
                     <v-stepper-window-item :value="1">
-                      <v-form @submit.prevent="createAdmin" class="pa-4">
+                      <v-form ref="formRef" @submit.prevent="createAdmin" class="pa-4">
                         <v-text-field
                           v-model="adminName"
                           label="管理员姓名"
@@ -43,6 +43,28 @@
                           :rules="[v => !!v || '邮箱不能为空', v => /.+@.+\..+/.test(v) || '邮箱格式不正确']"
                           required
                           class="mb-4"
+                        />
+                        <v-text-field
+                          v-model="adminUsername"
+                          label="管理员用户名"
+                          placeholder="admin-user"
+                          prepend-inner-icon="mdi-account"
+                          :rules="[v => !!v || '用户名不能为空', v => /^[a-z][a-z-]{2,49}$/.test(v) || '3-50位小写字母和连字符，以字母开头']"
+                          required
+                          autocapitalize="off"
+                          class="mb-4"
+                        />
+                        <v-text-field
+                          v-model="adminPassword"
+                          label="管理员密码"
+                          placeholder="至少 6 位"
+                          prepend-inner-icon="mdi-lock"
+                          :type="showPwd ? 'text' : 'password'"
+                          :append-inner-icon="showPwd ? 'mdi-eye-off' : 'mdi-eye'"
+                          :rules="[v => !!v || '密码不能为空', v => v.length >= 6 || '密码至少 6 位']"
+                          required
+                          class="mb-4"
+                          @click:append-inner="showPwd = !showPwd"
                         />
                         <v-text-field
                           v-model="orgName"
@@ -64,14 +86,17 @@
                       </v-form>
                     </v-stepper-window-item>
 
-                    <!-- Step 2: Register Passkey -->
+                    <!-- Step 2: Register Passkey (optional) -->
                     <v-stepper-window-item :value="2">
                       <div class="pa-4">
                         <p class="text-body-1 mb-4">
-                          现在为管理员 <strong>{{ adminName }}</strong> 注册 Passkey（安全密钥）。
+                          管理员 <strong>{{ adminName }}</strong> 已创建成功，可以使用密码登录。
+                        </p>
+                        <p class="text-body-2 mb-2">
+                          你也可以注册 Passkey（安全密钥）来增强安全性。
                         </p>
                         <p class="text-body-2 text-grey-darken-1 mb-6">
-                          Passkey 用于无密码登录，支持生物识别（指纹、面容）或硬件安全密钥。
+                          Passkey 支持生物识别（指纹、面容）或硬件安全密钥，可作为密码的补充登录方式。
                         </p>
                         <v-btn
                           color="primary"
@@ -81,7 +106,16 @@
                           @click="registerPasskey"
                         >
                           <v-icon start>mdi-key</v-icon>
-                          注册 Passkey
+                          注册 Passkey（可选）
+                        </v-btn>
+                        <v-btn
+                          variant="outlined"
+                          block
+                          class="mt-3"
+                          :disabled="loading"
+                          @click="step = 3"
+                        >
+                          跳过，使用密码登录
                         </v-btn>
                         <v-btn
                           variant="text"
@@ -143,16 +177,23 @@ const router = useRouter()
 const step = ref(1)
 const loading = ref(false)
 const errorMessage = ref('')
+const formRef = ref()
+const showPwd = ref(false)
 
 // Step 1 fields
 const adminName = ref('')
 const adminEmail = ref('')
+const adminUsername = ref('')
+const adminPassword = ref('')
 const orgName = ref('')
 
 // Step 2 fields (stored after step 1)
 let userId = 0
 
 async function createAdmin() {
+  const { valid } = await formRef.value.validate()
+  if (!valid) return
+
   loading.value = true
   errorMessage.value = ''
 
@@ -161,6 +202,8 @@ async function createAdmin() {
     const resp = await apiClient.post('/oobe/setup', {
       adminName: adminName.value,
       adminEmail: adminEmail.value,
+      adminUsername: adminUsername.value,
+      adminPassword: adminPassword.value,
       orgName: orgName.value,
     })
 

@@ -1,5 +1,5 @@
 // frontend/app/src/stores/auth.ts
-// Auth store — OAuth-only (WebAuthn + DingTalk). No passwords.
+// Auth store — Multi-method auth: password (primary), WebAuthn, DingTalk.
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
@@ -8,6 +8,7 @@ import {
   getDingTalkAuthorizeURL,
   exchangeLoginSession,
   refreshAccessToken,
+  loginWithPassword,
   type OrgChoice,
   type LoginResult,
 } from '../api/oauth'
@@ -33,6 +34,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value)
   const userRole = computed(() => user.value?.role || '')
+
+  // ---- Password login (primary method) ----
+
+  async function loginWithUsernamePassword(username: string, password: string): Promise<LoginResult> {
+    const resp = await loginWithPassword({ username, password })
+    const data = resp.data
+    availableOrgs.value = data.availableOrgs
+    loginSessionId.value = data.sessionId
+    return data
+  }
 
   // ---- WebAuthn login ----
 
@@ -153,6 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginSessionId,
     isAuthenticated,
     userRole,
+    loginWithUsernamePassword,
     loginWithPasskey,
     completeLoginWithToken,
     redirectToDingTalk,
