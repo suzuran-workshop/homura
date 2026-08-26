@@ -1,50 +1,49 @@
-<!-- 组织详情：头部卡片 + v-tabs 部门/成员 -->
+<!-- 组织详情：头部卡片 + fluent-tablist 部门/成员 -->
 <template>
   <div v-if="org">
-    <v-btn variant="text" prepend-icon="mdi-arrow-left" @click="router.push('/provider/orgs')" class="mb-4">
+    <fluent-button appearance="subtle" @click="router.push('/provider/orgs')" style="margin-bottom: var(--spacingVerticalM);">
+      <i class="mdi mdi-arrow-left" style="font-size: 16px; margin-right: 4px;"</i>
       返回组织列表
-    </v-btn>
+    </fluent-button>
 
     <!-- 组织头部 -->
-    <v-card class="mb-6">
-      <v-card-text>
-        <div class="d-flex align-center">
-          <v-avatar color="primary" size="56" class="mr-4">
-            <v-icon size="32">mdi-domain</v-icon>
-          </v-avatar>
-          <div>
-            <div class="text-h5 font-weight-bold">{{ org.name }}</div>
-            <div class="text-caption text-grey mt-1">ID: {{ org.id }}</div>
-          </div>
+    <FluentCard style="margin-bottom: var(--spacingVerticalXL);">
+      <div style="display: flex; align-items: center; gap: var(--spacingHorizontalM);">
+        <div style="width: 56px; height: 56px; border-radius: var(--borderRadiusCircular); background: var(--colorBrandBackground); display: flex; align-items: center; justify-content: center;">
+          <i class="mdi mdi-domain" style="font-size: 32px; color: #fff"</i>
         </div>
-        <v-divider class="my-4"></v-divider>
-        <div class="text-body-2 text-grey-darken-1">{{ org.description || '暂无描述' }}</div>
-      </v-card-text>
-    </v-card>
+        <div>
+          <div style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightBold);">{{ org.name }}</div>
+          <div style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground3); margin-top: var(--spacingVerticalXS);">ID: {{ org.id }}</div>
+        </div>
+      </div>
+      <fluent-divider style="margin: var(--spacingVerticalM) 0;" />
+      <div style="font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground2);">{{ org.description || '暂无描述' }}</div>
+    </FluentCard>
 
     <!-- 部门 / 成员 Tab -->
-    <v-tabs v-model="activeTab" color="primary" class="mb-4">
-      <v-tab value="departments">
-        <v-icon start>mdi-folder-tree</v-icon>部门
-      </v-tab>
-      <v-tab value="members">
-        <v-icon start>mdi-account-group</v-icon>成员
-      </v-tab>
-    </v-tabs>
+    <fluent-tablist :selected-value="activeTab" @change="activeTab = ($event.target as any).selectedValue" style="margin-bottom: var(--spacingVerticalM);">
+      <fluent-tab value="departments">
+        <i class="mdi mdi-folder" style="font-size: 16px; margin-right: 4px;"</i>
+        部门
+      </fluent-tab>
+      <fluent-tab value="members">
+        <i class="mdi mdi-account-group" style="font-size: 16px; margin-right: 4px;"</i>
+        成员
+      </fluent-tab>
+    </fluent-tablist>
 
-    <v-window v-model="activeTab">
-      <v-window-item value="departments">
-        <DepartmentManager :org-id="orgId" />
-      </v-window-item>
-      <v-window-item value="members">
-        <MemberManager :org-id="orgId" />
-      </v-window-item>
-    </v-window>
+    <div v-if="activeTab === 'departments'">
+      <DepartmentManager :org-id="orgId" />
+    </div>
+    <div v-if="activeTab === 'members'">
+      <MemberManager :org-id="orgId" />
+    </div>
   </div>
 
-  <div v-else class="text-center pa-8">
-    <v-progress-circular indeterminate color="primary"></v-progress-circular>
-    <div class="mt-4 text-grey">加载组织中...</div>
+  <div v-else style="text-align: center; padding: var(--spacingVerticalXXXL);">
+    <fluent-spinner size="large" />
+    <div style="margin-top: var(--spacingVerticalM); color: var(--colorNeutralForeground3);">加载组织中...</div>
   </div>
 </template>
 
@@ -54,6 +53,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { listOrgs, type Org } from '../../api/org'
 import DepartmentManager from '../../components/org/DepartmentManager.vue'
 import MemberManager from '../../components/org/MemberManager.vue'
+import FluentCard from '../../components/FluentCard.vue'
 
 const router = useRouter()
 const route = useRoute()

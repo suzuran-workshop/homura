@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter, RouterView } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import ToastMessage from './components/ToastMessage.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -26,8 +27,14 @@ function handleLogout() {
 </script>
 
 <template>
-  <RouterView />
+  <RouterView v-slot="{ Component }">
+    <Transition name="fade" mode="out-in">
+      <component :is="Component" />
+    </Transition>
+  </RouterView>
+  <ToastMessage />
 </template>
 
-<style scoped>
+<style>
+@import './style.css';
 </style>

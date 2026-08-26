@@ -80,16 +80,6 @@ const router = createRouter({
           name: 'AppDistribution',
           component: () => import('../views/provider/AppDistribution.vue'),
         },
-        {
-          path: 'mcp/tools',
-          name: 'ProviderMCPTools',
-          component: () => import('../views/provider/MCPTools.vue'),
-        },
-        {
-          path: 'mcp/logs',
-          name: 'ProviderMCPLogs',
-          component: () => import('../views/provider/MCPLogs.vue'),
-        },
       ],
     },
     // User routes (用户端) — accessible to ALL authenticated users

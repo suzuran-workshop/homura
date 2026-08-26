@@ -1,215 +1,160 @@
 <!-- frontend/app/src/views/provider/Dashboard.vue -->
 <template>
   <div>
-    <h1 class="text-h4 mb-4">仪表盘</h1>
+    <h2 style="font-size: var(--fontSizeBase500); font-weight: var(--fontWeightSemibold); margin-bottom: var(--spacingVerticalL);">仪表盘</h2>
 
     <!-- System Monitoring Section -->
-    <v-row class="mb-6">
-      <v-col cols="12">
-        <h2 class="text-h5 mb-3">服务端运行情况</h2>
-      </v-col>
+    <h3 style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold); margin-bottom: var(--spacingVerticalM);">服务端运行情况</h3>
 
+    <div class="metrics-grid">
       <!-- Memory Usage Card -->
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-text>
-            <div class="d-flex align-center mb-2">
-              <v-icon size="32" color="primary" class="mr-2">mdi-memory</v-icon>
-              <span class="text-h6">内存使用</span>
-            </div>
-            <v-progress-linear
-              :model-value="memoryUsagePercent"
-              :color="getMemoryColor(memoryUsagePercent)"
-              height="20"
-              rounded
-              class="mb-2"
-            >
-              <template v-slot:default="{ value }">
-                <strong>{{ Math.round(value) }}%</strong>
-              </template>
-            </v-progress-linear>
-            <div class="text-caption text-grey">
-              {{ formatBytes(systemMetrics.memoryUsage) }} / {{ formatBytes(systemMetrics.memoryTotal) }}
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
+      <FluentCard>
+        <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalS);">
+          <i class="mdi mdi-memory" style="font-size: 28px; color: var(--colorBrandForeground1)"</i>
+          <span style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold);">内存使用</span>
+        </div>
+        <fluent-progress-bar
+          :value="memoryUsagePercent"
+          :max="100"
+          style="margin-bottom: var(--spacingVerticalS);"
+        />
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>{{ Math.round(memoryUsagePercent) }}%</strong>
+        </div>
+        <div class="text-caption">
+          {{ formatBytes(systemMetrics.memoryUsage) }} / {{ formatBytes(systemMetrics.memoryTotal) }}
+        </div>
+      </FluentCard>
 
       <!-- Disk Usage Card -->
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-text>
-            <div class="d-flex align-center mb-2">
-              <v-icon size="32" color="secondary" class="mr-2">mdi-harddisk</v-icon>
-              <span class="text-h6">磁盘使用</span>
-            </div>
-            <v-progress-linear
-              :model-value="diskUsagePercent"
-              :color="getDiskColor(diskUsagePercent)"
-              height="20"
-              rounded
-              class="mb-2"
-            >
-              <template v-slot:default="{ value }">
-                <strong>{{ Math.round(value) }}%</strong>
-              </template>
-            </v-progress-linear>
-            <div class="text-caption text-grey">
-              {{ formatBytes(systemMetrics.diskUsage) }} / {{ formatBytes(systemMetrics.diskTotal) }}
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
+      <FluentCard>
+        <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalS);">
+          <i class="mdi mdi-harddisk" style="font-size: 28px; color: var(--colorPalettePurpleForeground1)"</i>
+          <span style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold);">磁盘使用</span>
+        </div>
+        <fluent-progress-bar
+          :value="diskUsagePercent"
+          :max="100"
+          style="margin-bottom: var(--spacingVerticalS);"
+        />
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>{{ Math.round(diskUsagePercent) }}%</strong>
+        </div>
+        <div class="text-caption">
+          {{ formatBytes(systemMetrics.diskUsage) }} / {{ formatBytes(systemMetrics.diskTotal) }}
+        </div>
+      </FluentCard>
 
       <!-- Database Pressure Card -->
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-text>
-            <div class="d-flex align-center mb-2">
-              <v-icon size="32" color="info" class="mr-2">mdi-database</v-icon>
-              <span class="text-h6">数据库连接</span>
-            </div>
-            <v-progress-linear
-              :model-value="dbConnectionPercent"
-              :color="getDbColor(dbConnectionPercent)"
-              height="20"
-              rounded
-              class="mb-2"
-            >
-              <template v-slot:default>
-                <strong v-if="dbMetrics.maxOpenConns > 0">{{ dbMetrics.inUse }} / {{ dbMetrics.maxOpenConns }}</strong>
-                <strong v-else>{{ dbMetrics.inUse }} (无限制)</strong>
-              </template>
-            </v-progress-linear>
-            <div class="text-caption text-grey">
-              活跃: {{ dbMetrics.activeConnections }}, 空闲: {{ dbMetrics.idleConnections }}
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+      <FluentCard>
+        <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalS);">
+          <i class="mdi mdi-database" style="font-size: 28px; color: var(--colorPaletteBlueForeground1)"</i>
+          <span style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold);">数据库连接</span>
+        </div>
+        <fluent-progress-bar
+          :value="dbConnectionPercent"
+          :max="100"
+          style="margin-bottom: var(--spacingVerticalS);"
+        />
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong v-if="dbMetrics.maxOpenConns > 0">{{ dbMetrics.inUse }} / {{ dbMetrics.maxOpenConns }}</strong>
+          <strong v-else>{{ dbMetrics.inUse }} (无限制)</strong>
+        </div>
+        <div class="text-caption">
+          活跃: {{ dbMetrics.activeConnections }}, 空闲: {{ dbMetrics.idleConnections }}
+        </div>
+      </FluentCard>
+    </div>
 
     <!-- Additional System Info -->
-    <v-row class="mb-6">
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="primary">mdi-cpu-64-bit</v-icon>
-                </template>
-                <v-list-item-title>CPU 核心数</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="primary" size="small">{{ systemMetrics.cpuCores }}</v-chip>
-                </template>
-              </v-list-item>
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="success">mdi-application</v-icon>
-                </template>
-                <v-list-item-title>Goroutine 数量</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="success" size="small">{{ systemMetrics.goroutineCount }}</v-chip>
-                </template>
-              </v-list-item>
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="warning">mdi-clock-outline</v-icon>
-                </template>
-                <v-list-item-title>运行时间</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="warning" size="small">{{ systemMetrics.uptime || 'N/A' }}</v-chip>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="info">mdi-database-outline</v-icon>
-                </template>
-                <v-list-item-title>最大连接数</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="info" size="small">{{ dbMetrics.maxOpenConns > 0 ? dbMetrics.maxOpenConns : '无限制' }}</v-chip>
-                </template>
-              </v-list-item>
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="error">mdi-timer-sand</v-icon>
-                </template>
-                <v-list-item-title>等待次数</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="error" size="small">{{ dbMetrics.waitCount || 0 }}</v-chip>
-                </template>
-              </v-list-item>
-              <v-list-item>
-                <template v-slot:prepend>
-                  <v-icon color="secondary">mdi-update</v-icon>
-                </template>
-                <v-list-item-title>最后更新</v-list-item-title>
-                <template v-slot:append>
-                  <v-chip color="secondary" size="small">{{ lastUpdateTime }}</v-chip>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Backend Logs Section -->
-    <v-row>
-      <v-col cols="12">
-        <div class="d-flex align-center mb-2">
-          <h2 class="text-h5">后端运行日志</h2>
-          <v-spacer></v-spacer>
-          <v-select
-            v-model="logLevelFilter"
-            :items="['DEBUG', 'INFO', 'WARN', 'ERROR']"
-            label="日志级别"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="width: 120px; margin-right: 8px"
-          />
-          <v-select
-            v-model="logLimit"
-            :items="[100, 200, 500]"
-            label="显示条数"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="width: 120px"
-            @update:model-value="fetchLogs"
-          />
-        </div>
-        <div class="terminal-container">
-          <div class="terminal-output" ref="terminalRef">
-            <div v-for="(log, index) in filteredLogs" :key="index" class="terminal-line">
-              <span class="terminal-time">{{ formatTerminalTime(log.timestamp) }}</span>
-              <span :class="getTerminalLevelClass(log.level)" class="terminal-level">{{ log.level.toUpperCase() }}</span>
-              <span class="terminal-message">{{ log.message }}</span>
-            </div>
-            <div v-if="filteredLogs.length === 0" class="terminal-empty text-grey">
-              暂无符合条件的日志
-            </div>
+    <div class="info-grid" style="margin-top: var(--spacingVerticalXL);">
+      <FluentCard>
+        <div class="info-list">
+          <div class="info-row">
+            <i class="mdi mdi-memory mdi-18px" style="color: var(--colorBrandForeground1)"></i>
+            <span class="info-label">CPU 核心数</span>
+            <FluentChip color="brand" small>{{ systemMetrics.cpuCores }}</FluentChip>
+          </div>
+          <div class="info-row">
+            <i class="mdi mdi-apps mdi-18px" style="color: var(--colorPaletteGreenForeground1)"></i>
+            <span class="info-label">Goroutine 数量</span>
+            <FluentChip color="success" small>{{ systemMetrics.goroutineCount }}</FluentChip>
+          </div>
+          <div class="info-row">
+            <i class="mdi mdi-clock-outline mdi-18px" style="color: var(--colorPaletteYellowForeground1)"></i>
+            <span class="info-label">运行时间</span>
+            <FluentChip color="warning" small>{{ systemMetrics.uptime || 'N/A' }}</FluentChip>
           </div>
         </div>
-      </v-col>
-    </v-row>
+      </FluentCard>
+
+      <FluentCard>
+        <div class="info-list">
+          <div class="info-row">
+            <i class="mdi mdi-database mdi-18px" style="color: var(--colorPaletteBlueForeground1)"></i>
+            <span class="info-label">最大连接数</span>
+            <FluentChip color="info" small>{{ dbMetrics.maxOpenConns > 0 ? dbMetrics.maxOpenConns : '无限制' }}</FluentChip>
+          </div>
+          <div class="info-row">
+            <i class="mdi mdi-timer-sand mdi-18px" style="color: var(--colorPaletteRedForeground1)"></i>
+            <span class="info-label">等待次数</span>
+            <FluentChip color="danger" small>{{ dbMetrics.waitCount || 0 }}</FluentChip>
+          </div>
+          <div class="info-row">
+            <i class="mdi mdi-autorenew mdi-18px" style="color: var(--colorPalettePurpleForeground1)"></i>
+            <span class="info-label">最后更新</span>
+            <FluentChip color="default" small>{{ lastUpdateTime }}</FluentChip>
+          </div>
+        </div>
+      </FluentCard>
+    </div>
+
+    <!-- Backend Logs Section -->
+    <div style="margin-top: var(--spacingVerticalXL);">
+      <div style="display: flex; align-items: center; gap: var(--spacingHorizontalM); margin-bottom: var(--spacingVerticalM);">
+        <h3 style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold); margin: 0;">后端运行日志</h3>
+        <div style="flex: 1;"></div>
+        <fluent-dropdown
+          :value="logLevelFilter"
+          @change="logLevelFilter = ($event.target as any).value"
+          style="width: 130px;"
+        >
+          <fluent-option value="DEBUG">DEBUG</fluent-option>
+          <fluent-option value="INFO">INFO</fluent-option>
+          <fluent-option value="WARN">WARN</fluent-option>
+          <fluent-option value="ERROR">ERROR</fluent-option>
+        </fluent-dropdown>
+        <fluent-dropdown
+          :value="String(logLimit)"
+          @change="logLimit = Number(($event.target as any).value); fetchLogs()"
+          style="width: 130px;"
+        >
+          <fluent-option value="100">100 条</fluent-option>
+          <fluent-option value="200">200 条</fluent-option>
+          <fluent-option value="500">500 条</fluent-option>
+        </fluent-dropdown>
+      </div>
+      <div class="terminal-container">
+        <div class="terminal-output" ref="terminalRef">
+          <div v-for="(log, index) in filteredLogs" :key="index" class="terminal-line">
+            <span class="terminal-time">{{ formatTerminalTime(log.timestamp) }}</span>
+            <span :class="getTerminalLevelClass(log.level)" class="terminal-level">{{ log.level.toUpperCase() }}</span>
+            <span class="terminal-message">{{ log.message }}</span>
+          </div>
+          <div v-if="filteredLogs.length === 0" class="terminal-empty">
+            暂无符合条件的日志
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import axios from 'axios'
+import FluentCard from '../../components/FluentCard.vue'
+import FluentChip from '../../components/FluentChip.vue'
 
 interface SystemMetrics {
   memoryUsage: number
@@ -289,24 +234,6 @@ const filteredLogs = computed(() => {
 const memoryUsagePercent = ref(0)
 const diskUsagePercent = ref(0)
 const dbConnectionPercent = ref(0)
-
-const getMemoryColor = (percent: number) => {
-  if (percent > 90) return 'error'
-  if (percent > 70) return 'warning'
-  return 'success'
-}
-
-const getDiskColor = (percent: number) => {
-  if (percent > 90) return 'error'
-  if (percent > 70) return 'warning'
-  return 'success'
-}
-
-const getDbColor = (percent: number) => {
-  if (percent > 90) return 'error'
-  if (percent > 70) return 'warning'
-  return 'info'
-}
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B'
@@ -436,20 +363,45 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.bg-red-lighten-5 {
-  background-color: rgba(var(--v-theme-error), 0.08);
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacingHorizontalM);
 }
-.bg-orange-lighten-5 {
-  background-color: rgba(var(--v-theme-warning), 0.08);
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacingHorizontalM);
 }
-.bg-blue-lighten-5 {
-  background-color: rgba(var(--v-theme-info), 0.08);
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.info-label {
+  flex: 1;
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+}
+
+.text-caption {
+  font-size: var(--fontSizeBase100);
+  color: var(--colorNeutralForeground3);
 }
 
 /* Terminal style */
 .terminal-container {
   background-color: #1e1e1e;
-  border-radius: 6px;
+  border-radius: var(--borderRadiusMedium);
   padding: 12px;
   max-height: 400px;
   overflow: hidden;
@@ -527,5 +479,15 @@ onUnmounted(() => {
   text-align: center;
   padding: 20px;
   font-style: italic;
+  color: #808080;
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -1,155 +1,132 @@
 <template>
   <div>
     <!-- 页头 -->
-    <div class="d-flex align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">
-        <v-icon class="mr-2" color="primary">mdi-apps</v-icon>
-        应用启动台
-      </h1>
-      <v-spacer />
-      <v-btn
-        v-if="isProvider"
-        color="primary"
-        variant="tonal"
-        prepend-icon="mdi-upload"
-        class="mr-2"
-        :loading="importing"
-        @click="importDialog = true"
-      >
-        导入应用
-      </v-btn>
-      <v-btn
-        color="primary"
-        variant="text"
-        prepend-icon="mdi-refresh"
-        :loading="appStore.loading"
-        @click="appStore.fetchApps()"
-      >
-        刷新
-      </v-btn>
+    <div class="page-header">
+      <div class="page-header-left">
+        <i class="mdi mdi-apps mdi-24px" style="color: var(--colorBrandForeground1)"></i>
+        <h1 class="page-title">应用启动台</h1>
+      </div>
+      <div class="page-header-right">
+        <fluent-button
+          v-if="isProvider"
+          appearance="filled"
+          :disabled="importing"
+          @click="importDialog = true"
+        >
+          <i class="mdi mdi-upload" style="font-size: 14px"</i>
+          导入应用
+        </fluent-button>
+        <fluent-button
+          appearance="subtle"
+          :disabled="appStore.loading"
+          @click="appStore.fetchApps()"
+        >
+          <i class="mdi mdi-autorenew" style="font-size: 14px"</i>
+          刷新
+        </fluent-button>
+      </div>
     </div>
 
     <!-- 导入应用对话框 -->
-    <v-dialog v-model="importDialog" max-width="560">
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          <v-icon class="mr-2" color="primary">mdi-package-variant-closed</v-icon>
-          导入应用
-        </v-card-title>
-        <v-card-text>
-          <p class="text-body-2 text-grey-darken-1 mb-4">
-            上传应用代码 zip 包（根目录须含 app.json 清单）。导入后代码存储于平台，
-            不依赖本地目录，清库后可通过重新导入恢复。
-          </p>
-          <v-file-input
-            v-model="importFile"
-            label="选择 zip 包"
+    <fluent-dialog :open="importDialog" @close="importDialog = false">
+      <div class="dialog-header">
+        <i class="mdi mdi-archive-outline" style="font-size: 20px; color: var(--colorBrandForeground1)"</i>
+        <span class="dialog-title">导入应用</span>
+      </div>
+      <fluent-dialog-body>
+        <p class="dialog-hint">
+          上传应用代码 zip 包（根目录须含 app.json 清单）。导入后代码存储于平台，
+          不依赖本地目录，清库后可通过重新导入恢复。
+        </p>
+        <div class="file-pick-row">
+          <input
+            ref="fileInputRef"
+            type="file"
             accept=".zip,application/zip"
-            prepend-icon="mdi-package-variant"
-            :loading="importing"
+            style="display: none"
+            @change="onFilePicked"
           />
-          <v-alert v-if="importError" type="error" closable class="mt-2">
-            {{ importError }}
-          </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="importDialog = false">取消</v-btn>
-          <v-btn
-            color="primary"
-            :disabled="!importFile || importing"
-            :loading="importing"
-            @click="doImport"
-          >
-            导入
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <fluent-button appearance="outlined" @click="fileInputRef?.click()">
+            <i class="mdi mdi-folder" style="font-size: 14px"</i>
+            {{ importFile ? importFile.name : '选择 zip 包' }}
+          </fluent-button>
+          <span v-if="importFile" class="file-name">{{ (importFile.size / 1024).toFixed(1) }} KB</span>
+        </div>
+        <fluent-message-bar v-if="importError" intent="error" class="mt-m">
+          {{ importError }}
+        </fluent-message-bar>
+      </fluent-dialog-body>
+      <div class="dialog-actions">
+        <fluent-button appearance="subtle" @click="importDialog = false">取消</fluent-button>
+        <fluent-button
+          appearance="filled"
+          :disabled="!importFile || importing"
+          @click="doImport"
+        >
+          <fluent-spinner v-if="importing" size="small" />
+          导入
+        </fluent-button>
+      </div>
+    </fluent-dialog>
 
     <!-- 错误提示 -->
-    <v-alert
-      v-if="appStore.error"
-      type="error"
-      class="mb-4"
-      closable
-    >
+    <fluent-message-bar v-if="appStore.error" intent="error" class="mb-l">
       {{ appStore.error }}
-    </v-alert>
+    </fluent-message-bar>
 
     <!-- 加载中 -->
-    <div v-if="appStore.loading" class="text-center py-12">
-      <v-progress-circular indeterminate color="primary" size="64" />
-      <p class="text-body-1 mt-4 text-grey">正在加载应用列表...</p>
+    <div v-if="appStore.loading" class="loading-state">
+      <fluent-spinner size="large" />
+      <p class="loading-text">正在加载应用列表...</p>
     </div>
 
     <!-- 空状态 -->
-    <v-card
-      v-else-if="appStore.apps.length === 0"
-      class="text-center pa-12"
-      variant="outlined"
-    >
-      <v-icon size="80" color="grey-lighten-1">mdi-store-outline</v-icon>
-      <p class="text-h6 mt-4 text-grey-darken-1">还没有可用应用</p>
-      <p class="text-body-2 text-grey">
-        服务商可以在管理端部署应用，部署后将出现在这里
-      </p>
-    </v-card>
+    <FluentCard v-else-if="appStore.apps.length === 0" outlined class="empty-state">
+      <i class="mdi mdi-store" style="font-size: 80px; color: var(--colorNeutralForeground3)"</i>
+      <h2 class="empty-title">还没有可用应用</h2>
+      <p class="empty-hint">服务商可以在管理端部署应用，部署后将出现在这里</p>
+    </FluentCard>
 
     <!-- 应用卡片网格 -->
     <template v-else>
       <!-- 运行中应用 -->
-      <div v-if="appStore.runningApps.length > 0" class="mb-8">
-        <h2 class="text-subtitle-1 font-weight-bold mb-3">
-          <v-icon class="mr-1" color="success">mdi-circle-medium</v-icon>
+      <div v-if="appStore.runningApps.length > 0" class="section">
+        <h2 class="section-title">
+          <i class="mdi mdi-circle-medium" style="font-size: 12px; color: var(--colorPaletteGreenForeground1)"></i>
           运行中 ({{ appStore.runningApps.length }})
         </h2>
-        <v-row>
-          <v-col
+        <div class="app-grid">
+          <AppCard
             v-for="app in appStore.runningApps"
             :key="app.id"
-            cols="12"
-            sm="6"
-            md="4"
-            lg="3"
-          >
-            <AppCard
-              :app="app"
-              :show-details="isProvider"
-              :show-data="!!app.isAdmin"
-              @open="openApp"
-              @details="showDetails"
-              @data="openData"
-            />
-          </v-col>
-        </v-row>
+            :app="app"
+            :show-details="isProvider"
+            :show-data="!!app.isAdmin"
+            @open="openApp"
+            @details="showDetails"
+            @data="openData"
+          />
+        </div>
       </div>
 
       <!-- 已停止应用 -->
-      <div v-if="appStore.stoppedApps.length > 0">
-        <h2 class="text-subtitle-1 font-weight-bold mb-3">
-          <v-icon class="mr-1" color="grey">mdi-circle-medium</v-icon>
+      <div v-if="appStore.stoppedApps.length > 0" class="section">
+        <h2 class="section-title">
+          <i class="mdi mdi-circle-medium" style="font-size: 12px; color: var(--colorNeutralForeground3)"</i>
           未运行 ({{ appStore.stoppedApps.length }})
         </h2>
-        <v-row>
-          <v-col
+        <div class="app-grid">
+          <AppCard
             v-for="app in appStore.stoppedApps"
             :key="app.id"
-            cols="12"
-            sm="6"
-            md="4"
-            lg="3"
-          >
-            <AppCard
-              :app="app"
-              disabled
-              :show-details="isProvider"
-              :show-data="!!app.isAdmin"
-              @details="showDetails"
-              @data="openData"
-            />
-          </v-col>
-        </v-row>
+            :app="app"
+            disabled
+            :show-details="isProvider"
+            :show-data="!!app.isAdmin"
+            @details="showDetails"
+            @data="openData"
+          />
+        </div>
       </div>
     </template>
   </div>
@@ -161,6 +138,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApplicationStore } from '../stores/application'
 import { useAuthStore } from '../stores/auth'
 import AppCard from '../components/AppCard.vue'
+import FluentCard from '../components/FluentCard.vue'
 import { importApp, type Application } from '../api/application'
 
 const appStore = useApplicationStore()
@@ -172,17 +150,20 @@ const importDialog = ref(false)
 const importFile = ref<File | null>(null)
 const importing = ref(false)
 const importError = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// Provider portal shows a "details" link to AppDetail; tenant/user portals don't.
 const isProvider = computed(() => route.path.startsWith('/provider'))
 
 onMounted(() => {
   appStore.fetchApps()
 })
 
+function onFilePicked(e: Event) {
+  const input = e.target as HTMLInputElement
+  importFile.value = input.files?.[0] || null
+}
+
 function openApp(app: Application) {
-  // Navigate to the app container via the proxy route
-  // The backend's AppRouter will proxy requests to /apps/:appId/*
   window.open(`/apps/${app.id}/`, '_blank')
 }
 
@@ -212,3 +193,145 @@ async function doImport() {
   }
 }
 </script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacingVerticalXL);
+  flex-wrap: wrap;
+  gap: var(--spacingVerticalM);
+}
+
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.page-title {
+  font-size: var(--fontSizeHero700);
+  font-weight: var(--fontWeightBold);
+  color: var(--colorNeutralForeground1);
+  margin: 0;
+}
+
+.page-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+/* Dialog */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXL);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+
+.dialog-title {
+  font-size: var(--fontSizeBase500);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.dialog-hint {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+  margin: 0 0 var(--spacingVerticalM) 0;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalS);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalXL);
+  border-top: 1px solid var(--colorNeutralStroke2);
+}
+
+.file-pick-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.file-name {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+}
+
+.mt-m { margin-top: var(--spacingVerticalM); }
+.mb-l { margin-bottom: var(--spacingVerticalL); }
+
+/* Loading */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacingVerticalXXXL) 0;
+}
+
+.loading-text {
+  margin-top: var(--spacingVerticalL);
+  font-size: var(--fontSizeBase300);
+  color: var(--colorNeutralForeground2);
+}
+
+/* Empty */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacingVerticalXXXL) var(--spacingHorizontalXL);
+  text-align: center;
+}
+
+.empty-title {
+  font-size: var(--fontSizeBase500);
+  font-weight: var(--fontWeightSemibold);
+  margin: var(--spacingVerticalL) 0 var(--spacingVerticalS);
+  color: var(--colorNeutralForeground1);
+}
+
+.empty-hint {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+  margin: 0;
+}
+
+/* Sections */
+.section {
+  margin-bottom: var(--spacingVerticalXL);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground1);
+  margin: 0 0 var(--spacingVerticalM) 0;
+}
+
+/* Grid */
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacingHorizontalL);
+}
+
+/* Spinner animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>

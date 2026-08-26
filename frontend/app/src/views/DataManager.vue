@@ -1,119 +1,118 @@
 <!-- frontend/app/src/views/DataManager.vue -->
 <template>
   <div>
-    <v-btn variant="text" prepend-icon="mdi-arrow-left" @click="router.back()" class="mb-2">返回</v-btn>
-    <h2 class="text-h5 mb-4">数据管理</h2>
+    <fluent-button appearance="subtle" @click="router.back()" style="margin-bottom: var(--spacingVerticalS);">
+      <i class="mdi mdi-arrow-left" style="font-size: 16px; margin-right: 4px;"</i>
+      返回
+    </fluent-button>
+    <h2 style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold); margin-bottom: var(--spacingVerticalM);">数据管理</h2>
 
-    <v-row>
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-text>
-            <v-select
-              v-if="isProvider"
-              v-model="orgId"
-              :items="orgs"
-              item-title="name"
-              item-value="id"
-              label="组织"
-              variant="outlined"
-              density="compact"
-              :loading="orgsLoading"
-              @update:model-value="loadTables"
-            />
-            <v-alert v-else type="info" variant="tonal" density="compact" class="mb-3">
-              当前组织：{{ orgName }}
-            </v-alert>
+    <div class="data-manager-grid">
+      <FluentCard>
+        <fluent-field v-if="isProvider" label="组织">
+          <fluent-dropdown
+            :value="orgId ? String(orgId) : ''"
+            @change="orgId = Number(($event.target as any).value); loadTables()"
+            :disabled="orgsLoading"
+            style="width: 100%;"
+          >
+            <fluent-option v-for="o in orgs" :key="o.id" :value="String(o.id)">
+              {{ o.name }}
+            </fluent-option>
+          </fluent-dropdown>
+        </fluent-field>
+        <fluent-message-bar v-else intent="info" style="margin-bottom: var(--spacingVerticalM);">
+          当前组织：{{ orgName }}
+        </fluent-message-bar>
 
-            <v-progress-linear v-if="tablesLoading" indeterminate class="my-2" />
-            <v-list v-else-if="tables.length" density="compact">
-              <v-list-item
-                v-for="t in tables"
-                :key="t.tableName"
-                :active="selectedTable === t.tableName"
-                @click="selectTable(t.tableName)"
-              >
-                <v-list-item-title>{{ t.tableName }}</v-list-item-title>
-                <v-list-item-subtitle>{{ (t.columns || []).map(c => c.name).join(', ') }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-            <v-alert v-else-if="!tablesLoading" type="info" variant="tonal">
-              该应用暂无数据表。数据表由应用运行时自动创建。
-            </v-alert>
-          </v-card-text>
-        </v-card>
-      </v-col>
+        <fluent-progress-bar v-if="tablesLoading" style="margin: var(--spacingVerticalS) 0;" />
+        <div v-else-if="tables.length" class="table-list">
+          <div
+            v-for="t in tables"
+            :key="t.tableName"
+            :class="['table-list-item', { 'selected': selectedTable === t.tableName }]"
+            @click="selectTable(t.tableName)"
+          >
+            <div style="font-weight: var(--fontWeightSemibold);">{{ t.tableName }}</div>
+            <div style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground3);">
+              {{ (t.columns || []).map(c => c.name).join(', ') }}
+            </div>
+          </div>
+        </div>
+        <fluent-message-bar v-else-if="!tablesLoading" intent="info">
+          该应用暂无数据表。数据表由应用运行时自动创建。
+        </fluent-message-bar>
+      </FluentCard>
 
-      <v-col cols="12" md="8">
-        <v-card v-if="selectedTable">
-          <v-toolbar density="compact" color="primary" dark>
-            <v-toolbar-title>{{ selectedTable }}</v-toolbar-title>
-            <v-spacer />
-            <v-btn density="compact" variant="text" @click="openInsertDialog">新增行</v-btn>
-          </v-toolbar>
+      <FluentCard v-if="selectedTable">
+        <template #header>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold);">{{ selectedTable }}</span>
+            <fluent-button appearance="subtle" size="small" @click="openInsertDialog">
+              <i class="mdi mdi-plus" style="font-size: 14px; margin-right: 4px;"</i>
+              新增行
+            </fluent-button>
+          </div>
+        </template>
 
-          <v-card-text>
-            <v-progress-linear v-if="rowsLoading" indeterminate />
-            <template v-else>
-              <v-table density="compact">
-                <thead>
-                  <tr>
-                    <th v-for="col in tableColumns" :key="col">{{ col }}</th>
-                    <th class="text-right">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, i) in rows" :key="i">
-                    <td v-for="col in tableColumns" :key="col" class="text-body-2">{{ formatCell(row[col]) }}</td>
-                    <td class="text-right">
-                      <v-btn size="x-small" variant="text" icon="mdi-pencil" @click="openEditDialog(row)" />
-                      <v-btn size="x-small" variant="text" icon="mdi-delete" color="error" @click="removeRow(row)" />
-                    </td>
-                  </tr>
-                </tbody>
-              </v-table>
-              <div v-if="!rows.length" class="text-center text-grey pa-4">暂无数据</div>
+        <fluent-progress-bar v-if="rowsLoading" style="margin-bottom: var(--spacingVerticalM);" />
+        <template v-else>
+          <FluentTable dense>
+            <thead>
+              <tr>
+                <th v-for="col in tableColumns" :key="col">{{ col }}</th>
+                <th style="text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in rows" :key="i">
+                <td v-for="col in tableColumns" :key="col" style="font-size: var(--fontSizeBase200);">{{ formatCell(row[col]) }}</td>
+                <td style="text-align: right;">
+                  <fluent-button appearance="subtle" size="small" @click="openEditDialog(row)">
+                    <i class="mdi mdi-pencil" style="font-size: 14px"</i>
+                  </fluent-button>
+                  <fluent-button appearance="subtle" size="small" @click="removeRow(row)" style="color: var(--colorPaletteRedForeground1);">
+                    <i class="mdi mdi-delete" style="font-size: 14px"</i>
+                  </fluent-button>
+                </td>
+              </tr>
+            </tbody>
+          </FluentTable>
+          <div v-if="!rows.length" style="text-align: center; color: var(--colorNeutralForeground3); padding: var(--spacingVerticalM);">暂无数据</div>
 
-              <div class="d-flex align-center justify-end mt-3">
-                <span class="text-caption text-grey mr-3">共 {{ totalCount }} 条</span>
-                <v-btn size="small" variant="text" :disabled="offset === 0" @click="changePage(offset - limit)">上一页</v-btn>
-                <v-btn size="small" variant="text" :disabled="offset + limit >= totalCount" @click="changePage(offset + limit)">下一页</v-btn>
-              </div>
-            </template>
-          </v-card-text>
-        </v-card>
-        <v-alert v-else type="info" variant="tonal">从左侧选择一张表查看数据。</v-alert>
-      </v-col>
-    </v-row>
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: var(--spacingHorizontalS); margin-top: var(--spacingVerticalM);">
+            <span style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground3);">共 {{ totalCount }} 条</span>
+            <fluent-button appearance="subtle" size="small" :disabled="offset === 0" @click="changePage(offset - limit)">上一页</fluent-button>
+            <fluent-button appearance="subtle" size="small" :disabled="offset + limit >= totalCount" @click="changePage(offset + limit)">下一页</fluent-button>
+          </div>
+        </template>
+      </FluentCard>
+      <fluent-message-bar v-else intent="info">从左侧选择一张表查看数据。</fluent-message-bar>
+    </div>
 
     <!-- Insert / Edit dialog -->
-    <v-dialog v-model="editor.show" max-width="640">
-      <v-card>
-        <v-card-title>{{ editor.row ? '编辑行' : '新增行' }} #{{ editor.rowId || '' }}</v-card-title>
-        <v-card-text>
-          <v-text-field
-            v-for="col in editableColumns"
-            :key="col.name"
-            v-model="editor.values[col.name]"
-            :label="col.name"
-            :type="col.type === 'integer' || col.type === 'numeric' ? 'number' : col.type === 'boolean' ? 'checkbox' : 'text'"
-            :hint="col.type"
-            persistent-hint
-            density="compact"
-            class="mb-2"
-          />
-          <p v-if="!editableColumns.length" class="text-grey">该表没有可编辑字段。</p>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="editor.show = false">取消</v-btn>
-          <v-btn color="primary" @click="saveRow">保存</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <fluent-dialog :open="editor.show" @close="editor.show = false" modal-type="modal" style="--dialog-width: 640px;">
+      <fluent-dialog-body>
+        <h3 slot="title" style="margin: 0; font-size: var(--fontSizeBase400);">{{ editor.row ? '编辑行' : '新增行' }} #{{ editor.rowId || '' }}</h3>
+        <div style="display: flex; flex-direction: column; gap: var(--spacingVerticalM); margin-top: var(--spacingVerticalM);">
+          <fluent-field v-for="col in editableColumns" :key="col.name" :label="col.name">
+            <fluent-text-input
+              :value="editor.values[col.name]"
+              @input="editor.values[col.name] = ($event.target as HTMLInputElement).value"
+              :type="col.type === 'integer' || col.type === 'numeric' ? 'number' : 'text'"
+            />
+            <div slot="hint" style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground3);">{{ col.type }}</div>
+          </fluent-field>
+          <p v-if="!editableColumns.length" style="color: var(--colorNeutralForeground3);">该表没有可编辑字段。</p>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: var(--spacingHorizontalS); margin-top: var(--spacingVerticalL);">
+          <fluent-button appearance="subtle" @click="editor.show = false">取消</fluent-button>
+          <fluent-button appearance="primary" @click="saveRow">保存</fluent-button>
+        </div>
+      </fluent-dialog-body>
+    </fluent-dialog>
 
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
-      {{ snackbar.text }}
-    </v-snackbar>
+    <ToastMessage />
   </div>
 </template>
 
@@ -123,10 +122,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { listOrgs } from '../api/org'
 import { listTables, listRows, insertRow, updateRow, deleteRow, type TableInfo, type DataColumn } from '../api/data'
+import { useToast } from '../composables/useToast'
+import FluentCard from '../components/FluentCard.vue'
+import FluentTable from '../components/FluentTable.vue'
+import ToastMessage from '../components/ToastMessage.vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const { notify } = useToast()
 
 const appId = route.params.appId as string
 const isProvider = computed(() => authStore.userRole === 'provider')
@@ -162,12 +166,6 @@ const editor = reactive({
   rowId: 0,
   values: {} as Record<string, string>,
 })
-
-const snackbar = ref({ show: false, text: '', color: 'success' })
-
-function notify(text: string, color = 'success') {
-  snackbar.value = { show: true, text, color }
-}
 
 function formatCell(v: unknown) {
   if (v === null || v === undefined) return '—'
@@ -326,3 +324,39 @@ onMounted(async () => {
   await initOrg()
 })
 </script>
+
+<style scoped>
+.data-manager-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--spacingHorizontalL);
+}
+
+.table-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+}
+
+.table-list-item {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  border-radius: var(--borderRadiusMedium);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.table-list-item:hover {
+  background: var(--colorNeutralBackground1Hover);
+}
+
+.table-list-item.selected {
+  background: var(--colorNeutralBackground1Selected);
+  border-left: 3px solid var(--colorBrandForeground1);
+}
+
+@media (max-width: 768px) {
+  .data-manager-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

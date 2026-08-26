@@ -1,184 +1,206 @@
 <template>
-  <v-app>
-    <v-main class="oobe-bg">
-      <v-container class="fill-height" fluid>
-        <v-row align="center" justify="center">
-          <v-col cols="12" sm="8" md="6" lg="4">
-            <v-card class="elevation-8 rounded-lg">
-              <v-card-title class="text-h5 text-center py-6">
-                <v-icon size="large" color="primary" class="mr-2">mdi-cloud-plus</v-icon>
-                Suzuran Cloud 初始化
-              </v-card-title>
-              <v-card-text>
-                <p class="text-body-1 text-center mb-6">
-                  欢迎使用 Suzuran Cloud！系统首次运行需要初始化配置。
-                </p>
+  <div class="oobe-page">
+    <div class="oobe-card">
+      <div class="oobe-header">
+        <i class="mdi mdi-cloud-plus" style="font-size: 28px; color: var(--colorBrandForeground1)"</i>
+        <h1 class="oobe-title">Suzuran Cloud 初始化</h1>
+      </div>
+      <p class="oobe-description">
+        欢迎使用 Suzuran Cloud！系统首次运行需要初始化配置。
+      </p>
 
-                <v-stepper v-model="step" class="elevation-0">
-                  <v-stepper-header>
-                    <v-stepper-item :value="1" title="创建管理员" />
-                    <v-divider />
-                    <v-stepper-item :value="2" title="注册 Passkey" />
-                    <v-divider />
-                    <v-stepper-item :value="3" title="完成" />
-                  </v-stepper-header>
+      <!-- Custom Stepper -->
+      <div class="stepper">
+        <div class="stepper-steps">
+          <div
+            v-for="s in 3"
+            :key="s"
+            class="stepper-step"
+            :class="{ active: step === s, completed: step > s }"
+          >
+            <div class="step-circle">
+              <i v-if="step > s" class="mdi mdi-check" style="font-size: 14px"></i>
+              <span v-else>{{ s }}</span>
+            </div>
+            <span class="step-label">{{ stepLabels[s - 1] }}</span>
+          </div>
+          <div class="stepper-line">
+            <fluent-progress-bar :value="((step - 1) / 2) * 100" />
+          </div>
+        </div>
+      </div>
 
-                  <v-stepper-window>
-                    <!-- Step 1: Create first admin user -->
-                    <v-stepper-window-item :value="1">
-                      <v-form ref="formRef" @submit.prevent="createAdmin" class="pa-4">
-                        <v-text-field
-                          v-model="adminName"
-                          label="管理员姓名"
-                          placeholder="请输入姓名"
-                          :rules="[v => !!v || '姓名不能为空']"
-                          required
-                          class="mb-4"
-                        />
-                        <v-text-field
-                          v-model="adminEmail"
-                          label="邮箱地址"
-                          placeholder="admin@example.com"
-                          type="email"
-                          :rules="[v => !!v || '邮箱不能为空', v => /.+@.+\..+/.test(v) || '邮箱格式不正确']"
-                          required
-                          class="mb-4"
-                        />
-                        <v-text-field
-                          v-model="adminUsername"
-                          label="管理员用户名"
-                          placeholder="admin-user"
-                          prepend-inner-icon="mdi-account"
-                          :rules="[v => !!v || '用户名不能为空', v => /^[a-z][a-z-]{2,49}$/.test(v) || '3-50位小写字母和连字符，以字母开头']"
-                          required
-                          autocapitalize="off"
-                          class="mb-4"
-                        />
-                        <v-text-field
-                          v-model="adminPassword"
-                          label="管理员密码"
-                          placeholder="至少 6 位"
-                          prepend-inner-icon="mdi-lock"
-                          :type="showPwd ? 'text' : 'password'"
-                          :append-inner-icon="showPwd ? 'mdi-eye-off' : 'mdi-eye'"
-                          :rules="[v => !!v || '密码不能为空', v => v.length >= 6 || '密码至少 6 位']"
-                          required
-                          class="mb-4"
-                          @click:append-inner="showPwd = !showPwd"
-                        />
-                        <v-text-field
-                          v-model="orgName"
-                          label="组织名称"
-                          placeholder="我的公司"
-                          :rules="[v => !!v || '组织名称不能为空']"
-                          required
-                          class="mb-4"
-                        />
-                        <v-btn
-                          type="submit"
-                          color="primary"
-                          block
-                          :loading="loading"
-                          :disabled="loading"
-                        >
-                          下一步
-                        </v-btn>
-                      </v-form>
-                    </v-stepper-window-item>
+      <!-- Step 1: Create first admin user -->
+      <div v-if="step === 1" class="step-content">
+        <form @submit.prevent="createAdmin">
+          <fluent-field class="oobe-field">
+            <fluent-label>管理员姓名</fluent-label>
+            <fluent-text-input
+              :value="adminName"
+              @input="adminName = ($event.target as HTMLInputElement).value"
+              placeholder="请输入姓名"
+              required
+            />
+            <span v-if="fieldErrors.adminName" class="field-error">{{ fieldErrors.adminName }}</span>
+          </fluent-field>
 
-                    <!-- Step 2: Register Passkey (optional) -->
-                    <v-stepper-window-item :value="2">
-                      <div class="pa-4">
-                        <p class="text-body-1 mb-4">
-                          管理员 <strong>{{ adminName }}</strong> 已创建成功，可以使用密码登录。
-                        </p>
-                        <p class="text-body-2 mb-2">
-                          你也可以注册 Passkey（安全密钥）来增强安全性。
-                        </p>
-                        <p class="text-body-2 text-grey-darken-1 mb-6">
-                          Passkey 支持生物识别（指纹、面容）或硬件安全密钥，可作为密码的补充登录方式。
-                        </p>
-                        <v-btn
-                          color="primary"
-                          block
-                          :loading="loading"
-                          :disabled="loading"
-                          @click="registerPasskey"
-                        >
-                          <v-icon start>mdi-key</v-icon>
-                          注册 Passkey（可选）
-                        </v-btn>
-                        <v-btn
-                          variant="outlined"
-                          block
-                          class="mt-3"
-                          :disabled="loading"
-                          @click="step = 3"
-                        >
-                          跳过，使用密码登录
-                        </v-btn>
-                        <v-btn
-                          variant="text"
-                          block
-                          class="mt-3"
-                          :disabled="loading"
-                          @click="step = 1"
-                        >
-                          <v-icon start>mdi-arrow-left</v-icon>
-                          返回修改信息
-                        </v-btn>
-                      </div>
-                    </v-stepper-window-item>
+          <fluent-field class="oobe-field">
+            <fluent-label>邮箱地址</fluent-label>
+            <fluent-text-input
+              :value="adminEmail"
+              @input="adminEmail = ($event.target as HTMLInputElement).value"
+              placeholder="admin@example.com"
+              type="email"
+              required
+            />
+            <span v-if="fieldErrors.adminEmail" class="field-error">{{ fieldErrors.adminEmail }}</span>
+          </fluent-field>
 
-                    <!-- Step 3: Complete -->
-                    <v-stepper-window-item :value="3">
-                      <div class="pa-4 text-center">
-                        <v-icon size="64" color="success" class="mb-4">mdi-check-circle</v-icon>
-                        <h3 class="text-h6 mb-4">初始化完成！</h3>
-                        <p class="text-body-1 mb-6">
-                          管理员账户已创建，系统已准备就绪。
-                        </p>
-                        <v-btn
-                          color="primary"
-                          block
-                          @click="goToLogin"
-                        >
-                          前往登录
-                        </v-btn>
-                      </div>
-                    </v-stepper-window-item>
-                  </v-stepper-window>
-                </v-stepper>
+          <fluent-field class="oobe-field">
+            <fluent-label>管理员用户名</fluent-label>
+            <fluent-text-input
+              :value="adminUsername"
+              @input="adminUsername = ($event.target as HTMLInputElement).value"
+              placeholder="admin-user"
+              autocapitalize="off"
+              required
+            />
+            <span v-if="fieldErrors.adminUsername" class="field-error">{{ fieldErrors.adminUsername }}</span>
+          </fluent-field>
 
-                <v-alert
-                  v-if="errorMessage"
-                  type="error"
-                  class="mt-4"
-                  closable
-                  @click:close="errorMessage = ''"
-                >
-                  {{ errorMessage }}
-                </v-alert>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-  </v-app>
+          <fluent-field class="oobe-field">
+            <fluent-label>管理员密码</fluent-label>
+            <div class="password-wrapper">
+              <fluent-text-input
+                :value="adminPassword"
+                @input="adminPassword = ($event.target as HTMLInputElement).value"
+                :type="showPwd ? 'text' : 'password'"
+                placeholder="至少 6 位"
+                required
+                class="password-input"
+              />
+              <fluent-button
+                appearance="transparent"
+                size="small"
+                @click="showPwd = !showPwd"
+                class="password-toggle"
+              >
+                <i :class="['mdi', showPwd ? 'mdi-eye-off' : 'mdi-eye']" style="font-size: 18px"></i>
+              </fluent-button>
+            </div>
+            <span v-if="fieldErrors.adminPassword" class="field-error">{{ fieldErrors.adminPassword }}</span>
+          </fluent-field>
+
+          <fluent-field class="oobe-field">
+            <fluent-label>组织名称</fluent-label>
+            <fluent-text-input
+              :value="orgName"
+              @input="orgName = ($event.target as HTMLInputElement).value"
+              placeholder="我的公司"
+              required
+            />
+            <span v-if="fieldErrors.orgName" class="field-error">{{ fieldErrors.orgName }}</span>
+          </fluent-field>
+
+          <fluent-button
+            appearance="accent"
+            size="large"
+            type="submit"
+            :disabled="loading"
+            class="oobe-btn"
+          >
+            <fluent-spinner v-if="loading" size="small" />
+            <span v-else>下一步</span>
+          </fluent-button>
+        </form>
+      </div>
+
+      <!-- Step 2: Register Passkey (optional) -->
+      <div v-if="step === 2" class="step-content">
+        <p class="step-text">
+          管理员 <strong>{{ adminName }}</strong> 已创建成功，可以使用密码登录。
+        </p>
+        <p class="step-subtext">
+          你也可以注册 Passkey（安全密钥）来增强安全性。
+        </p>
+        <p class="step-hint">
+          Passkey 支持生物识别（指纹、面容）或硬件安全密钥，可作为密码的补充登录方式。
+        </p>
+
+        <fluent-button
+          appearance="accent"
+          size="large"
+          :disabled="loading"
+          class="oobe-btn"
+          @click="registerPasskey"
+        >
+          <i class="mdi mdi-key mdi-18px btn-icon"></i>
+          <fluent-spinner v-if="loading" size="small" />
+          <span v-else>注册 Passkey（可选）</span>
+        </fluent-button>
+
+        <fluent-button
+          appearance="outline"
+          size="large"
+          :disabled="loading"
+          class="oobe-btn"
+          @click="step = 3"
+        >
+          跳过，使用密码登录
+        </fluent-button>
+
+        <fluent-button
+          appearance="subtle"
+          size="large"
+          :disabled="loading"
+          class="oobe-btn"
+          @click="step = 1"
+        >
+          <i class="mdi mdi-arrow-left mdi-18px btn-icon"></i>
+          返回修改信息
+        </fluent-button>
+      </div>
+
+      <!-- Step 3: Complete -->
+      <div v-if="step === 3" class="step-content step-complete">
+        <i class="mdi mdi-check-circle" style="font-size: 64px; color: var(--colorPaletteGreenForeground1)"</i>
+        <h2 class="complete-title">初始化完成！</h2>
+        <p class="step-text">
+          管理员账户已创建，系统已准备就绪。
+        </p>
+        <fluent-button
+          appearance="accent"
+          size="large"
+          class="oobe-btn"
+          @click="goToLogin"
+        >
+          前往登录
+        </fluent-button>
+      </div>
+
+      <fluent-message-bar
+        v-if="errorMessage"
+        intent="error"
+        class="oobe-alert"
+      >
+        {{ errorMessage }}
+      </fluent-message-bar>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api/client'
-
 const router = useRouter()
 const step = ref(1)
 const loading = ref(false)
 const errorMessage = ref('')
-const formRef = ref()
 const showPwd = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
+
+const stepLabels = ['创建管理员', '注册 Passkey', '完成']
 
 // Step 1 fields
 const adminName = ref('')
@@ -190,9 +212,37 @@ const orgName = ref('')
 // Step 2 fields (stored after step 1)
 let userId = 0
 
+function validateStep1(): boolean {
+  const errors: Record<string, string> = {}
+
+  if (!adminName.value) errors.adminName = '姓名不能为空'
+
+  if (!adminEmail.value) {
+    errors.adminEmail = '邮箱不能为空'
+  } else if (!/.+@.+\..+/.test(adminEmail.value)) {
+    errors.adminEmail = '邮箱格式不正确'
+  }
+
+  if (!adminUsername.value) {
+    errors.adminUsername = '用户名不能为空'
+  } else if (!/^[a-z][a-z-]{2,49}$/.test(adminUsername.value)) {
+    errors.adminUsername = '3-50位小写字母和连字符，以字母开头'
+  }
+
+  if (!adminPassword.value) {
+    errors.adminPassword = '密码不能为空'
+  } else if (adminPassword.value.length < 6) {
+    errors.adminPassword = '密码至少 6 位'
+  }
+
+  if (!orgName.value) errors.orgName = '组织名称不能为空'
+
+  fieldErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
 async function createAdmin() {
-  const { valid } = await formRef.value.validate()
-  if (!valid) return
+  if (!validateStep1()) return
 
   loading.value = true
   errorMessage.value = ''
@@ -300,7 +350,7 @@ function arrayBufferToBase64Url(buf: ArrayBuffer): string {
 }
 
 function base64UrlToBuffer(base64url: string): Uint8Array {
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+  const base64 = base64url.replace(/-/g, '+').replace(/\//g, '/')
   const pad = base64.length % 4
   const padded = pad ? base64 + '='.repeat(4 - pad) : base64
   const binary = atob(padded)
@@ -311,7 +361,182 @@ function base64UrlToBuffer(base64url: string): Uint8Array {
 </script>
 
 <style scoped>
-.oobe-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.oobe-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f6cbd 0%, #115ea3 50%, #0c3b5e 100%);
+  padding: 1rem;
+}
+
+.oobe-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--colorNeutralBackground1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: var(--shadow16);
+}
+
+.oobe-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.oobe-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.oobe-description {
+  text-align: center;
+  margin: 0 0 1.5rem 0;
+  color: var(--colorNeutralForeground3);
+  font-size: 0.875rem;
+}
+
+/* Stepper */
+.stepper {
+  margin-bottom: 1.5rem;
+}
+
+.stepper-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0 1rem;
+}
+
+.stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 1;
+}
+
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--colorNeutralBackground3);
+  color: var(--colorNeutralForeground3);
+  transition: all 0.2s;
+}
+
+.stepper-step.active .step-circle {
+  background: var(--colorBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+}
+
+.stepper-step.completed .step-circle {
+  background: var(--colorPaletteGreenBackground3);
+  color: var(--colorNeutralForegroundInverted);
+}
+
+.step-label {
+  font-size: 0.75rem;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+}
+
+.stepper-step.active .step-label {
+  color: var(--colorBrandForeground1);
+  font-weight: 600;
+}
+
+.stepper-line {
+  position: absolute;
+  top: 16px;
+  left: 3rem;
+  right: 3rem;
+  z-index: 0;
+}
+
+/* Step content */
+.step-content {
+  padding: 0.5rem 0;
+}
+
+.step-complete {
+  text-align: center;
+}
+
+.complete-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1rem 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.step-text {
+  font-size: 0.9375rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.step-subtext {
+  font-size: 0.875rem;
+  margin: 0 0 0.25rem 0;
+  color: var(--colorNeutralForeground2);
+}
+
+.step-hint {
+  font-size: 0.8125rem;
+  margin: 0 0 1.5rem 0;
+  color: var(--colorNeutralForeground3);
+}
+
+.oobe-field {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: var(--colorPaletteRedForeground1);
+  margin-top: 2px;
+}
+
+.password-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.password-input {
+  flex: 1;
+}
+
+.password-toggle {
+  flex-shrink: 0;
+}
+
+.oobe-btn {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  min-height: 40px;
+}
+
+.oobe-alert {
+  margin-top: 1rem;
+}
+
+.btn-icon {
+  margin-right: 8px;
 }
 </style>

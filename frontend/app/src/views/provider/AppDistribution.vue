@@ -1,123 +1,118 @@
 <!-- frontend/app/src/views/provider/AppDistribution.vue -->
 <template>
   <div>
-    <h2 class="text-h5 mb-4">应用分发</h2>
-    <p class="text-body-2 text-grey mb-4">
+    <h2 style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightSemibold); margin-bottom: var(--spacingVerticalM);">应用分发</h2>
+    <p style="font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground3); margin-bottom: var(--spacingVerticalM);">
       将应用分发给组织后，该组织成员即可在启动台看到此应用。每个组织可单独设置应用管理员（对应用数据拥有全部读写权限）。服务商天然是任何应用的管理员。
     </p>
 
-    <v-card class="mb-4">
-      <v-card-text>
-        <v-select
-          v-model="selectedAppId"
-          :items="apps"
-          item-title="name"
-          item-value="id"
-          label="选择应用"
-          variant="outlined"
-          density="compact"
-          :loading="appsLoading"
-          @update:model-value="loadDistributions"
-        />
-      </v-card-text>
-    </v-card>
+    <FluentCard style="margin-bottom: var(--spacingVerticalM);">
+      <fluent-field label="选择应用">
+        <fluent-dropdown
+          :value="selectedAppId"
+          @change="selectedAppId = ($event.target as any).value; loadDistributions()"
+          :disabled="appsLoading"
+          style="width: 100%;"
+        >
+          <fluent-option v-for="app in apps" :key="app.id" :value="app.id">
+            {{ app.name }}
+          </fluent-option>
+        </fluent-dropdown>
+      </fluent-field>
+    </FluentCard>
 
-    <v-card v-if="selectedAppId">
-      <v-toolbar density="compact" color="primary" dark>
-        <v-toolbar-title>分发到组织（{{ distributions.length }}）</v-toolbar-title>
-      </v-toolbar>
+    <FluentCard v-if="selectedAppId">
+      <template #header>
+        <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold);">分发到组织（{{ distributions.length }}）</span>
+      </template>
 
-      <v-card-text>
-        <v-table v-if="orgs.length">
-          <thead>
-            <tr>
-              <th>组织</th>
-              <th>状态</th>
-              <th>应用管理员</th>
-              <th class="text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="org in orgs" :key="org.id">
-              <td>{{ org.name }}</td>
-              <td>
-                <v-chip v-if="isDistributed(org.id)" size="small" color="success" variant="tonal">已分发</v-chip>
-                <v-chip v-else size="small" color="grey" variant="tonal">未分发</v-chip>
-              </td>
-              <td>
-                <template v-if="isDistributed(org.id)">
-                  <v-chip
-                    v-for="admin in adminsOf(org.id)"
-                    :key="admin.userId"
-                    size="small"
-                    class="mr-1 mb-1"
-                    closable
-                    @click:close="removeAdmin(org.id, admin)"
-                  >
-                    {{ admin.name }}{{ admin.username ? ` (${admin.username})` : '' }}
-                  </v-chip>
-                  <v-chip v-if="!adminsOf(org.id).length" size="small" variant="tonal" class="mr-1">无（仅服务商可管理）</v-chip>
-                </template>
-                <span v-else class="text-grey text-caption">—</span>
-              </td>
-              <td class="text-right">
-                <v-btn
-                  v-if="isDistributed(org.id)"
-                  size="small"
-                  variant="text"
-                  @click="openAdminDialog(org)"
+      <FluentTable v-if="orgs.length">
+        <thead>
+          <tr>
+            <th>组织</th>
+            <th>状态</th>
+            <th>应用管理员</th>
+            <th style="text-align: right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="org in orgs" :key="org.id">
+            <td>{{ org.name }}</td>
+            <td>
+              <FluentChip v-if="isDistributed(org.id)" color="success" small>已分发</FluentChip>
+              <FluentChip v-else color="default" small variant="subtle">未分发</FluentChip>
+            </td>
+            <td>
+              <template v-if="isDistributed(org.id)">
+                <FluentChip
+                  v-for="admin in adminsOf(org.id)"
+                  :key="admin.userId"
+                  small
+                  closable
+                  @close="removeAdmin(org.id, admin)"
+                  style="margin-right: 4px; margin-bottom: 4px;"
                 >
-                  设管理员
-                </v-btn>
-                <v-btn
-                  v-if="isDistributed(org.id)"
-                  size="small"
-                  variant="tonal"
-                  color="error"
-                  @click="undistribute(org.id)"
-                >
-                  取消分发
-                </v-btn>
-                <v-btn v-else size="small" color="primary" @click="distribute(org.id)">
-                  分发
-                </v-btn>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-        <v-alert v-else type="info" variant="tonal">暂无组织，请先在「组织管理」中创建组织。</v-alert>
-      </v-card-text>
-    </v-card>
+                  {{ admin.name }}{{ admin.username ? ` (${admin.username})` : '' }}
+                </FluentChip>
+                <FluentChip v-if="!adminsOf(org.id).length" variant="subtle" small style="margin-right: 4px;">无（仅服务商可管理）</FluentChip>
+              </template>
+              <span v-else style="color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase100);">—</span>
+            </td>
+            <td style="text-align: right;">
+              <fluent-button
+                v-if="isDistributed(org.id)"
+                appearance="subtle"
+                size="small"
+                @click="openAdminDialog(org)"
+              >
+                设管理员
+              </fluent-button>
+              <fluent-button
+                v-if="isDistributed(org.id)"
+                appearance="outline"
+                size="small"
+                @click="undistribute(org.id)"
+                style="color: var(--colorPaletteRedForeground1);"
+              >
+                取消分发
+              </fluent-button>
+              <fluent-button v-else appearance="primary" size="small" @click="distribute(org.id)">
+                分发
+              </fluent-button>
+            </td>
+          </tr>
+        </tbody>
+      </FluentTable>
+      <fluent-message-bar v-else intent="info">暂无组织，请先在「组织管理」中创建组织。</fluent-message-bar>
+    </FluentCard>
 
-    <v-dialog v-model="adminDialog" max-width="500">
-      <v-card>
-        <v-card-title>设置应用管理员</v-card-title>
-        <v-card-text>
-          <p class="text-body-2 text-grey mb-2">
-            组织：<strong>{{ adminDialogOrg?.name }}</strong> — 应用：<strong>{{ selectedAppName }}</strong>
-          </p>
-          <v-select
-            v-model="newAdminUserId"
-            :items="orgMembers"
-            item-title="name"
-            item-value="userId"
-            label="选择组织成员"
-            variant="outlined"
-            density="compact"
-            :loading="membersLoading"
-          />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="adminDialog = false">取消</v-btn>
-          <v-btn color="primary" :disabled="!newAdminUserId" @click="confirmAddAdmin">添加</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- 设置管理员对话框 -->
+    <fluent-dialog :open="adminDialog" @close="adminDialog = false" modal-type="modal" style="--dialog-width: 500px;">
+      <fluent-dialog-body>
+        <h3 slot="title" style="margin: 0; font-size: var(--fontSizeBase400);">设置应用管理员</h3>
+        <p style="font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground2); margin: var(--spacingVerticalM) 0;">
+          组织：<strong>{{ adminDialogOrg?.name }}</strong> — 应用：<strong>{{ selectedAppName }}</strong>
+        </p>
+        <fluent-field label="选择组织成员">
+          <fluent-dropdown
+            :value="newAdminUserId ? String(newAdminUserId) : ''"
+            @change="newAdminUserId = Number(($event.target as any).value)"
+            :disabled="membersLoading"
+            style="width: 100%;"
+          >
+            <fluent-option v-for="member in orgMembers" :key="member.userId" :value="String(member.userId)">
+              {{ member.name }}
+            </fluent-option>
+          </fluent-dropdown>
+        </fluent-field>
+        <div style="display: flex; justify-content: flex-end; gap: var(--spacingHorizontalS); margin-top: var(--spacingVerticalL);">
+          <fluent-button appearance="subtle" @click="adminDialog = false">取消</fluent-button>
+          <fluent-button appearance="primary" :disabled="!newAdminUserId" @click="confirmAddAdmin">添加</fluent-button>
+        </div>
+      </fluent-dialog-body>
+    </fluent-dialog>
 
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
-      {{ snackbar.text }}
-    </v-snackbar>
+    <ToastMessage />
   </div>
 </template>
 
@@ -134,11 +129,18 @@ import {
   removeAppAdmin,
   type DistributionView,
 } from '../../api/distribution'
+import { useToast } from '../../composables/useToast'
+import FluentCard from '../../components/FluentCard.vue'
+import FluentTable from '../../components/FluentTable.vue'
+import FluentChip from '../../components/FluentChip.vue'
+import ToastMessage from '../../components/ToastMessage.vue'
 
 interface OrgItem {
   id: number
   name: string
 }
+
+const { notify } = useToast()
 
 const apps = ref<Array<{ id: string; name: string }>>([])
 const appsLoading = ref(false)
@@ -152,8 +154,6 @@ const orgMembers = ref<Member[]>([])
 const membersLoading = ref(false)
 const newAdminUserId = ref<number | null>(null)
 
-const snackbar = ref({ show: false, text: '', color: 'success' })
-
 const selectedAppName = computed(() => apps.value.find(a => a.id === selectedAppId.value)?.name || '')
 
 function isDistributed(orgId: number) {
@@ -162,10 +162,6 @@ function isDistributed(orgId: number) {
 
 function adminsOf(orgId: number) {
   return distributions.value.find(d => d.orgId === orgId)?.admins || []
-}
-
-function notify(text: string, color = 'success') {
-  snackbar.value = { show: true, text, color }
 }
 
 async function loadApps() {

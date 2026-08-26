@@ -1,109 +1,105 @@
 <template>
-  <v-app>
-    <v-main class="login-bg">
-      <v-container>
-        <v-row justify="center" align="center" style="height: 100vh">
-          <v-col cols="12" sm="8" md="6" lg="4">
-            <v-card elevation="8" class="pa-2">
-              <v-card-title class="text-h4 font-weight-bold text-center mt-6">
-                Suzuran Cloud
-              </v-card-title>
-              <v-card-subtitle class="text-center mb-4">
-                AI 原生多租户应用平台
-              </v-card-subtitle>
+  <div class="login-page">
+    <div class="login-card">
+      <h1 class="login-title">Suzuran Cloud</h1>
+      <p class="login-subtitle">AI 原生多租户应用平台</p>
 
-              <v-card-text>
-                <v-alert v-if="errorMessage" type="error" class="mb-4" closable>
-                  {{ errorMessage }}
-                </v-alert>
-                <v-alert v-if="successMessage" type="success" class="mb-4" closable>
-                  {{ successMessage }}
-                </v-alert>
+      <fluent-message-bar v-if="errorMessage" intent="error" class="login-alert">
+        {{ errorMessage }}
+      </fluent-message-bar>
+      <fluent-message-bar v-if="successMessage" intent="success" class="login-alert">
+        {{ successMessage }}
+      </fluent-message-bar>
 
-                <!-- 用户名/密码登录（主要方式） -->
-                <v-form ref="form" @submit.prevent="handlePasswordLogin">
-                  <v-text-field
-                    v-model="username"
-                    label="用户名"
-                    prepend-inner-icon="mdi-account"
-                    required
-                    :rules="[rules.required]"
-                    autocomplete="username"
-                    autocapitalize="off"
-                    class="mb-3"
-                  />
+      <!-- 用户名/密码登录（主要方式） -->
+      <form @submit.prevent="handlePasswordLogin">
+        <fluent-field class="login-field">
+          <fluent-label>用户名</fluent-label>
+          <fluent-text-input
+            :value="username"
+            @input="username = ($event.target as HTMLInputElement).value"
+            placeholder="请输入用户名"
+            required
+            autocomplete="username"
+            autocapitalize="off"
+          />
+          <span v-if="fieldErrors.username" class="field-error">{{ fieldErrors.username }}</span>
+        </fluent-field>
 
-                  <v-text-field
-                    v-model="password"
-                    :type="showPassword ? 'text' : 'password'"
-                    label="密码"
-                    prepend-inner-icon="mdi-lock"
-                    :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                    required
-                    :rules="[rules.required, rules.minLength]"
-                    autocomplete="current-password"
-                    class="mb-4"
-                    @click:append-inner="showPassword = !showPassword"
-                  />
+        <fluent-field class="login-field">
+          <fluent-label>密码</fluent-label>
+          <div class="password-wrapper">
+            <fluent-text-input
+              :value="password"
+              @input="password = ($event.target as HTMLInputElement).value"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="请输入密码"
+              required
+              autocomplete="current-password"
+              class="password-input"
+            />
+            <fluent-button
+              appearance="transparent"
+              size="small"
+              @click="showPassword = !showPassword"
+              class="password-toggle"
+            >
+              <i :class="['mdi', showPassword ? 'mdi-eye-off' : 'mdi-eye']" style="font-size: 18px"></i>
+            </fluent-button>
+          </div>
+          <span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
+        </fluent-field>
 
-                  <v-btn
-                    type="submit"
-                    color="primary"
-                    size="x-large"
-                    block
-                    :loading="loading"
-                  >
-                    登录
-                  </v-btn>
-                </v-form>
+        <fluent-button
+          appearance="accent"
+          size="large"
+          type="submit"
+          :disabled="loading"
+          class="login-btn"
+        >
+          <fluent-spinner v-if="loading" size="small" />
+          <span v-else>登录</span>
+        </fluent-button>
+      </form>
 
-                <v-divider class="my-6">或使用其他方式登录</v-divider>
+      <fluent-divider class="login-divider">或使用其他方式登录</fluent-divider>
 
-                <!-- WebAuthn 登录 -->
-                <v-btn
-                  color="secondary"
-                  size="large"
-                  block
-                  variant="outlined"
-                  :loading="passkeyLoading"
-                  prepend-icon="mdi-fingerprint"
-                  class="mb-3"
-                  @click="handlePasskeyLogin"
-                >
-                  使用 Passkey 登录
-                </v-btn>
+      <!-- WebAuthn 登录 -->
+      <fluent-button
+        appearance="outline"
+        size="large"
+        :disabled="passkeyLoading"
+        class="login-btn-secondary"
+        @click="handlePasskeyLogin"
+      >
+        <i class="mdi mdi-fingerprint mdi-18px btn-icon"></i>
+        <fluent-spinner v-if="passkeyLoading" size="small" />
+        <span v-else>使用 Passkey 登录</span>
+      </fluent-button>
 
-                <!-- 钉钉 OAuth 登录 -->
-                <v-btn
-                  color="info"
-                  size="large"
-                  block
-                  variant="outlined"
-                  :loading="dingtalkLoading"
-                  prepend-icon="mdi-account-tie"
-                  @click="handleDingTalkLogin"
-                >
-                  钉钉登录
-                </v-btn>
-
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-  </v-app>
+      <!-- 钉钉 OAuth 登录 -->
+      <fluent-button
+        appearance="outline"
+        size="large"
+        :disabled="dingtalkLoading"
+        class="login-btn-secondary"
+        @click="handleDingTalkLogin"
+      >
+        <i class="mdi mdi-account-tie mdi-18px btn-icon"></i>
+        <fluent-spinner v-if="dingtalkLoading" size="small" />
+        <span v-else>钉钉登录</span>
+      </fluent-button>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-
 const router = useRouter()
 const authStore = useAuthStore()
 
-const form = ref()
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -112,17 +108,35 @@ const passkeyLoading = ref(false)
 const dingtalkLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const fieldErrors = ref<Record<string, string>>({})
 
 // 验证规则
 const rules = {
-  required: (v: string) => !!v || '必填',
-  minLength: (v: string) => v.length >= 6 || '密码至少 6 位',
+  required: (v: string, label: string) => !!v || `${label}为必填`,
+  minLength: (v: string, min: number, label: string) => v.length >= min || `${label}至少 ${min} 位`,
+}
+
+function validateForm(): boolean {
+  const errors: Record<string, string> = {}
+
+  const usernameErr = rules.required(username.value, '用户名')
+  if (usernameErr !== true) errors.username = usernameErr
+
+  const passwordRequiredErr = rules.required(password.value, '密码')
+  if (passwordRequiredErr !== true) {
+    errors.password = passwordRequiredErr
+  } else {
+    const passwordMinErr = rules.minLength(password.value, 6, '密码')
+    if (passwordMinErr !== true) errors.password = passwordMinErr
+  }
+
+  fieldErrors.value = errors
+  return Object.keys(errors).length === 0
 }
 
 // 用户名/密码登录
 const handlePasswordLogin = async () => {
-  const { valid } = await form.value.validate()
-  if (!valid) return
+  if (!validateForm()) return
 
   loading.value = true
   errorMessage.value = ''
@@ -202,8 +216,88 @@ const handleDingTalkLogin = async () => {
 </script>
 
 <style scoped>
-.login-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.login-page {
   min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f6cbd 0%, #115ea3 50%, #0c3b5e 100%);
+  padding: 1rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--colorNeutralBackground1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: var(--shadow16);
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 0.25rem 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.login-subtitle {
+  text-align: center;
+  margin: 0 0 1.5rem 0;
+  color: var(--colorNeutralForeground3);
+  font-size: 0.875rem;
+}
+
+.login-alert {
+  margin-bottom: 1rem;
+}
+
+.login-field {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: var(--colorPaletteRedForeground1);
+  margin-top: 2px;
+}
+
+.password-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.password-input {
+  flex: 1;
+}
+
+.password-toggle {
+  flex-shrink: 0;
+}
+
+.login-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  min-height: 44px;
+  font-size: 1rem;
+}
+
+.login-divider {
+  margin: 1.5rem 0;
+}
+
+.login-btn-secondary {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  min-height: 40px;
+}
+
+.btn-icon {
+  margin-right: 8px;
 }
 </style>

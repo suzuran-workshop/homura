@@ -1,30 +1,31 @@
 <template>
   <div>
-    <div class="d-flex align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">
-        <v-icon class="mr-2" color="primary">mdi-script-text-outline</v-icon>
+    <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalXL);">
+      <h2 style="font-size: var(--fontSizeBase500); font-weight: var(--fontWeightBold); margin: 0; display: flex; align-items: center; gap: var(--spacingHorizontalS);">
+        <i class="mdi mdi-script-text-outline mdi-24px" style="color: var(--colorBrandForeground1)"></i>
         MCP 调用日志
-      </h1>
-      <v-spacer />
-      <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="fetchLogs">
+      </h2>
+      <div style="flex: 1;"></div>
+      <fluent-button appearance="subtle" :disabled="loading" @click="fetchLogs">
+        <i class="mdi mdi-autorenew" style="font-size: 16px; margin-right: 4px;"</i>
         刷新
-      </v-btn>
+      </fluent-button>
     </div>
 
-    <v-alert v-if="error" type="error" class="mb-4" closable>{{ error }}</v-alert>
+    <fluent-message-bar v-if="error" intent="error" style="margin-bottom: var(--spacingVerticalM);">{{ error }}</fluent-message-bar>
 
-    <div v-if="loading && logs.length === 0" class="text-center py-12">
-      <v-progress-circular indeterminate color="primary" size="64" />
+    <div v-if="loading && logs.length === 0" style="text-align: center; padding: var(--spacingVerticalXXXL);">
+      <fluent-spinner size="large" />
     </div>
 
-    <v-card v-else-if="logs.length === 0" variant="outlined" class="text-center pa-12">
-      <v-icon size="64" color="grey-lighten-1">mdi-script-text-outline</v-icon>
-      <p class="text-h6 mt-4 text-grey">还没有 MCP 调用记录</p>
-      <p class="text-body-2 text-grey">应用通过 MCP 访问数据时，调用记录会出现在这里</p>
-    </v-card>
+    <FluentCard v-else-if="logs.length === 0" outlined style="text-align: center; padding: var(--spacingVerticalXXXL);">
+      <i class="mdi mdi-script-text-outline" style="font-size: 64px; color: var(--colorNeutralForeground3)"</i>
+      <p style="font-size: var(--fontSizeBase400); margin-top: var(--spacingVerticalM); color: var(--colorNeutralForeground2);">还没有 MCP 调用记录</p>
+      <p style="font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground3);">应用通过 MCP 访问数据时，调用记录会出现在这里</p>
+    </FluentCard>
 
-    <v-card v-else variant="outlined">
-      <v-table>
+    <FluentCard v-else outlined>
+      <FluentTable>
         <thead>
           <tr>
             <th>时间</th>
@@ -38,37 +39,39 @@
         </thead>
         <tbody>
           <tr v-for="log in logs" :key="log.id">
-            <td class="text-no-wrap">{{ formatDate(log.createdAt) }}</td>
+            <td style="white-space: nowrap;">{{ formatDate(log.createdAt) }}</td>
             <td>{{ log.userId ?? '—' }}</td>
             <td>{{ log.orgId ?? '—' }}</td>
-            <td class="font-monospace">{{ extractTool(log) }}</td>
+            <td style="font-family: 'Consolas', 'Monaco', monospace;">{{ extractTool(log) }}</td>
             <td>
-              <v-chip
+              <FluentChip
                 v-if="log.responseStatus"
-                :color="log.responseStatus < 400 ? 'success' : 'error'"
-                size="small"
-                label
+                :color="log.responseStatus < 400 ? 'success' : 'danger'"
+                small
               >
                 {{ log.responseStatus }}
-              </v-chip>
-              <span v-else class="text-grey">—</span>
+              </FluentChip>
+              <span v-else style="color: var(--colorNeutralForeground3);">—</span>
             </td>
-            <td class="text-truncate" style="max-width: 280px">
-              <span class="text-caption text-grey-darken-1 font-monospace">
+            <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground2); font-family: 'Consolas', 'Monaco', monospace;">
                 {{ formatRequestData(log) }}
               </span>
             </td>
-            <td class="text-caption">{{ log.ipAddress || '—' }}</td>
+            <td style="font-size: var(--fontSizeBase100);">{{ log.ipAddress || '—' }}</td>
           </tr>
         </tbody>
-      </v-table>
-    </v-card>
+      </FluentTable>
+    </FluentCard>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { listAuditLogs, type AuditLogEntry } from '../../api/mcp'
+import FluentCard from '../../components/FluentCard.vue'
+import FluentTable from '../../components/FluentTable.vue'
+import FluentChip from '../../components/FluentChip.vue'
 
 const logs = ref<AuditLogEntry[]>([])
 const loading = ref(false)

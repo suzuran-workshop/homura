@@ -1,101 +1,72 @@
 <template>
-  <v-card
+  <FluentCard
     :class="['app-card', { 'app-card--disabled': disabled }]"
-    :elevation="disabled ? 1 : 3"
-    :ripple="!disabled"
+    :interactive="!disabled"
     @click="!disabled ? $emit('open', app) : null"
   >
     <!-- 状态指示条 -->
-    <div :class="['status-bar', statusColor]" />
+    <div :class="['status-bar', `status-bar--${statusColor}`]" />
 
-    <v-card-text class="pa-5">
+    <div class="card-content">
       <!-- 图标 + 名称 -->
-      <div class="d-flex align-center mb-3">
-        <v-avatar :color="iconBgColor" size="48" class="mr-3">
-          <v-icon :color="iconColor" size="28">{{ runtimeIcon }}</v-icon>
-        </v-avatar>
-        <div class="flex-grow-1 overflow-hidden">
-          <div class="text-subtitle-1 font-weight-bold text-truncate">
-            {{ app.name }}
-          </div>
-          <div class="text-caption text-grey">v{{ app.version || '0.0.0' }}</div>
+      <div class="app-header-row">
+        <div :class="['runtime-avatar', `runtime-avatar--${iconBgTone}`]">
+          <i :class="['mdi', runtimeMdiIcon]" :style="`font-size: 28px; color: ${iconColor}`"></i>
+        </div>
+        <div class="app-name-block">
+          <div class="app-name">{{ app.name }}</div>
+          <div class="app-version">v{{ app.version || '0.0.0' }}</div>
         </div>
       </div>
 
       <!-- 状态标签 -->
-      <div class="d-flex align-center mb-3">
-        <v-chip
-          :color="statusColor"
-          size="small"
-          variant="flat"
-          label
-        >
-          <v-icon start size="small">{{ statusIcon }}</v-icon>
+      <div class="status-row">
+        <FluentChip :color="statusColor" :icon="statusMdiIcon" small>
           {{ statusLabel }}
-        </v-chip>
-        <v-spacer />
-        <span class="text-caption text-grey">{{ app.runtime || 'unknown' }}</span>
+        </FluentChip>
+        <span class="runtime-label">{{ app.runtime || 'unknown' }}</span>
       </div>
 
       <!-- 资源信息 -->
-      <div class="text-body-2 text-grey-darken-1">
-        <v-icon size="small" class="mr-1">mdi-cpu-64-bit</v-icon>
-        {{ app.cpuQuota || '无限制' }} CPU
-        <v-icon size="small" class="ml-3 mr-1">mdi-memory</v-icon>
-        {{ app.memoryQuota || '无限制' }}
+      <div class="resource-info">
+        <i class="mdi mdi-memory" style="font-size: 14px"></i>
+        <span>{{ app.cpuQuota || '无限制' }} CPU</span>
+        <i class="mdi mdi-code-tags resource-spacer" style="font-size: 14px"></i>
+        <span>{{ app.memoryQuota || '无限制' }}</span>
       </div>
-    </v-card-text>
+    </div>
 
-    <v-card-actions v-if="!disabled" class="px-5 pb-4">
-      <v-btn
-        color="primary"
-        variant="flat"
-        size="small"
-        @click.stop="$emit('open', app)"
-      >
-        进入应用
-        <v-icon end>mdi-arrow-right</v-icon>
-      </v-btn>
-      <v-spacer />
-      <v-btn
-        v-if="showDetails"
-        size="small"
-        variant="text"
-        @click.stop="$emit('details', app)"
-      >
-        详情
-        <v-icon end>mdi-chevron-right</v-icon>
-      </v-btn>
-      <v-btn
-        v-if="showData"
-        size="small"
-        variant="text"
-        @click.stop="$emit('data', app)"
-      >
-        数据管理
-        <v-icon end>mdi-database</v-icon>
-      </v-btn>
-    </v-card-actions>
-    <v-card-actions v-else class="px-5 pb-4">
-      <v-btn disabled size="small" block variant="outlined">
-        应用未运行
-      </v-btn>
-      <v-btn
-        v-if="showData"
-        size="small"
-        variant="text"
-        @click.stop="$emit('data', app)"
-      >
-        数据管理
-      </v-btn>
-    </v-card-actions>
-  </v-card>
+    <template #actions>
+      <template v-if="!disabled">
+        <fluent-button appearance="filled" size="small" @click.stop="$emit('open', app)">
+          进入应用
+          <i class="mdi mdi-arrow-right" style="font-size: 14px"></i>
+        </fluent-button>
+        <div class="spacer" />
+        <fluent-button v-if="showDetails" appearance="subtle" size="small" @click.stop="$emit('details', app)">
+          详情
+          <i class="mdi mdi-chevron-right" style="font-size: 14px"></i>
+        </fluent-button>
+        <fluent-button v-if="showData" appearance="subtle" size="small" @click.stop="$emit('data', app)">
+          数据管理
+          <i class="mdi mdi-database" style="font-size: 14px"></i>
+        </fluent-button>
+      </template>
+      <template v-else>
+        <fluent-button disabled style="flex: 1">应用未运行</fluent-button>
+        <fluent-button v-if="showData" appearance="subtle" size="small" @click.stop="$emit('data', app)">
+          数据管理
+        </fluent-button>
+      </template>
+    </template>
+  </FluentCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Application } from '../api/application'
-
+import FluentCard from '../components/FluentCard.vue'
+import FluentChip from '../components/FluentChip.vue'
 const props = defineProps<{
   app: Application
   disabled?: boolean
@@ -109,39 +80,27 @@ defineEmits<{
   data: [app: Application]
 }>()
 
-const statusColor = computed(() => {
+const statusColor = computed<'success' | 'default' | 'info' | 'danger' | 'warning'>(() => {
   switch (props.app.status) {
-    case 'running':
-      return 'success'
-    case 'stopped':
-      return 'grey'
-    case 'created':
-      return 'info'
-    case 'error':
-      return 'error'
+    case 'running': return 'success'
+    case 'stopped': return 'default'
+    case 'created': return 'info'
+    case 'error': return 'danger'
     case 'building':
-    case 'deploying':
-      return 'warning'
-    default:
-      return 'grey'
+    case 'deploying': return 'warning'
+    default: return 'default'
   }
 })
 
-const statusIcon = computed(() => {
+const statusMdiIcon = computed(() => {
   switch (props.app.status) {
-    case 'running':
-      return 'mdi-play-circle'
-    case 'stopped':
-      return 'mdi-pause-circle'
-    case 'created':
-      return 'mdi-plus-circle'
-    case 'error':
-      return 'mdi-alert-circle'
+    case 'running': return 'mdi-play-circle-outline'
+    case 'stopped': return 'mdi-pause-circle-outline'
+    case 'created': return 'mdi-plus-circle-outline'
+    case 'error': return 'mdi-alert-circle'
     case 'building':
-    case 'deploying':
-      return 'mdi-sync'
-    default:
-      return 'mdi-help-circle'
+    case 'deploying': return 'mdi-autorenew'
+    default: return 'mdi-help-circle-outline'
   }
 })
 
@@ -158,45 +117,116 @@ const statusLabel = computed(() => {
   return labels[props.app.status] || props.app.status
 })
 
-const runtimeIcon = computed(() => {
+const runtimeMdiIcon = computed(() => {
   const rt = (props.app.runtime || '').toLowerCase()
   if (rt.includes('node')) return 'mdi-nodejs'
   if (rt.includes('python')) return 'mdi-language-python'
   if (rt.includes('go')) return 'mdi-language-go'
-  return 'mdi-application'
+  return 'mdi-apps'
 })
 
-const iconBgColor = computed(() => {
-  if (props.app.status === 'running') return 'success-lighten-4'
-  return 'grey-lighten-3'
-})
+const iconBgTone = computed(() => (props.app.status === 'running' ? 'active' : 'inactive'))
 
 const iconColor = computed(() => {
-  if (props.app.status === 'running') return 'success'
-  return 'grey'
+  if (props.app.status === 'running') return 'var(--colorPaletteGreenForeground1)'
+  return 'var(--colorNeutralForeground3)'
 })
 </script>
 
 <style scoped>
 .app-card {
   height: 100%;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.app-card:hover:not(.app-card--disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .app-card--disabled {
-  opacity: 0.7;
-  cursor: default;
+  opacity: 0.65;
+  pointer-events: none;
 }
 
 .status-bar {
   height: 4px;
   width: 100%;
   border-radius: 4px 4px 0 0;
+}
+.status-bar--success { background: var(--colorPaletteGreenBackground3); }
+.status-bar--default { background: var(--colorNeutralStroke1); }
+.status-bar--info { background: var(--colorPaletteBlueBackground3); }
+.status-bar--danger { background: var(--colorPaletteRedBackground3); }
+.status-bar--warning { background: var(--colorPaletteYellowBackground3); }
+
+.card-content {
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+
+.app-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.runtime-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--borderRadiusMedium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.runtime-avatar--active { background: var(--colorPaletteGreenBackground2); }
+.runtime-avatar--inactive { background: var(--colorNeutralBackground3); }
+
+.app-name-block {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-name {
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-version {
+  font-size: var(--fontSizeBase100);
+  color: var(--colorNeutralForeground3);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.runtime-label {
+  margin-left: auto;
+  font-size: var(--fontSizeBase100);
+  color: var(--colorNeutralForeground3);
+}
+
+.resource-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+}
+
+.resource-spacer {
+  margin-left: var(--spacingHorizontalM);
+}
+
+.spacer {
+  flex: 1;
 }
 </style>

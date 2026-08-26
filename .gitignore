@@ -50,6 +50,7 @@ build/
 /backend/main
 
 # Test artifacts
+screenshots/
 test-results/
 .last-run.json
 

@@ -1,55 +1,37 @@
 <template>
-  <v-app>
-    <v-main class="callback-bg">
-      <v-container>
-        <v-row justify="center" align="center" style="height: 100vh">
-          <v-col cols="12" sm="8" md="6" lg="4">
-            <v-card elevation="8" class="pa-6">
-              <v-card-title class="text-h4 font-weight-bold text-center">
-                钉钉登录中...
-              </v-card-title>
+  <div class="callback-page">
+    <div class="callback-card">
+      <h1 class="callback-title">钉钉登录中...</h1>
 
-              <v-card-text>
-                <v-alert v-if="errorMessage" type="error" class="mb-4">
-                  {{ errorMessage }}
-                </v-alert>
+      <fluent-message-bar v-if="errorMessage" intent="error" class="callback-alert">
+        {{ errorMessage }}
+      </fluent-message-bar>
 
-                <div v-if="!errorMessage" class="text-center">
-                  <v-progress-circular
-                    indeterminate
-                    color="primary"
-                    size="64"
-                    class="mb-4"
-                  />
-                  <p class="text-body-1 text-grey-darken-1">
-                    正在处理钉钉授权，请稍候...
-                  </p>
-                </div>
+      <div v-if="!errorMessage" class="callback-loading">
+        <fluent-spinner size="large" />
+        <p class="callback-text">
+          正在处理钉钉授权，请稍候...
+        </p>
+      </div>
 
-                <!-- 组织选择（如果用户有多个组织） -->
-                <div v-if="showOrgSelector">
-                  <v-divider class="my-4" />
-                  <h3 class="text-subtitle-1 font-weight-bold mb-2">选择登录组织</h3>
-                  <v-list>
-                    <v-list-item
-                      v-for="org in availableOrgs"
-                      :key="org.orgId"
-                      @click="selectOrg(org.orgId)"
-                    >
-                      <v-list-item-title>{{ org.orgName }}</v-list-item-title>
-                      <v-list-item-subtitle>
-                        {{ org.isAdmin ? '管理员' : '普通成员' }}
-                      </v-list-item-subtitle>
-                    </v-list-item>
-                  </v-list>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-  </v-app>
+      <!-- 组织选择（如果用户有多个组织） -->
+      <div v-if="showOrgSelector" class="org-selector">
+        <fluent-divider class="selector-divider" />
+        <h3 class="selector-title">选择登录组织</h3>
+        <div class="org-list">
+          <div
+            v-for="org in availableOrgs"
+            :key="org.orgId"
+            class="org-item"
+            @click="selectOrg(org.orgId)"
+          >
+            <span class="org-name">{{ org.orgName }}</span>
+            <span class="org-role">{{ org.isAdmin ? '管理员' : '普通成员' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -120,8 +102,90 @@ async function selectOrg(orgId: number) {
 </script>
 
 <style scoped>
-.callback-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.callback-page {
   min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f6cbd 0%, #115ea3 50%, #0c3b5e 100%);
+  padding: 1rem;
+}
+
+.callback-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--colorNeutralBackground1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: var(--shadow16);
+}
+
+.callback-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 1.5rem 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.callback-alert {
+  margin-bottom: 1rem;
+}
+
+.callback-loading {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.callback-text {
+  color: var(--colorNeutralForeground3);
+  font-size: 0.9375rem;
+  margin-top: 1rem;
+}
+
+.org-selector {
+  margin-top: 0.5rem;
+}
+
+.selector-divider {
+  margin: 1rem 0;
+}
+
+.selector-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.org-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.org-item:hover {
+  background: var(--colorNeutralBackground1Hover);
+}
+
+.org-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--colorNeutralForeground1);
+}
+
+.org-role {
+  font-size: 0.8125rem;
+  color: var(--colorNeutralForeground3);
 }
 </style>

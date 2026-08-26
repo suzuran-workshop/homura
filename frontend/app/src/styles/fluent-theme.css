@@ -1,0 +1,292 @@
+/* Fluent UI Design Tokens - CSS Custom Properties */
+/* Light Theme (default) */
+:root {
+  /* Border Radius */
+  --borderRadiusNone: 0;
+  --borderRadiusSmall: 2px;
+  --borderRadiusMedium: 4px;
+  --borderRadiusLarge: 6px;
+  --borderRadiusXLarge: 8px;
+  --borderRadiusCircular: 50%;
+
+  /* Font Size */
+  --fontSizeBase100: 10px;
+  --fontSizeBase200: 12px;
+  --fontSizeBase300: 14px;
+  --fontSizeBase400: 16px;
+  --fontSizeBase500: 20px;
+  --fontSizeBase600: 24px;
+  --fontSizeHero700: 28px;
+  --fontSizeHero800: 32px;
+  --fontSizeHero900: 40px;
+
+  /* Line Height */
+  --lineHeightBase100: 14px;
+  --lineHeightBase200: 16px;
+  --lineHeightBase300: 20px;
+  --lineHeightBase400: 22px;
+  --lineHeightBase500: 26px;
+  --lineHeightBase600: 32px;
+  --lineHeightHero700: 36px;
+  --lineHeightHero800: 40px;
+  --lineHeightHero900: 52px;
+
+  /* Font Weight */
+  --fontWeightRegular: 400;
+  --fontWeightMedium: 500;
+  --fontWeightSemibold: 600;
+
+  /* Spacing Vertical */
+  --spacingVerticalNone: 0;
+  --spacingVerticalXXS: 2px;
+  --spacingVerticalXS: 4px;
+  --spacingVerticalSNudge: 6px;
+  --spacingVerticalS: 8px;
+  --spacingVerticalMNudge: 10px;
+  --spacingVerticalM: 12px;
+  --spacingVerticalL: 16px;
+  --spacingVerticalXL: 20px;
+  --spacingVerticalXXL: 24px;
+
+  /* Spacing Horizontal */
+  --spacingHorizontalNone: 0;
+  --spacingHorizontalXXS: 2px;
+  --spacingHorizontalXS: 4px;
+  --spacingHorizontalSNudge: 6px;
+  --spacingHorizontalS: 8px;
+  --spacingHorizontalMNudge: 10px;
+  --spacingHorizontalM: 12px;
+  --spacingHorizontalL: 16px;
+  --spacingHorizontalXL: 20px;
+  --spacingHorizontalXXL: 24px;
+
+  /* Shadow */
+  --shadow2: 0 0 2px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.14);
+  --shadow4: 0 0 2px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.14);
+  --shadow8: 0 0 2px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.14);
+  --shadow16: 0 0 2px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.14);
+  --shadow28: 0 0 8px rgba(0,0,0,0.12), 0 14px 28px rgba(0,0,0,0.24);
+  --shadow64: 0 0 8px rgba(0,0,0,0.12), 0 32px 64px rgba(0,0,0,0.24);
+
+  /* Light Theme Colors */
+  --colorNeutralForeground1: #242424;
+  --colorNeutralForeground2: #424242;
+  --colorNeutralForeground3: #616161;
+  --colorNeutralForeground4: #707070;
+  --colorNeutralForegroundDisabled: #bdbdbd;
+
+  --colorNeutralBackground1: #ffffff;
+  --colorNeutralBackground2: #fafafa;
+  --colorNeutralBackground3: #f5f5f5;
+  --colorNeutralBackground4: #f0f0f0;
+  --colorNeutralBackground5: #e0e0e0;
+  --colorNeutralBackground6: #d6d6d6;
+
+  --colorNeutralBackgroundInverted: #292929;
+  --colorNeutralBackgroundStatic: #333333;
+
+  --colorNeutralStroke1: #d1d1d1;
+  --colorNeutralStroke2: #e0e0e0;
+  --colorNeutralStroke3: #f0f0f0;
+  --colorNeutralStrokeDisabled: #e0e0e0;
+  --colorNeutralStrokeAccessible: #616161;
+
+  --colorBrandBackground: #0f6cbd;
+  --colorBrandBackgroundHover: #115ea3;
+  --colorBrandBackgroundPressed: #0c3b5e;
+  --colorBrandBackgroundDisabled: #f0f0f0;
+  --colorBrandBackground2: #ebf3fc;
+  --colorBrandBackground2Hover: #e1e9f5;
+  --colorBrandBackground2Pressed: #cfe4fa;
+
+  --colorBrandForeground1: #0f6cbd;
+  --colorBrandForeground2: #115ea3;
+  --colorBrandForeground2Hover: #0c3b5e;
+  --colorBrandForeground2Pressed: #0a2e4a;
+  --colorBrandForegroundLink: #0f6cbd;
+  --colorBrandForegroundLinkHover: #115ea3;
+  --colorBrandForegroundLinkPressed: #0c3b5e;
+
+  --colorCompoundBrandForeground1: #0f6cbd;
+  --colorCompoundBrandForeground1Hover: #115ea3;
+  --colorCompoundBrandForeground1Pressed: #0c3b5e;
+  --colorCompoundBrandBackground: #0f6cbd;
+  --colorCompoundBrandBackgroundHover: #115ea3;
+  --colorCompoundBrandBackgroundPressed: #0c3b5e;
+
+  /* Status Colors - Red */
+  --colorPaletteRedBackground1: #fdf3f4;
+  --colorPaletteRedBackground2: #f1bbbc;
+  --colorPaletteRedBackground3: #c50f1f;
+  --colorPaletteRedForeground1: #c50f1f;
+  --colorPaletteRedForeground2: #b10e1c;
+  --colorPaletteRedForeground3: #9b0d19;
+  --colorPaletteRedBorder1: #d63347;
+  --colorPaletteRedBorder2: #c50f1f;
+
+  /* Status Colors - Green */
+  --colorPaletteGreenBackground1: #f1faf1;
+  --colorPaletteGreenBackground2: #9fd89f;
+  --colorPaletteGreenBackground3: #107c10;
+  --colorPaletteGreenForeground1: #107c10;
+  --colorPaletteGreenForeground2: #0e700e;
+  --colorPaletteGreenForeground3: #0c650c;
+  --colorPaletteGreenBorder1: #3a9c3a;
+  --colorPaletteGreenBorder2: #107c10;
+
+  /* Status Colors - Yellow/Warning */
+  --colorPaletteYellowBackground1: #fefbf3;
+  --colorPaletteYellowBackground2: #f9e2ae;
+  --colorPaletteYellowBackground3: #f7c948;
+  --colorPaletteYellowForeground1: #835b00;
+  --colorPaletteYellowForeground2: #755200;
+  --colorPaletteYellowForeground3: #664800;
+  --colorPaletteYellowBorder1: #d9a100;
+  --colorPaletteYellowBorder2: #c29100;
+
+  /* Status Colors - Orange */
+  --colorPaletteOrangeBackground1: #fef6f0;
+  --colorPaletteOrangeBackground2: #f9d5b9;
+  --colorPaletteOrangeBackground3: #e85d00;
+  --colorPaletteOrangeForeground1: #bc4b09;
+  --colorPaletteOrangeForeground2: #a94408;
+  --colorPaletteOrangeForeground3: #963d07;
+  --colorPaletteOrangeBorder1: #dc7326;
+  --colorPaletteOrangeBorder2: #e85d00;
+
+  /* Status Colors - Blue */
+  --colorPaletteBlueBackground1: #f0f6ff;
+  --colorPaletteBlueBackground2: #a9d3f2;
+  --colorPaletteBlueBackground3: #0078d4;
+  --colorPaletteBlueForeground1: #0078d4;
+  --colorPaletteBlueForeground2: #006cbd;
+  --colorPaletteBlueForeground3: #005a9e;
+  --colorPaletteBlueBorder1: #2886de;
+  --colorPaletteBlueBorder2: #0078d4;
+
+  /* Status Colors - Purple */
+  --colorPalettePurpleBackground1: #f6f3fd;
+  --colorPalettePurpleBackground2: #c8b4e8;
+  --colorPalettePurpleBackground3: #7b3f9e;
+  --colorPalettePurpleForeground1: #7b3f9e;
+  --colorPalettePurpleForeground2: #6e388e;
+  --colorPalettePurpleForeground3: #61317e;
+  --colorPalettePurpleBorder1: #8c5ba8;
+  --colorPalettePurpleBorder2: #7b3f9e;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --colorNeutralForeground1: #ffffff;
+  --colorNeutralForeground2: #d6d6d6;
+  --colorNeutralForeground3: #adadad;
+  --colorNeutralForeground4: #999999;
+  --colorNeutralForegroundDisabled: #5c5c5c;
+
+  --colorNeutralBackground1: #1a1a1a;
+  --colorNeutralBackground2: #242424;
+  --colorNeutralBackground3: #2e2e2e;
+  --colorNeutralBackground4: #383838;
+  --colorNeutralBackground5: #424242;
+  --colorNeutralBackground6: #4d4d4d;
+
+  --colorNeutralBackgroundInverted: #ffffff;
+  --colorNeutralBackgroundStatic: #e0e0e0;
+
+  --colorNeutralStroke1: #424242;
+  --colorNeutralStroke2: #383838;
+  --colorNeutralStroke3: #2e2e2e;
+  --colorNeutralStrokeDisabled: #383838;
+  --colorNeutralStrokeAccessible: #adadad;
+
+  --colorBrandBackground: #479ef5;
+  --colorBrandBackgroundHover: #62abf5;
+  --colorBrandBackgroundPressed: #2886de;
+  --colorBrandBackgroundDisabled: #2e2e2e;
+  --colorBrandBackground2: #1b3a57;
+  --colorBrandBackground2Hover: #244a6e;
+  --colorBrandBackground2Pressed: #1a3350;
+
+  --colorBrandForeground1: #479ef5;
+  --colorBrandForeground2: #62abf5;
+  --colorBrandForeground2Hover: #7ab8f7;
+  --colorBrandForeground2Pressed: #90c5f8;
+  --colorBrandForegroundLink: #479ef5;
+  --colorBrandForegroundLinkHover: #62abf5;
+  --colorBrandForegroundLinkPressed: #2886de;
+
+  --colorCompoundBrandForeground1: #479ef5;
+  --colorCompoundBrandForeground1Hover: #62abf5;
+  --colorCompoundBrandForeground1Pressed: #2886de;
+  --colorCompoundBrandBackground: #479ef5;
+  --colorCompoundBrandBackgroundHover: #62abf5;
+  --colorCompoundBrandBackgroundPressed: #2886de;
+
+  /* Status Colors - Red (Dark) */
+  --colorPaletteRedBackground1: #442726;
+  --colorPaletteRedBackground2: #d63347;
+  --colorPaletteRedBackground3: #e37d80;
+  --colorPaletteRedForeground1: #e37d80;
+  --colorPaletteRedForeground2: #d63347;
+  --colorPaletteRedForeground3: #c50f1f;
+  --colorPaletteRedBorder1: #d63347;
+  --colorPaletteRedBorder2: #e37d80;
+
+  /* Status Colors - Green (Dark) */
+  --colorPaletteGreenBackground1: #052505;
+  --colorPaletteGreenBackground2: #3a9c3a;
+  --colorPaletteGreenBackground3: #5ec75a;
+  --colorPaletteGreenForeground1: #5ec75a;
+  --colorPaletteGreenForeground2: #3a9c3a;
+  --colorPaletteGreenForeground3: #107c10;
+  --colorPaletteGreenBorder1: #3a9c3a;
+  --colorPaletteGreenBorder2: #5ec75a;
+
+  /* Status Colors - Yellow (Dark) */
+  --colorPaletteYellowBackground1: #4a3f1f;
+  --colorPaletteYellowBackground2: #d9a100;
+  --colorPaletteYellowBackground3: #f7c948;
+  --colorPaletteYellowForeground1: #f7c948;
+  --colorPaletteYellowForeground2: #d9a100;
+  --colorPaletteYellowForeground3: #c29100;
+  --colorPaletteYellowBorder1: #d9a100;
+  --colorPaletteYellowBorder2: #f7c948;
+
+  /* Status Colors - Orange (Dark) */
+  --colorPaletteOrangeBackground1: #4a2c1a;
+  --colorPaletteOrangeBackground2: #dc7326;
+  --colorPaletteOrangeBackground3: #f09458;
+  --colorPaletteOrangeForeground1: #f09458;
+  --colorPaletteOrangeForeground2: #dc7326;
+  --colorPaletteOrangeForeground3: #e85d00;
+  --colorPaletteOrangeBorder1: #dc7326;
+  --colorPaletteOrangeBorder2: #f09458;
+
+  /* Status Colors - Blue (Dark) */
+  --colorPaletteBlueBackground1: #002c4e;
+  --colorPaletteBlueBackground2: #2886de;
+  --colorPaletteBlueBackground3: #62abf5;
+  --colorPaletteBlueForeground1: #62abf5;
+  --colorPaletteBlueForeground2: #2886de;
+  --colorPaletteBlueForeground3: #0078d4;
+  --colorPaletteBlueBorder1: #2886de;
+  --colorPaletteBlueBorder2: #62abf5;
+
+  /* Status Colors - Purple (Dark) */
+  --colorPalettePurpleBackground1: #2d1a3d;
+  --colorPalettePurpleBackground2: #8c5ba8;
+  --colorPalettePurpleBackground3: #b794d4;
+  --colorPalettePurpleForeground1: #b794d4;
+  --colorPalettePurpleForeground2: #8c5ba8;
+  --colorPalettePurpleForeground3: #7b3f9e;
+  --colorPalettePurpleBorder1: #8c5ba8;
+  --colorPalettePurpleBorder2: #b794d4;
+
+  /* Shadow (Dark) */
+  --shadow2: 0 0 2px rgba(0,0,0,0.24), 0 1px 2px rgba(0,0,0,0.28);
+  --shadow4: 0 0 2px rgba(0,0,0,0.24), 0 2px 4px rgba(0,0,0,0.28);
+  --shadow8: 0 0 2px rgba(0,0,0,0.24), 0 4px 8px rgba(0,0,0,0.28);
+  --shadow16: 0 0 2px rgba(0,0,0,0.24), 0 8px 16px rgba(0,0,0,0.28);
+  --shadow28: 0 0 8px rgba(0,0,0,0.24), 0 14px 28px rgba(0,0,0,0.36);
+  --shadow64: 0 0 8px rgba(0,0,0,0.24), 0 32px 64px rgba(0,0,0,0.36);
+}

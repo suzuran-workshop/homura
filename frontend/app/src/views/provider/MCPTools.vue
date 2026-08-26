@@ -1,74 +1,77 @@
 <template>
   <div>
-    <div class="d-flex align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">
-        <v-icon class="mr-2" color="primary">mdi-tools</v-icon>
+    <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalXL);">
+      <h2 style="font-size: var(--fontSizeBase500); font-weight: var(--fontWeightBold); margin: 0; display: flex; align-items: center; gap: var(--spacingHorizontalS);">
+        <i class="mdi mdi-tools mdi-24px" style="color: var(--colorBrandForeground1)"></i>
         MCP 工具
-      </h1>
-      <v-spacer />
-      <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="fetchTools">
+      </h2>
+      <div style="flex: 1;"></div>
+      <fluent-button appearance="subtle" :disabled="loading" @click="fetchTools">
+        <i class="mdi mdi-autorenew" style="font-size: 16px; margin-right: 4px;"</i>
         刷新
-      </v-btn>
+      </fluent-button>
     </div>
 
-    <v-alert v-if="error" type="error" class="mb-4" closable>{{ error }}</v-alert>
+    <fluent-message-bar v-if="error" intent="error" style="margin-bottom: var(--spacingVerticalM);">{{ error }}</fluent-message-bar>
 
-    <div v-if="loading" class="text-center py-12">
-      <v-progress-circular indeterminate color="primary" size="64" />
+    <div v-if="loading" style="text-align: center; padding: var(--spacingVerticalXXXL);">
+      <fluent-spinner size="large" />
     </div>
 
-    <v-card v-else-if="tools.length === 0" variant="outlined" class="text-center pa-12">
-      <v-icon size="64" color="grey-lighten-1">mdi-tools</v-icon>
-      <p class="text-h6 mt-4 text-grey">没有可用的 MCP 工具</p>
-    </v-card>
+    <FluentCard v-else-if="tools.length === 0" outlined style="text-align: center; padding: var(--spacingVerticalXXXL);">
+      <i class="mdi mdi-tools" style="font-size: 64px; color: var(--colorNeutralForeground3)"</i>
+      <p style="font-size: var(--fontSizeBase400); margin-top: var(--spacingVerticalM); color: var(--colorNeutralForeground2);">没有可用的 MCP 工具</p>
+    </FluentCard>
 
-    <v-row v-else>
-      <v-col
+    <div v-else class="tools-grid">
+      <FluentCard
         v-for="tool in tools"
         :key="tool.name"
-        cols="12"
-        md="6"
-        lg="4"
+        outlined
       >
-        <v-card variant="outlined" class="h-100">
-          <v-card-title class="text-subtitle-1 font-monospace">
+        <template #header>
+          <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold); font-family: 'Consolas', 'Monaco', monospace;">
             {{ tool.name }}
-          </v-card-title>
-          <v-card-subtitle class="text-body-2">
-            {{ tool.description || '无描述' }}
-          </v-card-subtitle>
-          <v-divider />
-          <v-card-text v-if="schemaProperties(tool)">
-            <div class="text-caption text-grey mb-1">输入参数</div>
-            <v-table density="compact">
-              <tbody>
-                <tr v-for="(prop, key) in schemaProperties(tool)" :key="key">
-                  <td class="font-monospace">{{ key }}</td>
-                  <td>
-                    <v-chip size="x-small" variant="flat" color="primary">
-                      {{ propType(prop) }}
-                    </v-chip>
-                    <v-icon v-if="isRequired(tool, key)" size="small" color="error" class="ml-1">
-                      mdi-asterisk
-                    </v-icon>
-                  </td>
-                  <td class="text-grey">{{ propDesc(prop) }}</td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card-text>
-          <v-card-text v-else class="text-grey">
-            无输入参数
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+          </span>
+        </template>
+
+        <p style="font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground2); margin-bottom: var(--spacingVerticalM);">
+          {{ tool.description || '无描述' }}
+        </p>
+
+        <fluent-divider style="margin: var(--spacingVerticalM) 0;" />
+
+        <div v-if="schemaProperties(tool)">
+          <div style="font-size: var(--fontSizeBase100); color: var(--colorNeutralForeground3); margin-bottom: var(--spacingVerticalXS);">输入参数</div>
+          <FluentTable dense>
+            <tbody>
+              <tr v-for="(prop, key) in schemaProperties(tool)" :key="key">
+                <td style="font-family: 'Consolas', 'Monaco', monospace;">{{ key }}</td>
+                <td>
+                  <FluentChip color="brand" small>
+                    {{ propType(prop) }}
+                  </FluentChip>
+                  <i class="mdi mdi-star" style="font-size: 14px; color: var(--colorPaletteRedForeground1); margin-left: 4px;" v-if="isRequired(tool, key)"</i>
+                </td>
+                <td style="color: var(--colorNeutralForeground3);">{{ propDesc(prop) }}</td>
+              </tr>
+            </tbody>
+          </FluentTable>
+        </div>
+        <div v-else style="color: var(--colorNeutralForeground3);">
+          无输入参数
+        </div>
+      </FluentCard>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import type { MCPTool } from '../../api/mcp'
+import FluentCard from '../../components/FluentCard.vue'
+import FluentTable from '../../components/FluentTable.vue'
+import FluentChip from '../../components/FluentChip.vue'
 
 const tools = ref<MCPTool[]>([])
 const loading = ref(false)
@@ -120,10 +123,9 @@ onMounted(fetchTools)
 </script>
 
 <style scoped>
-.font-monospace {
-  font-family: 'Consolas', 'Monaco', monospace;
-}
-.h-100 {
-  height: 100%;
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacingHorizontalL);
 }
 </style>

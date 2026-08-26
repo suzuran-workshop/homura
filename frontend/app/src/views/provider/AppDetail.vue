@@ -1,216 +1,206 @@
 <template>
   <div>
     <!-- 页头 -->
-    <div class="d-flex align-center mb-6">
-      <v-btn
-        variant="text"
-        prepend-icon="mdi-arrow-left"
-        to="/provider/apps"
-        class="mr-2"
-      >
+    <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS); margin-bottom: var(--spacingVerticalXL);">
+      <fluent-button appearance="subtle" @click="router.push('/provider/apps')">
+        <i class="mdi mdi-arrow-left" style="font-size: 16px"</i>
         返回
-      </v-btn>
-      <h1 class="text-h5 font-weight-bold">
-        <v-icon class="mr-2" color="primary">mdi-application-cog</v-icon>
+      </fluent-button>
+      <h2 style="font-size: var(--fontSizeBase400); font-weight: var(--fontWeightBold); margin: 0; display: flex; align-items: center; gap: var(--spacingHorizontalS);">
+        <i class="mdi mdi-cog" style="font-size: 20px; color: var(--colorBrandForeground1)"</i>
         {{ app?.name || '应用详情' }}
-      </h1>
-      <v-chip
+      </h2>
+      <FluentChip
         v-if="app"
         :color="statusColor"
-        size="small"
-        class="ml-3"
-        label
+        small
       >
         {{ statusLabel }}
-      </v-chip>
-      <v-spacer />
-      <v-btn
+      </FluentChip>
+      <div style="flex: 1;"></div>
+      <fluent-button
         v-if="app"
-        variant="outlined"
-        prepend-icon="mdi-refresh"
-        :loading="actionLoading"
+        appearance="outline"
+        :disabled="actionLoading"
         @click="refresh"
       >
+        <i class="mdi mdi-autorenew" style="font-size: 16px; margin-right: 4px;"</i>
         刷新
-      </v-btn>
+      </fluent-button>
     </div>
 
     <!-- 错误 -->
-    <v-alert v-if="error" type="error" class="mb-4" closable>
+    <fluent-message-bar v-if="error" intent="error" style="margin-bottom: var(--spacingVerticalM);">
       {{ error }}
-    </v-alert>
+    </fluent-message-bar>
 
     <!-- 加载 -->
-    <div v-if="loading && !app" class="text-center py-12">
-      <v-progress-circular indeterminate color="primary" size="64" />
+    <div v-if="loading && !app" style="text-align: center; padding: var(--spacingVerticalXXXL);">
+      <fluent-spinner size="large" />
     </div>
 
     <template v-if="app">
-      <v-row>
+      <div class="app-detail-grid">
         <!-- 左：元信息 + 操作 -->
-        <v-col cols="12" md="5">
-          <v-card variant="outlined" class="mb-4">
-            <v-card-title class="text-subtitle-1">应用信息</v-card-title>
-            <v-card-text>
-              <v-list density="compact">
-                <v-list-item>
-                  <v-list-item-title class="text-grey">ID</v-list-item-title>
-                  <v-list-item-subtitle class="font-monospace">{{ app.id }}</v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item>
-                  <v-list-item-title class="text-grey">版本</v-list-item-title>
-                  <v-list-item-subtitle>v{{ app.version || '0.0.0' }}</v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item>
-                  <v-list-item-title class="text-grey">运行时</v-list-item-title>
-                  <v-list-item-subtitle>{{ app.runtime || '—' }}</v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item>
-                  <v-list-item-title class="text-grey">入口</v-list-item-title>
-                  <v-list-item-subtitle class="font-monospace">{{ app.entrypoint || '—' }}</v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item>
-                  <v-list-item-title class="text-grey">端口</v-list-item-title>
-                  <v-list-item-subtitle>{{ app.port || '—' }}</v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item>
-                  <v-list-item-title class="text-grey">资源配额</v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{ app.cpuQuota || '无限制' }} CPU · {{ app.memoryQuota || '无限制' }} · {{ app.dbConnQuota }} 连接
-                  </v-list-item-subtitle>
-                </v-list-item>
-                <v-list-item v-if="app.containerId">
-                  <v-list-item-title class="text-grey">容器 ID</v-list-item-title>
-                  <v-list-item-subtitle class="font-monospace text-truncate">
-                    {{ app.containerId }}
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </v-list>
-            </v-card-text>
+        <FluentCard outlined>
+          <template #header>
+            <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold);">应用信息</span>
+          </template>
 
-            <v-divider />
-            <v-card-actions class="pa-4 flex-wrap">
-              <v-btn
-                color="primary"
-                prepend-icon="mdi-rocket-launch"
-                :loading="actionLoading"
-                @click="callAction('deploy')"
-              >
-                部署
-              </v-btn>
-              <v-btn
-                v-if="app.status === 'stopped' || app.status === 'created'"
-                color="success"
-                prepend-icon="mdi-play"
-                :loading="actionLoading"
-                @click="callAction('start')"
-              >
-                启动
-              </v-btn>
-              <v-btn
-                v-if="app.status === 'running'"
-                color="warning"
-                prepend-icon="mdi-stop"
-                :loading="actionLoading"
-                @click="callAction('stop')"
-              >
-                停止
-              </v-btn>
-              <v-btn
-                variant="outlined"
-                prepend-icon="mdi-restart"
-                :loading="actionLoading"
-                @click="callAction('restart')"
-              >
-                重启
-              </v-btn>
-              <v-btn
-                color="primary"
-                variant="text"
-                prepend-icon="mdi-open-in-new"
-                :disabled="app.status !== 'running'"
-                @click="openApp"
-              >
-                进入应用
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-col>
+          <div class="info-list">
+            <div class="info-item">
+              <span class="info-label">ID</span>
+              <span class="info-value font-monospace">{{ app.id }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">版本</span>
+              <span class="info-value">v{{ app.version || '0.0.0' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">运行时</span>
+              <span class="info-value">{{ app.runtime || '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">入口</span>
+              <span class="info-value font-monospace">{{ app.entrypoint || '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">端口</span>
+              <span class="info-value">{{ app.port || '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">资源配额</span>
+              <span class="info-value">
+                {{ app.cpuQuota || '无限制' }} CPU · {{ app.memoryQuota || '无限制' }} · {{ app.dbConnQuota }} 连接
+              </span>
+            </div>
+            <div v-if="app.containerId" class="info-item">
+              <span class="info-label">容器 ID</span>
+              <span class="info-value font-monospace text-truncate">{{ app.containerId }}</span>
+            </div>
+          </div>
+
+          <fluent-divider style="margin: var(--spacingVerticalM) 0;" />
+
+          <div class="action-buttons">
+            <fluent-button
+              appearance="primary"
+              :disabled="actionLoading"
+              @click="callAction('deploy')"
+            >
+              <i class="mdi mdi-rocket-launch-outline" style="font-size: 16px; margin-right: 4px;"</i>
+              部署
+            </fluent-button>
+            <fluent-button
+              v-if="app.status === 'stopped' || app.status === 'created'"
+              appearance="primary"
+              :disabled="actionLoading"
+              @click="callAction('start')"
+            >
+              <i class="mdi mdi-play" style="font-size: 16px; margin-right: 4px;"</i>
+              启动
+            </fluent-button>
+            <fluent-button
+              v-if="app.status === 'running'"
+              appearance="outline"
+              :disabled="actionLoading"
+              @click="callAction('stop')"
+            >
+              <i class="mdi mdi-stop" style="font-size: 16px; margin-right: 4px;"</i>
+              停止
+            </fluent-button>
+            <fluent-button
+              appearance="outline"
+              :disabled="actionLoading"
+              @click="callAction('restart')"
+            >
+              <i class="mdi mdi-autorenew" style="font-size: 16px; margin-right: 4px;"</i>
+              重启
+            </fluent-button>
+            <fluent-button
+              appearance="subtle"
+              :disabled="app.status !== 'running'"
+              @click="openApp"
+            >
+              <i class="mdi mdi-open-in-new" style="font-size: 16px; margin-right: 4px;"</i>
+              进入应用
+            </fluent-button>
+          </div>
+        </FluentCard>
 
         <!-- 右：日志 -->
-        <v-col cols="12" md="7">
-          <v-card variant="outlined" class="mb-4">
-            <v-card-title class="d-flex align-center text-subtitle-1">
-              运行日志
-              <v-spacer />
-              <v-btn
+        <FluentCard outlined>
+          <template #header>
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+              <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold);">运行日志</span>
+              <fluent-button
+                appearance="subtle"
                 size="small"
-                variant="text"
-                prepend-icon="mdi-refresh"
-                :loading="logsLoading"
+                :disabled="logsLoading"
                 @click="fetchLogs"
               >
+                <i class="mdi mdi-autorenew" style="font-size: 14px; margin-right: 4px;"</i>
                 刷新
-              </v-btn>
-            </v-card-title>
-            <v-card-text>
-              <div class="terminal-output pa-3">
-                <pre v-if="logs" class="terminal-text">{{ logs }}</pre>
-                <div v-else class="text-grey text-center py-4">暂无日志</div>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
+              </fluent-button>
+            </div>
+          </template>
+
+          <div class="terminal-output">
+            <pre v-if="logs" class="terminal-text">{{ logs }}</pre>
+            <div v-else style="color: var(--colorNeutralForeground3); text-align: center; padding: var(--spacingVerticalXL);">暂无日志</div>
+          </div>
+        </FluentCard>
+      </div>
 
       <!-- 部署历史 -->
-      <v-card variant="outlined">
-        <v-card-title class="text-subtitle-1">
-          <v-icon class="mr-2">mdi-history</v-icon>
-          部署历史
-        </v-card-title>
-        <v-card-text>
-          <div v-if="deploymentsLoading" class="text-center py-4">
-            <v-progress-circular indeterminate color="primary" />
+      <FluentCard outlined style="margin-top: var(--spacingVerticalL);">
+        <template #header>
+          <div style="display: flex; align-items: center; gap: var(--spacingHorizontalS);">
+            <i class="mdi mdi-history mdi-18px"</i>
+            <span style="font-size: var(--fontSizeBase300); font-weight: var(--fontWeightSemibold);">部署历史</span>
           </div>
-          <v-table v-else-if="deployments.length > 0">
-            <thead>
-              <tr>
-                <th>版本</th>
-                <th>镜像</th>
-                <th>状态</th>
-                <th>容器 ID</th>
-                <th>创建时间</th>
-                <th>完成时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in deployments" :key="d.id">
-                <td>v{{ d.version || '—' }}</td>
-                <td class="font-monospace">{{ d.imageTag || '—' }}</td>
-                <td>
-                  <v-chip :color="deploymentStatusColor(d.status)" size="small" label>
-                    {{ d.status }}
-                  </v-chip>
-                </td>
-                <td class="font-monospace text-truncate" style="max-width: 200px">
-                  {{ d.containerId || '—' }}
-                </td>
-                <td>{{ formatDate(d.createdAt) }}</td>
-                <td>{{ d.completedAt ? formatDate(d.completedAt) : '—' }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-          <div v-else class="text-grey text-center py-6">还没有部署记录</div>
-        </v-card-text>
-      </v-card>
+        </template>
+
+        <div v-if="deploymentsLoading" style="text-align: center; padding: var(--spacingVerticalXL);">
+          <fluent-spinner />
+        </div>
+        <FluentTable v-else-if="deployments.length > 0" dense>
+          <thead>
+            <tr>
+              <th>版本</th>
+              <th>镜像</th>
+              <th>状态</th>
+              <th>容器 ID</th>
+              <th>创建时间</th>
+              <th>完成时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="d in deployments" :key="d.id">
+              <td>v{{ d.version || '—' }}</td>
+              <td class="font-monospace">{{ d.imageTag || '—' }}</td>
+              <td>
+                <FluentChip :color="deploymentStatusColor(d.status)" small>
+                  {{ d.status }}
+                </FluentChip>
+              </td>
+              <td class="font-monospace text-truncate" style="max-width: 200px">
+                {{ d.containerId || '—' }}
+              </td>
+              <td>{{ formatDate(d.createdAt) }}</td>
+              <td>{{ d.completedAt ? formatDate(d.completedAt) : '—' }}</td>
+            </tr>
+          </tbody>
+        </FluentTable>
+        <div v-else style="color: var(--colorNeutralForeground3); text-align: center; padding: var(--spacingVerticalXL);">还没有部署记录</div>
+      </FluentCard>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getApp,
   getDeployments,
@@ -222,8 +212,12 @@ import {
   type Application,
   type Deployment,
 } from '../../api/application'
+import FluentCard from '../../components/FluentCard.vue'
+import FluentTable from '../../components/FluentTable.vue'
+import FluentChip from '../../components/FluentChip.vue'
 
 const route = useRoute()
+const router = useRouter()
 const appId = computed(() => String(route.params.appId))
 
 const app = ref<Application | null>(null)
@@ -238,16 +232,16 @@ const deployments = ref<Deployment[]>([])
 const deploymentsLoading = ref(false)
 
 const statusColor = computed(() => {
-  if (!app.value) return 'grey'
-  const map: Record<string, string> = {
+  if (!app.value) return 'default' as const
+  const map: Record<string, 'success' | 'default' | 'info' | 'danger' | 'warning'> = {
     running: 'success',
-    stopped: 'grey',
+    stopped: 'default',
     created: 'info',
-    error: 'error',
+    error: 'danger',
     building: 'warning',
     deploying: 'warning',
   }
-  return map[app.value.status] || 'grey'
+  return map[app.value.status] || 'default'
 })
 
 const statusLabel = computed(() => {
@@ -264,14 +258,14 @@ const statusLabel = computed(() => {
   return labels[app.value.status] || app.value.status
 })
 
-function deploymentStatusColor(status: string) {
-  const map: Record<string, string> = {
+function deploymentStatusColor(status: string): 'success' | 'default' | 'info' | 'danger' | 'warning' {
+  const map: Record<string, 'success' | 'default' | 'info' | 'danger' | 'warning'> = {
     deployed: 'success',
     building: 'warning',
-    failed: 'error',
-    stopped: 'grey',
+    failed: 'danger',
+    stopped: 'default',
   }
-  return map[status] || 'grey'
+  return map[status] || 'default'
 }
 
 function formatDate(s: string) {
@@ -349,13 +343,62 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.app-detail-grid {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: var(--spacingHorizontalL);
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacingHorizontalM);
+}
+
+.info-label {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground1);
+  text-align: right;
+}
+
+.font-monospace {
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}
+
 .terminal-output {
   background: #1e1e1e;
-  border-radius: 6px;
+  border-radius: var(--borderRadiusMedium);
   min-height: 200px;
   max-height: 400px;
   overflow: auto;
+  padding: var(--spacingVerticalM);
 }
+
 .terminal-text {
   color: #d4d4d4;
   font-family: 'Consolas', 'Monaco', monospace;
@@ -364,7 +407,10 @@ onMounted(() => {
   word-break: break-all;
   margin: 0;
 }
-.font-monospace {
-  font-family: 'Consolas', 'Monaco', monospace;
+
+@media (max-width: 768px) {
+  .app-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
