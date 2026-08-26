@@ -15,13 +15,13 @@ import (
 
 // FileTools provides file storage-related MCP tools.
 type FileTools struct {
-	fileStorage  *storage.MinIOClient
+	fileStorage  storage.FileStorage
 	rateLimiter  *mcpserver.RateLimiter
 	auditService *service.AuditService
 }
 
 // NewFileTools creates a new FileTools instance.
-func NewFileTools(fileStorage *storage.MinIOClient, rl *mcpserver.RateLimiter, as *service.AuditService) *FileTools {
+func NewFileTools(fileStorage storage.FileStorage, rl *mcpserver.RateLimiter, as *service.AuditService) *FileTools {
 	return &FileTools{fileStorage: fileStorage, rateLimiter: rl, auditService: as}
 }
 

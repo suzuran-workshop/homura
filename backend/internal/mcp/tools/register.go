@@ -13,7 +13,7 @@ func RegisterAllTools(
 	orgService *service.OrgService,
 	userService *service.UserService,
 	deptService *service.DepartmentService,
-	fileStorage *storage.MinIOClient,
+	fileStorage storage.FileStorage,
 	db *gorm.DB,
 	rateLimiter *mcpserver.RateLimiter,
 	auditService *service.AuditService,
