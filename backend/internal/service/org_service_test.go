@@ -52,7 +52,7 @@ func TestOrgService_CreateOrg(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			org, err := orgService.CreateOrg(ctx, tc.orgName, tc.description)
+			org, err := orgService.CreateOrg(ctx, tc.orgName, tc.description, nil)
 
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -256,7 +256,7 @@ func TestOrgService_UpdateOrg(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			err := orgService.UpdateOrg(ctx, tc.orgID, tc.newName, tc.newDesc)
+			err := orgService.UpdateOrg(ctx, tc.orgID, tc.newName, tc.newDesc, nil)
 
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -376,7 +376,7 @@ func TestOrgService_CreateOrg_SpecialCharacters(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			org, err := orgService.CreateOrg(ctx, tc.orgName, tc.description)
+			org, err := orgService.CreateOrg(ctx, tc.orgName, tc.description, nil)
 
 			require.NoError(t, err)
 			assert.NotNil(t, org)
@@ -406,7 +406,7 @@ func TestOrgService_UpdateOrg_SameValues(t *testing.T) {
 	orgService := NewOrgService(orgRepo, deptRepo, bondRepo)
 
 	ctx := context.Background()
-	err = orgService.UpdateOrg(ctx, org.ID, org.Name, org.Description)
+	err = orgService.UpdateOrg(ctx, org.ID, org.Name, org.Description, nil)
 
 	require.NoError(t, err)
 
@@ -430,7 +430,7 @@ func TestOrgService_CreateAndGet_Integration(t *testing.T) {
 
 	ctx := context.Background()
 
-	createdOrg, err := orgService.CreateOrg(ctx, "Integration Test Org", "Integration test")
+	createdOrg, err := orgService.CreateOrg(ctx, "Integration Test Org", "Integration test", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, createdOrg)
 
@@ -444,7 +444,7 @@ func TestOrgService_CreateAndGet_Integration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, allOrgs, 1)
 
-	err = orgService.UpdateOrg(ctx, createdOrg.ID, "Updated Integration Test Org", "Updated description")
+	err = orgService.UpdateOrg(ctx, createdOrg.ID, "Updated Integration Test Org", "Updated description", nil)
 	require.NoError(t, err)
 
 	updatedOrg, err := orgService.GetOrgByID(ctx, createdOrg.ID)
@@ -474,19 +474,19 @@ func TestOrgService_MultipleOrgsIndependent(t *testing.T) {
 
 	ctx := context.Background()
 
-	org1, err := orgService.CreateOrg(ctx, "Org 1", "First")
+	org1, err := orgService.CreateOrg(ctx, "Org 1", "First", nil)
 	require.NoError(t, err)
 
-	org2, err := orgService.CreateOrg(ctx, "Org 2", "Second")
+	org2, err := orgService.CreateOrg(ctx, "Org 2", "Second", nil)
 	require.NoError(t, err)
 
-	org3, err := orgService.CreateOrg(ctx, "Org 3", "Third")
+	org3, err := orgService.CreateOrg(ctx, "Org 3", "Third", nil)
 	require.NoError(t, err)
 
 	assert.NotEqual(t, org1.ID, org2.ID)
 	assert.NotEqual(t, org2.ID, org3.ID)
 
-	err = orgService.UpdateOrg(ctx, org2.ID, "Updated Org 2", "Updated second")
+	err = orgService.UpdateOrg(ctx, org2.ID, "Updated Org 2", "Updated second", nil)
 	require.NoError(t, err)
 
 	unchanged1, err := orgService.GetOrgByID(ctx, org1.ID)

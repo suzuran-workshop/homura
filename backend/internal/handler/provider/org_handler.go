@@ -20,13 +20,14 @@ func (h *OrgHandler) Create(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		ParentID    *int   `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	org, err := h.orgService.CreateOrg(c.Request.Context(), req.Name, req.Description)
+	org, err := h.orgService.CreateOrg(c.Request.Context(), req.Name, req.Description, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,13 +62,14 @@ func (h *OrgHandler) Update(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		ParentID    *int   `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := h.orgService.UpdateOrg(c.Request.Context(), id, req.Name, req.Description)
+	err := h.orgService.UpdateOrg(c.Request.Context(), id, req.Name, req.Description, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

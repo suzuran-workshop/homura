@@ -219,7 +219,7 @@ func (t *OrgTools) handleOrgCreate(ctx context.Context, request mcp.CallToolRequ
 
 	description := mcpserver.GetOptionalStringArg(request.Params.Arguments, "description", "")
 
-	org, err := t.orgService.CreateOrg(ctx, name, description)
+	org, err := t.orgService.CreateOrg(ctx, name, description, nil)
 	if err != nil {
 		return mcpserver.CreateErrorResponse(fmt.Sprintf("failed to create organization: %v", err)), nil
 	}
@@ -247,7 +247,7 @@ func (t *OrgTools) handleOrgUpdate(ctx context.Context, request mcp.CallToolRequ
 	name := mcpserver.GetOptionalStringArg(request.Params.Arguments, "name", "")
 	description := mcpserver.GetOptionalStringArg(request.Params.Arguments, "description", "")
 
-	err = t.orgService.UpdateOrg(ctx, orgID, name, description)
+	err = t.orgService.UpdateOrg(ctx, orgID, name, description, nil)
 	if err != nil {
 		return mcpserver.CreateErrorResponse(fmt.Sprintf("failed to update organization: %v", err)), nil
 	}
