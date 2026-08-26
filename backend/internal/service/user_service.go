@@ -16,6 +16,7 @@ type MemberView struct {
 	Phone               string  `json:"phone"`
 	Name                string  `json:"name"`
 	Email               string  `json:"email"`
+	LoginKey            string  `json:"loginKey"`
 	Username            *string `json:"username,omitempty"`
 	Position            string  `json:"position"`
 	BondID              int     `json:"bondId"`
@@ -54,6 +55,7 @@ func (s *UserService) ListMembers(ctx context.Context, orgID int) ([]MemberView,
 			v.Phone = b.User.Phone
 			v.Name = b.User.Name
 			v.Email = b.User.Email
+			v.LoginKey = b.User.LoginKey
 			v.Username = b.User.Username
 			v.Position = b.User.Position
 		}
@@ -89,6 +91,11 @@ func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, 
 			return nil, err
 		}
 
+		// login_key = username for provider-created users
+		if existing, _ := s.userRepo.GetByLoginKey(ctx, uname); existing != nil {
+			return nil, errors.New("login key already taken")
+		}
+
 		// Check username uniqueness
 		if existingByUsername, _ := s.userRepo.GetByUsername(ctx, uname); existingByUsername != nil {
 			return nil, errors.New("username already taken")
@@ -100,11 +107,12 @@ func (s *UserService) CreateMember(ctx context.Context, orgID int, phone, name, 
 			return nil, err
 		}
 
-		// Create new user with username and password
+		// Create new user with login_key, username, and password
 		user = &model.User{
 			Phone:        phone,
 			Name:         name,
 			Email:        email,
+			LoginKey:     uname, // login_key = username
 			Position:     position,
 			Username:     &uname,
 			PasswordHash: &hash,
@@ -227,6 +235,7 @@ func (s *UserService) singleMemberView(_ context.Context, bond *model.OrgUserBon
 		Phone:               user.Phone,
 		Name:                user.Name,
 		Email:               user.Email,
+		LoginKey:            user.LoginKey,
 		Username:            user.Username,
 		Position:            user.Position,
 		BondID:              bond.ID,

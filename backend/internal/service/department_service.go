@@ -9,15 +9,17 @@ import (
 
 // DepartmentService handles department operations
 type DepartmentService struct {
-	deptRepo *repository.DepartmentRepository
-	bondRepo *repository.OrgUserBondRepository
+	deptRepo   *repository.DepartmentRepository
+	bondRepo   *repository.OrgUserBondRepository
+	udRepo     *repository.UserDepartmentRepository
 }
 
 // NewDepartmentService creates a new department service
-func NewDepartmentService(deptRepo *repository.DepartmentRepository, bondRepo *repository.OrgUserBondRepository) *DepartmentService {
+func NewDepartmentService(deptRepo *repository.DepartmentRepository, bondRepo *repository.OrgUserBondRepository, udRepo *repository.UserDepartmentRepository) *DepartmentService {
 	return &DepartmentService{
 		deptRepo: deptRepo,
 		bondRepo: bondRepo,
+		udRepo:   udRepo,
 	}
 }
 
@@ -100,4 +102,64 @@ func (s *DepartmentService) BuildTree(ctx context.Context, orgID int) ([]Departm
 		return nodes
 	}
 	return build(roots), nil
+}
+
+// --- Multi-department membership ---
+
+// AddMember adds a user to a department within an org.
+func (s *DepartmentService) AddMember(ctx context.Context, orgID, userID, departmentID int) error {
+	ud := &model.UserDepartment{
+		OrgID:        orgID,
+		UserID:       userID,
+		DepartmentID: departmentID,
+	}
+	if err := s.udRepo.Create(ctx, ud); err != nil {
+		return err
+	}
+	// Also sync the primary department to the bond for backward compat
+	return s.syncPrimaryDeptToBond(ctx, orgID, userID)
+}
+
+// RemoveMember removes a user from a department within an org.
+func (s *DepartmentService) RemoveMember(ctx context.Context, orgID, userID, departmentID int) error {
+	if err := s.udRepo.Delete(ctx, orgID, userID, departmentID); err != nil {
+		return err
+	}
+	return s.syncPrimaryDeptToBond(ctx, orgID, userID)
+}
+
+// SetPrimaryDepartment marks a department as the user's primary department.
+func (s *DepartmentService) SetPrimaryDepartment(ctx context.Context, orgID, userID, departmentID int) error {
+	if err := s.udRepo.SetPrimary(ctx, orgID, userID, departmentID); err != nil {
+		return err
+	}
+	return s.syncPrimaryDeptToBond(ctx, orgID, userID)
+}
+
+// GetUserDepartments returns all departments a user belongs to within an org.
+func (s *DepartmentService) GetUserDepartments(ctx context.Context, orgID, userID int) ([]*model.UserDepartment, error) {
+	return s.udRepo.GetByUser(ctx, orgID, userID)
+}
+
+// GetDepartmentMembers returns all users in a department.
+func (s *DepartmentService) GetDepartmentMembers(ctx context.Context, orgID, departmentID int) ([]*model.UserDepartment, error) {
+	return s.udRepo.GetByDepartment(ctx, orgID, departmentID)
+}
+
+// syncPrimaryDeptToBond keeps the bond's department_id in sync with the primary UserDepartment.
+func (s *DepartmentService) syncPrimaryDeptToBond(ctx context.Context, orgID, userID int) error {
+	primary, err := s.udRepo.GetPrimary(ctx, orgID, userID)
+	if err != nil {
+		return err
+	}
+	bond, err := s.bondRepo.GetByOrgAndUser(ctx, orgID, userID)
+	if err != nil || bond == nil {
+		return err
+	}
+	var deptID *int
+	if primary != nil {
+		deptID = &primary.DepartmentID
+	}
+	bond.DepartmentID = deptID
+	return s.bondRepo.Update(ctx, bond)
 }

@@ -94,6 +94,11 @@ func (h *OOBEHandler) Setup(c *gin.Context) {
 		if count > 0 {
 			return errors.New("username already taken")
 		}
+		// Check login_key uniqueness inside the transaction
+		tx.Model(&model.User{}).Where("login_key = ?", uname).Count(&count)
+		if count > 0 {
+			return errors.New("login key already taken")
+		}
 
 		// 1. Create the provider organization
 		org = model.Org{
@@ -106,10 +111,11 @@ func (h *OOBEHandler) Setup(c *gin.Context) {
 			return err
 		}
 
-		// 2. Create the admin user with username and password
+		// 2. Create the admin user with login_key, username, and password
 		user = model.User{
 			Name:         req.AdminName,
 			Email:        req.AdminEmail,
+			LoginKey:     uname, // login_key = username for OOBE root user
 			Username:     &uname,
 			PasswordHash: &hash,
 			IsActive:     true,
