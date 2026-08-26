@@ -60,6 +60,16 @@ func (r *UserRepository) List(ctx context.Context) ([]*model.User, error) {
 	return users, err
 }
 
+// GetByLoginKey finds a user by their globally unique login key.
+func (r *UserRepository) GetByLoginKey(ctx context.Context, loginKey string) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).Where("login_key = ?", loginKey).First(&user).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &user, err
+}
+
 // GetByUsername finds a user by their normalized username.
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
 	var user model.User

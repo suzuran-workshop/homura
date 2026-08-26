@@ -27,15 +27,20 @@ func NewPasswordService(
 	return &PasswordService{userRepo: userRepo, bondRepo: bondRepo, orgRepo: orgRepo}
 }
 
-// Login authenticates with username+password and returns a login session ID
+// Login authenticates with loginKey+password and returns a login session ID
 // that the frontend exchanges for tokens via /oauth/session/token.
-func (s *PasswordService) Login(ctx context.Context, username, plaintext string) (string, error) {
-	user, err := s.userRepo.GetByUsername(ctx, username)
+// For backward compatibility, also accepts username as the login key.
+func (s *PasswordService) Login(ctx context.Context, loginKey, plaintext string) (string, error) {
+	// Try login_key first, then fall back to username for backward compatibility
+	user, err := s.userRepo.GetByLoginKey(ctx, loginKey)
 	if err != nil || user == nil {
+		user, _ = s.userRepo.GetByUsername(ctx, loginKey)
+	}
+	if user == nil {
 		// Run bcrypt even when user not found to maintain constant-time response
 		// (anti-enumeration, mirrors WebAuthn fakeLoginChallenge pattern).
 		_ = password.Verify(plaintext, "$2a$12$AAAAAAAAAAAAAAAAAAAAA.DummyHashForTimingCalibration0000000000000")
-		return "", errors.New("invalid username or password")
+		return "", errors.New("invalid login key or password")
 	}
 
 	if !user.IsActive {

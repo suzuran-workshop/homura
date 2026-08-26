@@ -301,11 +301,13 @@ func (h *Handler) Metadata(c *gin.Context) {
 
 // PasswordLogin
 // POST /oauth/password/login
-// Authenticates with username+password and returns a sessionId + availableOrgs,
+// Authenticates with loginKey+password and returns a sessionId + availableOrgs,
 // identical to the WebAuthn FinishLogin response shape.
+// For backward compatibility, also accepts "username" field name.
 func (h *Handler) PasswordLogin(c *gin.Context) {
 	var req struct {
-		Username string `json:"username" binding:"required"`
+		LoginKey string `json:"loginKey"`
+		Username string `json:"username"` // backward compat
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -313,7 +315,17 @@ func (h *Handler) PasswordLogin(c *gin.Context) {
 		return
 	}
 
-	loginSessionID, err := h.password.Login(c.Request.Context(), req.Username, req.Password)
+	// Accept either loginKey or username (backward compat)
+	key := req.LoginKey
+	if key == "" {
+		key = req.Username
+	}
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "loginKey is required"})
+		return
+	}
+
+	loginSessionID, err := h.password.Login(c.Request.Context(), key, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

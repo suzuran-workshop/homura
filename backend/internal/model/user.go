@@ -13,6 +13,11 @@ type User struct {
 	AvatarURL    string    `gorm:"column:avatar_url" json:"avatarUrl,omitempty"`
 	Position     string    `json:"position,omitempty"`
 
+	// LoginKey is the globally unique, immutable login identifier.
+	// Generated at registration: username-based users use the username;
+	// OAuth users use "<platform>-<openid>"; fallback is a UUID.
+	LoginKey     string  `gorm:"column:login_key;uniqueIndex;not null;default:''" json:"loginKey"`
+
 	// Username/password authentication (NULL for OAuth-only accounts)
 	Username     *string `gorm:"column:username" json:"username,omitempty"`
 	PasswordHash *string `gorm:"column:password_hash" json:"-"` // never serialize

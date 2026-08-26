@@ -11,6 +11,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/xrl/suzuran-cloud/internal/model"
+	"github.com/xrl/suzuran-cloud/internal/pkg/loginkey"
 	"github.com/xrl/suzuran-cloud/internal/repository"
 )
 
@@ -348,7 +349,7 @@ func (s *WebAuthnService) resolveUser(ctx context.Context, userID int, name, ema
 	if email == "" {
 		email = name + "@suzuran.io"
 	}
-	u := &model.User{Name: name, Email: email}
+	u := &model.User{Name: name, Email: email, LoginKey: loginkey.Generate("webauthn")}
 	if err := s.userRepo.Create(ctx, u); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}

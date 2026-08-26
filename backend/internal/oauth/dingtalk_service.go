@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xrl/suzuran-cloud/internal/model"
+	"github.com/xrl/suzuran-cloud/internal/pkg/loginkey"
 	"github.com/xrl/suzuran-cloud/internal/pkg/redis"
 	"github.com/xrl/suzuran-cloud/internal/repository"
 )
@@ -184,9 +185,12 @@ func (s *DingTalkService) LoginOrCreate(ctx context.Context, dtUser *DingTalkUse
 		} else if dtUser.Email != "" {
 			email = dtUser.Email
 		}
+		// Generate login_key: dingtalk-<openid>
+		lk := loginkey.ForOAuth("dingtalk", dtUser.OpenID)
 		user = &model.User{
 			Name:             name,
 			Email:            email,
+			LoginKey:         lk,
 			Phone:            dtUser.Mobile,
 			DingtalkUserID:   strPtr(dtUser.UserID),
 			DingtalkUnionID:  strPtr(dtUser.UnionID),
