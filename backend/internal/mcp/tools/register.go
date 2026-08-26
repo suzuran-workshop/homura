@@ -13,6 +13,7 @@ func RegisterAllTools(
 	orgService *service.OrgService,
 	userService *service.UserService,
 	deptService *service.DepartmentService,
+	roleService *service.RoleService,
 	fileStorage storage.FileStorage,
 	db *gorm.DB,
 	rateLimiter *mcpserver.RateLimiter,
@@ -33,6 +34,12 @@ func RegisterAllTools(
 	// Register department tools
 	deptTools := NewDeptTools(deptService, rateLimiter, auditService)
 	deptTools.RegisterTools(server)
+
+	// Register role tools (organization-scoped "flowing positions")
+	if roleService != nil {
+		roleTools := NewRoleTools(roleService, rateLimiter, auditService)
+		roleTools.Register(server)
+	}
 
 	// Register file tools (only if file storage is available)
 	if fileStorage != nil {

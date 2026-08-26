@@ -92,16 +92,13 @@ func main() {
 	clientRepo := repository.NewOAuthClientRepository(db)
 	tokenRepo := repository.NewOAuthTokenRepository(db)
 	sessionRepo := repository.NewOAuthSessionRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	udRepo := repository.NewUserDepartmentRepository(db)
 
-	// Initialize MinIO client
-	minioClient, err := storage.NewMinIOClient(
-		os.Getenv("MINIO_ENDPOINT"),
-		os.Getenv("MINIO_ACCESS_KEY"),
-		os.Getenv("MINIO_SECRET_KEY"),
-		getEnvOrDefault("MINIO_BUCKET", "suzuran-files"),
-	)
+	// Initialize file storage (factory selects backend from STORAGE_BACKEND env)
+	fileStorage, err := storage.NewFileStorage()
 	if err != nil {
-		log.Printf("Warning: Failed to initialize MinIO: %v", err)
+		log.Printf("Warning: Failed to initialize file storage: %v", err)
 	}
 
 	// Load OAuth IdP config
@@ -109,8 +106,9 @@ func main() {
 
 	// Initialize services
 	orgService := service.NewOrgService(orgRepo, deptRepo, bondRepo)
-	deptService := service.NewDepartmentService(deptRepo, bondRepo)
+	deptService := service.NewDepartmentService(deptRepo, bondRepo, udRepo)
 	userService := service.NewUserService(userRepo, bondRepo)
+	roleService := service.NewRoleService(roleRepo, userRepo, bondRepo)
 
 	webAuthnSvc, err := oauth.NewWebAuthnService(oauthCfg, userRepo, credRepo, bondRepo, orgRepo)
 	if err != nil {
@@ -124,7 +122,8 @@ func main() {
 	oauthHandler := oauth.NewHandler(webAuthnSvc, dingTalkSvc, oauthSvc, passwordSvc)
 	orgHandler := provider.NewOrgHandler(orgService)
 	orgMemberHandler := provider.NewOrgMemberHandler(deptService, userService)
-	fileHandler := handler.NewFileHandler(minioClient)
+	roleHandler := provider.NewRoleHandler(roleService)
+	fileHandler := handler.NewFileHandler(fileStorage)
 	systemHandler := handler.NewSystemHandler(db)
 	logHandler := handler.NewLogHandler("logs/app.log", 1000)
 
@@ -137,9 +136,9 @@ func main() {
 	}
 	var runtimeManager *runtime.RuntimeManager
 	if dockerClient != nil {
-		runtimeManager = runtime.NewRuntimeManager(dockerClient, appRepo, deployRepo, minioClient)
+		runtimeManager = runtime.NewRuntimeManager(dockerClient, appRepo, deployRepo, fileStorage)
 	}
-	appService := service.NewApplicationService(appRepo, deployRepo, runtimeManager, minioClient)
+	appService := service.NewApplicationService(appRepo, deployRepo, runtimeManager, fileStorage)
 	appHandler := provider.NewAppHandler(appService)
 	distService := service.NewDistributionService(appRepo, orgRepo, userRepo, bondRepo)
 	distHandler := provider.NewDistributionHandler(distService)
@@ -187,7 +186,8 @@ func main() {
 		orgService,
 		userService,
 		deptService,
-		minioClient,
+		roleService,
+		fileStorage,
 		db,
 		mcpRateLimiter,
 		auditSvc,
@@ -366,6 +366,19 @@ func main() {
 				orgUsers.PUT("/:userId", orgMemberHandler.UpdateMember)
 				orgUsers.DELETE("/:userId", orgMemberHandler.RemoveMember)
 				orgUsers.POST("/:userId/reset-password", orgMemberHandler.ResetPassword)
+				orgUsers.GET("/:userId/roles", roleHandler.GetUserRoles)
+			}
+
+			// Role management (organization-scoped "flowing positions")
+			orgRoles := providerGroup.Group("/orgs/:orgId/roles")
+			{
+				orgRoles.GET("", roleHandler.ListRoles)
+				orgRoles.POST("", roleHandler.CreateRole)
+				orgRoles.GET("/:roleId", roleHandler.GetRole)
+				orgRoles.PUT("/:roleId", roleHandler.UpdateRole)
+				orgRoles.DELETE("/:roleId", roleHandler.DeleteRole)
+				orgRoles.POST("/:roleId/users/:userId", roleHandler.AssignRole)
+				orgRoles.DELETE("/:roleId/users/:userId", roleHandler.UnassignRole)
 			}
 
 			// DingTalk organization sync (only mounted when configured)
@@ -477,6 +490,9 @@ func initDatabase() (*gorm.DB, error) {
 			&model.DataTable{},
 			&model.ApplicationDistribution{},
 			&model.ApplicationAdmin{},
+			&model.Role{},
+			&model.UserRole{},
+			&model.UserDepartment{},
 		); err != nil {
 			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 		}
