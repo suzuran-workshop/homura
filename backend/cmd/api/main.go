@@ -423,6 +423,7 @@ appGroup.POST("", appHandler.Create)
 			files := providerGroup.Group("/files")
 			{
 				files.POST("/upload", fileHandler.Upload)
+				files.GET("/list", fileHandler.List)
 				files.GET("/:key/download", fileHandler.Download)
 				files.DELETE("/:key", fileHandler.Delete)
 			}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -62,4 +63,28 @@ func (h *FileHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "file deleted"})
+}
+
+// List lists files for an organization
+func (h *FileHandler) List(c *gin.Context) {
+	orgID := c.GetInt("org_id")
+	prefix := c.Query("prefix")
+	limitStr := c.DefaultQuery("limit", "100")
+
+	var limit int
+	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+		limit = 100
+	}
+
+	files, err := h.storage.ListFiles(c.Request.Context(), orgID, prefix, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"orgId": orgID,
+		"count": len(files),
+		"files": files,
+	})
 }

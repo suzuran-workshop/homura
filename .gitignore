@@ -48,11 +48,18 @@ docker-compose.override.yml
 target/
 build/
 /backend/main
+*.tsbuildinfo
 
 # Test artifacts
 screenshots/
 test-results/
 .last-run.json
+
+# Local debug scripts (puppeteer / manual verification)
+frontend/app/check-*.mjs
+frontend/app/debug-*.mjs
+frontend/app/screenshot*.mjs
+frontend/app/verify-*.mjs
 
 # Openyida
 .cache/
