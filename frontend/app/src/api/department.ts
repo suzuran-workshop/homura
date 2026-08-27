@@ -1,4 +1,3 @@
-// frontend/app/src/api/department.ts
 import apiClient from './client'
 
 export interface Department {
@@ -19,30 +18,24 @@ export interface DepartmentNode extends Department {
 
 export interface DepartmentRequest {
   name: string
-  parentId?: number | null
-  description?: string
+  parentId: number | null
+  description: string
 }
 
-export function listDepartments(orgId: number) {
-  return apiClient.get<Department[]>(`/api/provider/orgs/${orgId}/departments`)
-}
+export const listDepartments = (orgId: number) =>
+  apiClient.get<Department[]>(`/api/provider/orgs/${orgId}/departments`).then((r) => r.data)
 
-export function getDepartmentTree(orgId: number) {
-  return apiClient.get<DepartmentNode[]>(`/api/provider/orgs/${orgId}/departments/tree`)
-}
+export const getDepartmentTree = (orgId: number) =>
+  apiClient.get<DepartmentNode[]>(`/api/provider/orgs/${orgId}/departments/tree`).then((r) => r.data)
 
-export function createDepartment(orgId: number, data: DepartmentRequest) {
-  return apiClient.post<Department>(`/api/provider/orgs/${orgId}/departments`, data)
-}
+export const createDepartment = (orgId: number, data: DepartmentRequest) =>
+  apiClient.post(`/api/provider/orgs/${orgId}/departments`, data).then((r) => r.data)
 
-export function updateDepartment(orgId: number, deptId: number, data: Partial<DepartmentRequest>) {
-  return apiClient.put<{ message: string }>(`/api/provider/orgs/${orgId}/departments/${deptId}`, data)
-}
+export const updateDepartment = (orgId: number, deptId: number, data: DepartmentRequest) =>
+  apiClient.put(`/api/provider/orgs/${orgId}/departments/${deptId}`, data).then((r) => r.data)
 
-export function deleteDepartment(orgId: number, deptId: number) {
-  return apiClient.delete<{ message: string }>(`/api/provider/orgs/${orgId}/departments/${deptId}`)
-}
+export const deleteDepartment = (orgId: number, deptId: number) =>
+  apiClient.delete(`/api/provider/orgs/${orgId}/departments/${deptId}`).then((r) => r.data)
 
-export function setDepartmentManager(orgId: number, deptId: number, managerUserId: number) {
-  return apiClient.post<{ message: string }>(`/api/provider/orgs/${orgId}/departments/${deptId}/manager`, { managerUserId })
-}
+export const setDepartmentManager = (orgId: number, deptId: number, managerUserId: number | null) =>
+  apiClient.post(`/api/provider/orgs/${orgId}/departments/${deptId}/manager`, { managerUserId }).then((r) => r.data)

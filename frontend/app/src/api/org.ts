@@ -1,4 +1,3 @@
-// frontend/app/src/api/org.ts
 import apiClient from './client'
 
 export interface Org {
@@ -9,27 +8,18 @@ export interface Org {
   updatedAt: string
 }
 
-// List all organizations (provider view)
-export function listOrgs() {
-  return apiClient.get<Org[]>('/api/provider/orgs')
-}
-
 export interface OrgRequest {
   name: string
-  description?: string
+  description: string
 }
 
-// Create a new organization
-export function createOrg(data: OrgRequest) {
-  return apiClient.post<Org>('/api/provider/orgs', data)
-}
+export const listOrgs = () => apiClient.get<Org[]>('/api/provider/orgs').then((r) => r.data)
 
-// Update an organization
-export function updateOrg(id: number, data: OrgRequest) {
-  return apiClient.put(`/api/provider/orgs/${id}`, data)
-}
+export const createOrg = (data: OrgRequest) =>
+  apiClient.post('/api/provider/orgs', data).then((r) => r.data)
 
-// Delete an organization
-export function deleteOrg(id: number) {
-  return apiClient.delete(`/api/provider/orgs/${id}`)
-}
+export const updateOrg = (id: number, data: OrgRequest) =>
+  apiClient.put(`/api/provider/orgs/${id}`, data).then((r) => r.data)
+
+export const deleteOrg = (id: number) =>
+  apiClient.delete(`/api/provider/orgs/${id}`).then((r) => r.data)

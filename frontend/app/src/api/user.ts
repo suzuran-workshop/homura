@@ -1,11 +1,10 @@
-// frontend/app/src/api/user.ts
 import apiClient from './client'
 
 export interface Member {
   userId: number
   phone: string
   name: string
-  username?: string
+  username: string
   email: string
   position: string
   bondId: string
@@ -18,32 +17,25 @@ export interface MemberRequest {
   phone: string
   name: string
   username: string
-  password: string
-  email?: string
-  position?: string
-  isAdmin?: boolean
-  departmentId?: number | null
-  isDepartmentManager?: boolean
+  password?: string
+  email: string
+  position: string
+  isAdmin: boolean
+  departmentId: number | null
+  isDepartmentManager: boolean
 }
 
-export function listMembers(orgId: number) {
-  return apiClient.get<Member[]>(`/api/provider/orgs/${orgId}/users`)
-}
+export const listMembers = (orgId: number) =>
+  apiClient.get<Member[]>(`/api/provider/orgs/${orgId}/users`).then((r) => r.data)
 
-export function createMember(orgId: number, data: MemberRequest) {
-  return apiClient.post<Member>(`/api/provider/orgs/${orgId}/users`, data)
-}
+export const createMember = (orgId: number, data: MemberRequest) =>
+  apiClient.post(`/api/provider/orgs/${orgId}/users`, data).then((r) => r.data)
 
-export function updateMember(orgId: number, userId: number, data: Partial<MemberRequest>) {
-  return apiClient.put<{ message: string }>(`/api/provider/orgs/${orgId}/users/${userId}`, data)
-}
+export const updateMember = (orgId: number, userId: number, data: Partial<MemberRequest>) =>
+  apiClient.put(`/api/provider/orgs/${orgId}/users/${userId}`, data).then((r) => r.data)
 
-export function removeMember(orgId: number, userId: number) {
-  return apiClient.delete<{ message: string }>(`/api/provider/orgs/${orgId}/users/${userId}`)
-}
+export const removeMember = (orgId: number, userId: number) =>
+  apiClient.delete(`/api/provider/orgs/${orgId}/users/${userId}`).then((r) => r.data)
 
-export function resetPassword(orgId: number, userId: number, newPassword: string) {
-  return apiClient.post<{ message: string }>(`/api/provider/orgs/${orgId}/users/${userId}/reset-password`, {
-    newPassword,
-  })
-}
+export const resetPassword = (orgId: number, userId: number, newPassword: string) =>
+  apiClient.post(`/api/provider/orgs/${orgId}/users/${userId}/reset-password`, { newPassword }).then((r) => r.data)

@@ -1,10 +1,9 @@
-// frontend/app/src/api/distribution.ts
 import apiClient from './client'
 
 export interface AdminView {
   userId: number
   name: string
-  username?: string
+  username: string
 }
 
 export interface DistributionView {
@@ -17,24 +16,17 @@ export interface DistributionListResponse {
   distributions: DistributionView[]
 }
 
-// ---- App distribution (provider portal) ----
+export const listDistributions = (appId: number) =>
+  apiClient.get<DistributionListResponse>(`/api/provider/apps/${appId}/distributions`).then((r) => r.data)
 
-export async function listDistributions(appId: string) {
-  return apiClient.get<DistributionListResponse>(`/api/provider/apps/${appId}/distributions`)
-}
+export const distributeApp = (appId: number, orgId: number) =>
+  apiClient.post(`/api/provider/apps/${appId}/distributions`, { orgId }).then((r) => r.data)
 
-export async function distributeApp(appId: string, orgId: number) {
-  return apiClient.post<{ message: string }>(`/api/provider/apps/${appId}/distributions`, { orgId })
-}
+export const undistributeApp = (appId: number, orgId: number) =>
+  apiClient.delete(`/api/provider/apps/${appId}/distributions/${orgId}`).then((r) => r.data)
 
-export async function undistributeApp(appId: string, orgId: number) {
-  return apiClient.delete<{ message: string }>(`/api/provider/apps/${appId}/distributions/${orgId}`)
-}
+export const setAppAdmin = (appId: number, orgId: number, userId: number) =>
+  apiClient.post(`/api/provider/apps/${appId}/distributions/${orgId}/admins`, { userId }).then((r) => r.data)
 
-export async function setAppAdmin(appId: string, orgId: number, userId: number) {
-  return apiClient.post<{ message: string }>(`/api/provider/apps/${appId}/distributions/${orgId}/admins`, { userId })
-}
-
-export async function removeAppAdmin(appId: string, orgId: number, userId: number) {
-  return apiClient.delete<{ message: string }>(`/api/provider/apps/${appId}/distributions/${orgId}/admins/${userId}`)
-}
+export const removeAppAdmin = (appId: number, orgId: number, userId: number) =>
+  apiClient.delete(`/api/provider/apps/${appId}/distributions/${orgId}/admins/${userId}`).then((r) => r.data)

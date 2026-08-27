@@ -1,14 +1,4 @@
-// frontend/app/src/api/oauth.ts
-// OAuth IdP API client — WebAuthn (Passkey) + DingTalk OAuth + OAuth2 token.
 import apiClient from './client'
-
-// ---- WebAuthn login ----
-
-export interface BeginLoginResponse {
-  sessionId: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  options: any
-}
 
 export interface OrgChoice {
   orgId: number
@@ -22,107 +12,55 @@ export interface LoginResult {
   availableOrgs: OrgChoice[]
 }
 
-// ---- Password login ----
-
-export interface PasswordLoginRequest {
-  username: string
-  password: string
-}
-
-export async function loginWithPassword(data: PasswordLoginRequest) {
-  return apiClient.post<LoginResult>('/oauth/password/login', data)
-}
-
-// ---- WebAuthn login ----
-
-export async function beginLogin() {
-  return apiClient.post<BeginLoginResponse>('/oauth/webauthn/login/begin', {})
-}
-
-export async function finishLogin(sessionId: string, response: unknown) {
-  return apiClient.post<LoginResult>('/oauth/webauthn/login/finish', { sessionId, response })
-}
-
-// ---- Session token exchange ----
-
 export interface SessionTokenResponse {
   access_token: string
   token_type: string
   expires_in: number
   refresh_token: string
-  scope?: string
+  scope: string
 }
 
-export async function exchangeLoginSession(sessionId: string, orgId: number) {
-  return apiClient.post<SessionTokenResponse>('/oauth/session/token', {
-    sessionId,
-    orgId,
-  })
+export interface User {
+  id: number
+  name: string
+  email: string
+  role: string
+  orgId: number
 }
 
-// ---- DingTalk OAuth ----
+export const loginWithPassword = (username: string, password: string) =>
+  apiClient.post<LoginResult>('/oauth/password/login', { username, password }).then((r) => r.data)
 
-export async function getDingTalkAuthorizeURL(redirectURI: string) {
-  return apiClient.get<{ authorizeUrl: string }>('/oauth/dingtalk/authorize', {
-    params: { redirect_uri: redirectURI },
-  })
-}
+export const exchangeSessionToken = (sessionId: string, orgId: number) =>
+  apiClient.post<SessionTokenResponse>('/oauth/session/token', { sessionId, orgId }).then((r) => r.data)
 
-// ---- OAuth2 token endpoint ----
+export const getDingTalkAuthorizeURL = (redirectURI: string) =>
+  apiClient.get<{ url: string }>('/oauth/dingtalk/authorize', { params: { redirectURI } }).then((r) => r.data)
 
-export interface TokenResponse {
-  access_token: string
-  token_type: string
-  expires_in: number
-  refresh_token: string
-  scope?: string
-}
-
-export async function exchangeAuthorizationCode(
-  code: string,
-  clientId: string,
-  redirectURI: string,
-  codeVerifier: string,
-) {
-  // Use form-urlencoded as per OAuth2 spec.
+export const exchangeAuthorizationCode = (code: string, clientId: string, redirectURI: string, codeVerifier: string) => {
   const params = new URLSearchParams()
-  params.set('grant_type', 'authorization_code')
-  params.set('code', code)
-  params.set('client_id', clientId)
-  params.set('redirect_uri', redirectURI)
-  params.set('code_verifier', codeVerifier)
-  return apiClient.post<TokenResponse>('/oauth/token', params, {
+  params.append('grant_type', 'authorization_code')
+  params.append('code', code)
+  params.append('client_id', clientId)
+  params.append('redirect_uri', redirectURI)
+  params.append('code_verifier', codeVerifier)
+  return apiClient.post<SessionTokenResponse>('/oauth/token', params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  })
+  }).then((r) => r.data)
 }
 
-export async function refreshAccessToken(refreshToken: string, clientId: string) {
+export const refreshAccessToken = (refreshToken: string, clientId: string) => {
   const params = new URLSearchParams()
-  params.set('grant_type', 'refresh_token')
-  params.set('refresh_token', refreshToken)
-  params.set('client_id', clientId)
-  return apiClient.post<TokenResponse>('/oauth/token', params, {
+  params.append('grant_type', 'refresh_token')
+  params.append('refresh_token', refreshToken)
+  params.append('client_id', clientId)
+  return apiClient.post<SessionTokenResponse>('/oauth/token', params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  })
+  }).then((r) => r.data)
 }
 
-export async function revokeToken(token: string) {
-  return apiClient.post('/oauth/revoke', { token })
-}
+export const revokeToken = (token: string) =>
+  apiClient.post('/oauth/revoke', { token }).then((r) => r.data)
 
-// ---- Server public key (for verifying tokens client-side, optional) ----
-
-export interface MetadataResponse {
-  issuer: string
-  authorization_endpoint: string
-  token_endpoint: string
-  revocation_endpoint: string
-  response_types_supported: string[]
-  grant_types_supported: string[]
-  code_challenge_methods_supported: string[]
-  scopes_supported: string[]
-}
-
-export async function getMetadata() {
-  return apiClient.get<MetadataResponse>('/.well-known/openid-configuration')
-}
+export const getMetadata = () =>
+  apiClient.get('/.well-known/openid-configuration').then((r) => r.data)

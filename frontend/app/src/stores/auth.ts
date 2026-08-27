@@ -1,228 +1,68 @@
-// frontend/app/src/stores/auth.ts
-// Auth store — Multi-method auth: password (primary), WebAuthn, DingTalk.
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import {
-  beginLogin,
-  finishLogin,
-  getDingTalkAuthorizeURL,
-  exchangeLoginSession,
-  refreshAccessToken,
-  loginWithPassword,
-  type OrgChoice,
-  type LoginResult,
-} from '../api/oauth'
+import { create } from 'zustand'
 
-interface User {
+export interface User {
   id: number
-  name?: string
-  email?: string
-  role?: 'provider' | 'tenant'
-  orgId?: number
+  name: string
+  email: string
+  role: string
+  orgId: number
 }
 
-// The OAuth client_id for the platform's own frontend (this SPA).
-const PLATFORM_CLIENT_ID = 'suzuran-spa'
+interface AuthState {
+  user: User | null
+  token: string | null
+  refreshToken: string | null
+  availableOrgs: Array<{ orgId: number; orgName: string; isAdmin: boolean }>
+  loginSessionId: string | null
+  isAuthenticated: boolean
+  userRole: string | null
+  initFromStorage: () => void
+  setUser: (user: User) => void
+  setTokens: (accessToken: string, refresh: string) => void
+  setAvailableOrgs: (orgs: Array<{ orgId: number; orgName: string; isAdmin: boolean }>) => void
+  setLoginSessionId: (id: string) => void
+  logout: () => void
+}
 
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref<User | null>(null)
-  const token = ref<string>('')
-  const refreshToken = ref<string>('')
-  const availableOrgs = ref<OrgChoice[]>([])
-  // loginSessionId is set after WebAuthn/DingTalk login and consumed by completeLoginWithToken.
-  const loginSessionId = ref<string>('')
-
-  const isAuthenticated = computed(() => !!token.value)
-  const userRole = computed(() => user.value?.role || '')
-
-  // ---- Password login (primary method) ----
-
-  async function loginWithUsernamePassword(username: string, password: string): Promise<LoginResult> {
-    const resp = await loginWithPassword({ username, password })
-    const data = resp.data
-    availableOrgs.value = data.availableOrgs
-    loginSessionId.value = data.sessionId
-    return data
-  }
-
-  // ---- WebAuthn login ----
-
-  async function loginWithPasskey(): Promise<LoginResult> {
-    const begin = await beginLogin()
-    const rawOptions = begin.data.options.publicKey || begin.data.options
-    const options = decodePublicKeyRequestOptions(rawOptions)
-    const assertion = await navigator.credentials.get({
-      publicKey: options,
-    })
-    if (!assertion) throw new Error('Passkey authentication cancelled')
-    const serialized = serializeAssertionCredential(assertion as PublicKeyCredential)
-    const result = await finishLogin(begin.data.sessionId, serialized)
-    const data = result.data
-    availableOrgs.value = data.availableOrgs
-    // Stash the login sessionId so completeLoginWithToken can use it.
-    loginSessionId.value = data.sessionId
-    return data
-  }
-
-  // ---- Complete login: exchange session + org for tokens ----
-
-  async function completeLoginWithToken(sessionId: string, orgId: number) {
-    const resp = await exchangeLoginSession(sessionId, orgId)
-    setTokens(resp.data.access_token, resp.data.refresh_token, resp.data.scope)
-    const u: User = {
-      id: 0,
-      orgId: orgId,
-      role: determineRole(orgId),
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  token: null,
+  refreshToken: null,
+  availableOrgs: [],
+  loginSessionId: null,
+  get isAuthenticated() {
+    return !!get().token
+  },
+  get userRole() {
+    return get().user?.role ?? null
+  },
+  initFromStorage: () => {
+    const token = localStorage.getItem('access_token')
+    const refresh = localStorage.getItem('refresh_token')
+    const userStr = localStorage.getItem('user')
+    if (token) {
+      set({
+        token,
+        refreshToken: refresh,
+        user: userStr ? JSON.parse(userStr) : null,
+      })
     }
-    setUser(u)
-    loginSessionId.value = ''
-    return resp.data
-  }
-
-  // Determine role based on the selected org from availableOrgs.
-  // Roles are now: provider (org 1 members) and tenant (everyone else).
-  function determineRole(orgId: number): 'provider' | 'tenant' {
-    if (orgId === 1) return 'provider'
-    return 'tenant'
-  }
-
-  // ---- DingTalk OAuth ----
-
-  async function redirectToDingTalk(redirectURI: string) {
-    const resp = await getDingTalkAuthorizeURL(redirectURI)
-    window.location.href = resp.data.authorizeUrl
-  }
-
-  // ---- Token management ----
-
-  function setTokens(accessToken: string, refresh: string, scope?: string) {
-    token.value = accessToken
-    refreshToken.value = refresh
-    localStorage.setItem('token', accessToken)
+  },
+  setUser: (user) => {
+    localStorage.setItem('user', JSON.stringify(user))
+    set({ user })
+  },
+  setTokens: (accessToken, refresh) => {
+    localStorage.setItem('access_token', accessToken)
     localStorage.setItem('refresh_token', refresh)
-    if (scope) localStorage.setItem('scope', scope)
-  }
-
-  function setUser(u: User) {
-    user.value = u
-    localStorage.setItem('user', JSON.stringify(u))
-  }
-
-  // Keep for backward compatibility (used by Login.vue old path).
-  function selectOrgAndMintToken(orgId: number, role: 'provider' | 'tenant') {
-    const u = user.value || { id: 0 }
-    u.orgId = orgId
-    u.role = role
-    setUser(u as User)
-  }
-
-  // Refresh the access token using the stored refresh token.
-  async function refresh() {
-    if (!refreshToken.value) {
-      logout()
-      return
-    }
-    try {
-      const resp = await refreshAccessToken(refreshToken.value, PLATFORM_CLIENT_ID)
-      setTokens(resp.data.access_token, resp.data.refresh_token, resp.data.scope)
-    } catch {
-      logout()
-    }
-  }
-
-  function logout() {
-    user.value = null
-    token.value = ''
-    refreshToken.value = ''
-    availableOrgs.value = []
-    loginSessionId.value = ''
-    localStorage.removeItem('token')
+    set({ token: accessToken, refreshToken: refresh })
+  },
+  setAvailableOrgs: (orgs) => set({ availableOrgs: orgs }),
+  setLoginSessionId: (id) => set({ loginSessionId: id }),
+  logout: () => {
+    localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
-    localStorage.removeItem('scope')
-  }
-
-  // Initialize from localStorage (called on app start).
-  function initFromStorage() {
-    const storedToken = localStorage.getItem('token')
-    const storedRefresh = localStorage.getItem('refresh_token')
-    const storedUser = localStorage.getItem('user')
-    if (storedToken && storedUser) {
-      token.value = storedToken
-      refreshToken.value = storedRefresh || ''
-      user.value = JSON.parse(storedUser)
-    }
-  }
-
-  return {
-    user,
-    token,
-    refreshToken,
-    availableOrgs,
-    loginSessionId,
-    isAuthenticated,
-    userRole,
-    loginWithUsernamePassword,
-    loginWithPasskey,
-    completeLoginWithToken,
-    redirectToDingTalk,
-    selectOrgAndMintToken,
-    refresh,
-    logout,
-    initFromStorage,
-    setTokens,
-    setUser,
-  }
-})
-
-// ---- WebAuthn credential serialization helpers ----
-
-function serializeAssertionCredential(cred: PublicKeyCredential): unknown {
-  const response = cred.response as AuthenticatorAssertionResponse
-  return {
-    id: cred.id,
-    rawId: arrayBufferToBase64Url(cred.rawId),
-    type: cred.type,
-    response: {
-      authenticatorData: arrayBufferToBase64Url(response.authenticatorData),
-      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
-      signature: arrayBufferToBase64Url(response.signature),
-      userHandle: response.userHandle ? arrayBufferToBase64Url(response.userHandle) : null,
-    },
-    clientExtensionResults: {},
-  }
-}
-
-function arrayBufferToBase64Url(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf)
-  let bin = ''
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
-  const base64 = btoa(bin)
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-// ---- WebAuthn options decoding (base64url → ArrayBuffer) ----
-
-function base64UrlToBuffer(base64url: string): Uint8Array {
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
-  const pad = base64.length % 4
-  const padded = pad ? base64 + '='.repeat(4 - pad) : base64
-  const binary = atob(padded)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-function decodePublicKeyRequestOptions(raw: any): PublicKeyCredentialRequestOptions {
-  return {
-    challenge: base64UrlToBuffer(raw.challenge) as BufferSource,
-    timeout: raw.timeout,
-    rpId: raw.rpId,
-    allowCredentials: raw.allowCredentials?.map((c: any) => ({
-      ...c,
-      id: base64UrlToBuffer(c.id) as BufferSource,
-    })),
-    userVerification: raw.userVerification,
-    extensions: raw.extensions,
-  }
-}
+    set({ user: null, token: null, refreshToken: null, availableOrgs: [], loginSessionId: null })
+  },
+}))

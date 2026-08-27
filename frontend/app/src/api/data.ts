@@ -1,51 +1,39 @@
-// frontend/app/src/api/data.ts
 import apiClient from './client'
 
-export interface DataColumn {
+export interface TableColumn {
   name: string
   type: string
-  nullable?: boolean
-  primaryKey?: boolean
-  defaultValue?: unknown
+  nullable: boolean
+  primaryKey: boolean
+  defaultValue: string | null
 }
 
 export interface TableInfo {
   tableName: string
-  columns: DataColumn[]
+  columns: TableColumn[]
 }
 
 export interface RowListResponse {
-  table: TableInfo
-  rows: Record<string, unknown>[]
+  table: string
+  rows: Record<string, any>[]
   count: number
   limit: number
   offset: number
 }
 
-// ---- App data management (app admins + providers) ----
+export const listTables = (orgId: number, appId: number) =>
+  apiClient.get<TableInfo[]>(`/api/data/orgs/${orgId}/apps/${appId}/tables`).then((r) => r.data)
 
-export async function listTables(orgId: number, appId: string) {
-  return apiClient.get<{ tables: TableInfo[] }>(`/api/data/orgs/${orgId}/apps/${appId}/tables`)
-}
+export const listRows = (orgId: number, appId: number, tableName: string, limit = 50, offset = 0) =>
+  apiClient.get<RowListResponse>(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows`, {
+    params: { limit, offset },
+  }).then((r) => r.data)
 
-export async function listRows(orgId: number, appId: string, tableName: string, limit = 50, offset = 0) {
-  return apiClient.get<RowListResponse>(
-    `/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows`,
-    { params: { limit, offset } },
-  )
-}
+export const insertRow = (orgId: number, appId: number, tableName: string, data: Record<string, any>) =>
+  apiClient.post(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows`, data).then((r) => r.data)
 
-export async function insertRow(orgId: number, appId: string, tableName: string, data: Record<string, unknown>) {
-  return apiClient.post<{ id: number }>(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows`, { data })
-}
+export const updateRow = (orgId: number, appId: number, tableName: string, rowId: number, data: Record<string, any>) =>
+  apiClient.put(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows/${rowId}`, data).then((r) => r.data)
 
-export async function updateRow(orgId: number, appId: string, tableName: string, rowId: number, data: Record<string, unknown>) {
-  return apiClient.put<{ updated: number }>(
-    `/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows/${rowId}`,
-    { data },
-  )
-}
-
-export async function deleteRow(orgId: number, appId: string, tableName: string, rowId: number) {
-  return apiClient.delete<{ deleted: number }>(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows/${rowId}`)
-}
+export const deleteRow = (orgId: number, appId: number, tableName: string, rowId: number) =>
+  apiClient.delete(`/api/data/orgs/${orgId}/apps/${appId}/tables/${tableName}/rows/${rowId}`).then((r) => r.data)

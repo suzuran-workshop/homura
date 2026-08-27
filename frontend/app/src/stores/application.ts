@@ -1,49 +1,27 @@
-// frontend/app/src/stores/application.ts
-// Application store — manages app list state for the OA start page.
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import {
-  listApps,
-  type Application,
-} from '../api/application'
+import { create } from 'zustand'
+import type { Application } from '../api/application'
+import { listApps } from '../api/application'
 
-export const useApplicationStore = defineStore('application', () => {
-  const apps = ref<Application[]>([])
-  const loading = ref(false)
-  const error = ref<string>('')
+interface ApplicationState {
+  apps: Application[]
+  loading: boolean
+  error: string
+  fetchApps: () => Promise<void>
+  clear: () => void
+}
 
-  const runningApps = computed(() =>
-    apps.value.filter((a) => a.status === 'running'),
-  )
-  const stoppedApps = computed(() =>
-    apps.value.filter((a) => a.status === 'stopped' || a.status === 'created'),
-  )
-
-  async function fetchApps() {
-    loading.value = true
-    error.value = ''
+export const useApplicationStore = create<ApplicationState>((set) => ({
+  apps: [],
+  loading: false,
+  error: '',
+  fetchApps: async () => {
+    set({ loading: true, error: '' })
     try {
-      const resp = await listApps()
-      apps.value = resp.data.apps || []
+      const apps = await listApps()
+      set({ apps, loading: false })
     } catch (e: any) {
-      error.value = e.response?.data?.error || e.message || '获取应用列表失败'
-    } finally {
-      loading.value = false
+      set({ error: e.message || 'Failed to fetch apps', loading: false })
     }
-  }
-
-  function clear() {
-    apps.value = []
-    error.value = ''
-  }
-
-  return {
-    apps,
-    loading,
-    error,
-    runningApps,
-    stoppedApps,
-    fetchApps,
-    clear,
-  }
-})
+  },
+  clear: () => set({ apps: [], error: '' }),
+}))
