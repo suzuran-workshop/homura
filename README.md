@@ -25,7 +25,7 @@ Suzuran Cloud 是一个 **AI 原生的多租户 SaaS 应用平台**：Agent 通�
 | **鉴权** | OAuth2 + WebAuthn (go-webauthn) |
 | **MCP** | mark3labs/mcp-go |
 | **应用运行时** | Docker / gVisor（待定） |
-| **前端** | Vue 3 + Vite + Vuetify + Pinia |
+| **前端** | React 18 + Vite + Fluent UI React v9 + Zustand |
 | **容器化** | Docker Compose |
 
 ## 📦 快速开始

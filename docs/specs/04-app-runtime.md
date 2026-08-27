@@ -173,16 +173,16 @@ func (r *AppRouter) UnregisterApp(appID string)
 
 ### 前端
 
-**`frontend/app/src/views/provider/Applications.vue`**（重新设计）：
-- 应用列表（名称、版本、状态、资源使用）
-- 创建应用按钮
+**`frontend/app/src/views/Apps.tsx`**：
+- 应用启动台（按分发关系展示，运行中/未运行分组）
+- 状态指示条 + 运行时图标
+- zip 导入对话框（仅 provider）
 
-**`frontend/app/src/views/provider/AppDetail.vue`**（新增）：
-- 应用详情（配置、路由、MCP scopes）
+**`frontend/app/src/views/provider/AppDetail.tsx`**：
+- 应用详情（配置、状态、资源使用）
 - 部署历史
-- 资源使用图表
+- 生命周期控制（启动/停止/重启）
 - 日志查看
-- 启动/停止/重启按钮
 
 ## 完成标准
 

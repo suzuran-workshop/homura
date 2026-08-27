@@ -46,7 +46,7 @@ jobs:
           path: backend/coverage.out
 
   frontend:
-    name: Frontend (Vue)
+    name: Frontend (React)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,7 +64,7 @@ jobs:
         run: npm ci
 
       - name: Type check
-        run: npx vue-tsc --noEmit
+        run: npx tsc --noEmit
 
       - name: Build
         run: npm run build

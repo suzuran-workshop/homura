@@ -105,17 +105,19 @@ Token 格式：
 
 #### 5. 前端
 
-**`frontend/app/src/views/Login.vue`**：
-- 移除密码登录表单
-- 添加 WebAuthn 登录按钮（调用 `navigator.credentials.get()`）
-- 添加钉钉 OAuth 登录按钮（跳转 `/oauth/dingtalk/authorize`）
+**`frontend/app/src/views/Login.tsx`**：
+- 支持用户名/密码登录（多组织时显示组织选择器）
+- Passkey (WebAuthn) 登录按钮（调用 `navigator.credentials.get()`）
+- 钉钉 OAuth 登录按钮（跳转 `/oauth/dingtalk/authorize`）
 
-**`frontend/app/src/views/Register.vue`**（新增）：
-- WebAuthn 注册页面（调用 `navigator.credentials.create()`）
+**`frontend/app/src/views/OOBE.tsx`**：
+- 首次运行向导，含 Passkey 注册（调用 `navigator.credentials.create()`）
 
-**`frontend/app/src/api/oauth.ts`**（新增）：
-- `beginWebAuthnLogin()`、`finishWebAuthnLogin()`
-- `beginWebAuthnRegister()`、`finishWebAuthnRegister()`
+**`frontend/app/src/api/webauthn.ts`**：
+- `registerPasskey()`、`loginWithPasskey()`
+- `isWebAuthnSupported()`
+
+**`frontend/app/src/api/oauth.ts`**：
 - `getDingTalkAuthorizeURL()`
 
 ### 数据库迁移
