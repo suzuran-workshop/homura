@@ -1,23 +1,27 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    vue({
-      template: {
-        compilerOptions: {
-          isCustomElement: (tag) => tag.startsWith('fluent-'),
-        },
-      },
-    }),
-  ],
+  plugins: [react()],
   server: {
+    port: 5174,
     proxy: {
       '/api': {
         target: 'http://localhost:8888',
         changeOrigin: true,
-      }
-    }
-  }
+      },
+      '/oauth': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+      },
+      '/oobe': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+      },
+      '/mcp': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+      },
+    },
+  },
 })
