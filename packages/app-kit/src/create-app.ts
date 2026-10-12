@@ -12,10 +12,38 @@ import { createSpaFallback, createStaticMiddleware } from './static.js'
 /** 能力实例的结构化契约（鸭子类型，避免包依赖；运行时由 App 传入） */
 export interface AppDeps {
   db?: Record<string, unknown>
-  storage?: { uploadFile(...args: never[]): Promise<unknown> } & Record<string, unknown>
-  sessions?: { verifyAccessToken(t: string): Promise<unknown> } & Record<string, unknown>
-  platform?: { name: string; capabilities: readonly string[] } & Record<string, unknown>
-  license?: { getStatus(): string } & Record<string, unknown>
+  storage?: StorageLike
+  sessions?: SessionManagerLike
+  platform?: PlatformLike
+  license?: LicenseClientLike
+}
+
+/** 各能力的最小结构化契约（App 传真实例，app-kit 只透传/调用这些方法） */
+export interface StorageLike {
+  uploadFile(...args: never[]): Promise<unknown>
+}
+export interface SessionManagerLike {
+  verifyAccessToken(t: string): Promise<unknown>
+}
+export interface PlatformLike {
+  name: string
+  capabilities: readonly string[]
+}
+export interface LicenseClientLike {
+  getStatus(): string
+}
+
+/** auth 注入包（由 @homura/auth/hono 构造后传入） */
+export interface AuthInject {
+  sessions: SessionManagerLike
+  sessionMiddleware: MiddlewareHandler
+  authRoutes: Hono
+}
+
+/** license 注入包（由 @homura/license/hono 构造后传入） */
+export interface LicenseInject {
+  client: LicenseClientLike
+  guard: MiddlewareHandler
 }
 
 export interface HealthCheck {
@@ -28,25 +56,15 @@ export interface CreateAppOptions {
   /** qw-pages 子路径挂载时，全中间件感知（默认 '/'） */
   basePath?: string
   routes?: Hono | ((deps: AppDeps) => Hono)
-  /** 注入 sessions + authRoutes 即启用认证链 */
-  auth?:
-    | {
-        sessions: NonNullable<AppDeps['sessions']>
-        sessionMiddleware: MiddlewareHandler
-        authRoutes: Hono
-      }
-    | false
+  /** 注入即启用认证链（sessionMiddleware + authRoutes） */
+  auth?: AuthInject | false
   /** 3p 注入（deps.platform 暴露给 routes，App 内 supports() 协商用能力） */
-  thirdParty?: { platform: NonNullable<AppDeps['platform']> }
-  license?:
-    | {
-        client: NonNullable<AppDeps['license']>
-        guard: MiddlewareHandler
-      }
-    | false
+  thirdParty?: { platform: PlatformLike }
+  /** 注入即挂停服守卫 */
+  license?: LicenseInject | false
   /** 注入 db/storage 汇总进 deps（供 routes 回调用） */
   db?: Record<string, unknown>
-  storage?: NonNullable<AppDeps['storage']>
+  storage?: StorageLike
   healthz?: { checks?: HealthCheck[] }
   /** 静态资源目录（adapter.assetsDir() 算出）；提供则挂 static + SPA fallback */
   staticDir?: string
