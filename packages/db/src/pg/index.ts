@@ -7,9 +7,15 @@ import postgres from 'postgres'
 import { registerPgDriver } from '../create-db.js'
 import type { PgDbConfig, PgDatabase } from '../types.js'
 
-/** 默认构造（惰性连接）：Supavisor transaction 模式强制 prepare:false */
+/** 默认构造（惰性连接）；Supavisor transaction 模式需 prepare:false（见 supabase.ts） */
 export function createPgDb(config: PgDbConfig): PgDatabase {
-  throw new Error('NotImplemented: createPgDb')
+  const sql = postgres(config.url, {
+    max: config.max ?? 10,
+    idle_timeout: config.idleTimeout ?? 30,
+    prepare: config.prepare ?? true,
+    ...(config.ssl === true ? { ssl: 'require' as const } : {}),
+  })
+  return drizzle({ client: sql })
 }
 
 registerPgDriver(createPgDb)

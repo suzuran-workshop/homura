@@ -1,5 +1,6 @@
 /**
  * drizzle-kit 配置工厂：App 的 drizzle.pg.config.ts / drizzle.sqlite.config.ts 各调一次。
+ * 返回值直接 export default 即可（kit 侧 jiti 加载，类型保持宽松）。
  */
 export interface DrizzleKitOptions {
   dialect: 'pg' | 'sqlite'
@@ -9,6 +10,11 @@ export interface DrizzleKitOptions {
   out: string
 }
 
+/** 注意映射：drizzle-kit 的 pg 方言枚举是 'postgresql' */
 export function defineDrizzleKitConfig(opts: DrizzleKitOptions): Record<string, unknown> {
-  throw new Error(`NotImplemented: defineDrizzleKitConfig(${opts.dialect})`)
+  return {
+    dialect: opts.dialect === 'pg' ? 'postgresql' : 'sqlite',
+    schema: opts.schemaGlob,
+    out: opts.out,
+  }
 }
