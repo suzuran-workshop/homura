@@ -14,6 +14,15 @@
 
 不在子集内（pg 专属 array/jsonb 索引操作、sqlite 的 WITHOUT ROWID 等）禁止使用。
 
+## ⚠ 列名规则（血泪教训）
+- schema-helpers 的配方**默认用 JS 属性名做 DB 列名**（camelCase）：`pgCol.text()` → 列名取属性名
+- 需要 snake_case 列名时**显式传入**：`pgCol.text('token_hash')`
+- **走原生 SQL 的表（auth refresh_tokens、license license_state）必须显式 snake_case**，
+  且与各自 store.ts 的原生 SQL 列名严格对齐——否则运行时列名不匹配必崩
+- **parity 测不出这个 bug**：它只比对 pg↔sqlite 两侧列名（两边都 camelCase 自然一致）
+- 铁律：改这类表的列名，务必同步 store.ts，并以 `drizzle-kit generate` 产物 DDL 为准复核
+- 走 query builder 的业务表（如 todos）由 drizzle 自动映射，保持 camelCase 无需显式列名
+
 ## App schema 写法（colocated 双文件）
 ```
 src/server/schema/
@@ -21,7 +30,8 @@ src/server/schema/
 ├── sqlite.ts  # import { sqliteTable, sqliteCol, sqliteJson } from '@homura/db/schema-helpers'
 └── parity.test.ts  # assertSchemaParity(pgSchema, sqliteSchema) 硬门禁
 ```
-第三方包的表（auth 的 refresh_tokens、license 的 license_state）spread 进两侧 schema 参与迁移。
+第三方包的表从子路径 spread 进两侧 schema 参与迁移：
+`@homura/auth/tables`（refresh_tokens）、`@homura/license/tables`（license_state）。
 
 ## 迁移双轨
 - 生成：`drizzle-kit generate --config=drizzle.pg.config.ts`（PG 方言，supabase/pgsql 共用 → drizzle/pg/）与 `drizzle.sqlite.config.ts`（→ drizzle/sqlite/）
@@ -30,6 +40,8 @@ src/server/schema/
 - supabase 侧执行通道：drizzle-kit migrate 直连（Supavisor session 模式）或 supabase CLI
 
 ## 验收标准
-- [x] pgCol/sqliteCol 配方 + parity（列级 primary + 表级 primaryKeys 并集指纹）
+- [x] pgCol/sqliteCol 配方（含可选 name 参数）+ parity（列级 primary + 表级 primaryKeys 并集指纹）
 - [x] runMigrations sqlite 幂等测试
+- [x] 模板真实 drizzle-kit generate 双方言迁移产物，复核 snake_case 列名落地
+- [x] 模板 e2e 走真实迁移建表 + todos CRUD（sqlite :memory:）
 - [ ] pg 侧 CI（postgres service）迁移往返

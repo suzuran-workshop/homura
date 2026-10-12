@@ -33,7 +33,7 @@
 | @homura/3p | Capability 分片（oauth/message/approval/contacts）+ supports 守卫协商 + dingtalk 实现（CorpTokenManager 缓存+single-flight、三组 v1.0 API、OAuth 预设） |
 | @homura/license | genuine 契约（contract.ts 单一事实源）+ LicenseClient（register/心跳±抖动/宽限状态机）+ licenseGuard（503/警告头/fail-open） |
 | @homura/app-kit | createApp 固定中间件链装配 + RuntimeAdapter（node: 监听+磁盘静态；qw-pages: 三导出对冲+app 内静态）+ /healthz |
-| templates/hono-react | 渐进式装配示范（homura.config.ts 每能力独立 env 开关）+ 双形态 build（standalone dist / qw-pages 自包含单文件 + manifest） |
+| templates/hono-react | 渐进式装配示范（env.ts 定义每能力独立 env 开关 + app.ts buildApp 逐级注入）+ 双形态 build（standalone dist / qw-pages 自包含单文件 + manifest） |
 
 ## 模块关系
 

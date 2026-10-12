@@ -25,4 +25,4 @@ await kv.set(state, value, 5 * 60_000)
 const taken = await kv.take(state) // 取出即删；过期 null
 ```
 
-多实例部署改用 `@homura/db` 的 `createDbTtlKv`。使用示范见 `templates/hono-react/homura.config.ts`。
+多实例部署改用 `@homura/db` 的 `createDbTtlKv`。使用示范见 `templates/hono-react/src/server/app.ts`（buildAuth 里 `stateKv: createMemoryTtlKv()`）。

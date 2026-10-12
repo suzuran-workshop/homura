@@ -33,3 +33,29 @@
 2. 抽象层「设计好但不接线」等于没有（ProviderRegistry 从未实例化）——homura 的 3p 抽象必须被 dingtalk 实现真正跑通
 3. 角色体系越简单越好（tenant_admin/dept_manager 废除史）——homura 直接单租户
 4. token 15 分钟过期无刷新是最大运行时债务——session 设计的第一优先级
+
+## 轮二实现教训（homura 自身，非 Suzuran 遗产）
+
+> 这些是 homura 建设过程中真实踩到的坑，印证了上面的遗产教训。
+
+5. **契约必须实读源码核对，不能信侦察摘要**（印证教训 2）：侦察兵报告 oauth2-dingtalk 的
+   userinfo 返回 `{openId,nick,avatarUrl}`，实读源码才发现服务端对外返回的是标准 OIDC
+   `{sub,name,email,picture}`（内部映射过）。若照摘要写 mapUser，运行时必抛「缺 sub」。
+   → 计划里「2.2 步强制实读 ../oauth2-dingtalk」这条纪律直接避免了一个线上 bug。
+6. **走原生 SQL 的表，列名必须显式声明**（新坑）：drizzle 配方默认用 JS 属性名（camelCase）
+   做 DB 列名，但 auth/license 的 store 走原生 SQL 用 snake_case → 迁移生成的 DDL 与 store
+   查询列名不匹配，运行时崩。parity 测试测不出（两侧都 camelCase 自然一致）。
+   → 靠「模板真实跑 drizzle-kit generate 并检查 DDL」发现。教训：集成测试要覆盖真实迁移产物，
+     不能只测单元测试层的 schema 对象。详见 specs/module-schema 的列名规则。
+7. **源码直出的 workspace 包，打包时必须 noExternal**（新坑）：`@homura/*` 的 exports 指向
+   `src/*.ts`，tsdown 默认 external 化后，`node dist/server/index.mjs` 运行时会去 import `.ts`
+   直接崩。→ 两个形态都必须 `noExternal: [/^@homura\//]`（qw-pages 更是全打包）。
+   教训：「内部包不预编译」的决策（ADR-004）把打包责任推给了消费方 build，必须在模板
+   build 脚本里显式处理，且靠「实测 node 跑产物」兜底（不能只 typecheck）。
+8. **UPDATE...RETURNING 返回更新后的值，不能用它判「更新前状态」**（新坑）：session refresh
+   的复用检出最初想用 `RETURNING used_at` 事后判断是否已被消费，但 RETURNING 给的是本次
+   刚写入的 ts，恒等于「未消费」→ 复用永远检不出。→ 改为「原子抢占（WHERE used_at IS NULL）
+   成功与否」区分首次消费与复用。教训：数据库「先占后判」优于「先改后读」。
+9. **测试桩要模拟真实的调用形态**：license e2e 最初靠「等心跳循环 setTimeout」触发 suspended，
+   flaky。→ 改为 fake genuine 在 register 就返回 suspended（合法场景），getStatus() 在 await
+   onStart() 后即为确定态。教训：能用确定的初始态，就别依赖异步时序。

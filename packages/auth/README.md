@@ -28,4 +28,4 @@ app.use('/api/*', requireAuth)
 app.get('/api/me', (c) => c.json(c.get('auth')))
 ```
 
-上游契约与 state 语义见 `docs/specs/module-oauth2`；session 状态机见 `module-session`。使用示范见模板 `src/server/index.ts`。
+上游契约与 state 语义见 `docs/specs/module-oauth2`；session 状态机见 `module-session`。使用示范见模板 `src/server/app.ts`（buildAuth）与 `src/server/routes/api.ts`（c.get('auth')）。

@@ -9,16 +9,23 @@
 - 错误：token 端点非 2xx → 抛含 body 的错误；userinfo 非 2xx → 抛错
 
 ## 上游契约快照（oauth2-dingtalk，3p/dingtalk/oauth.ts 消费）
-- `GET /:orgId/authorize` → 302 钉钉授权页
-- `POST /:orgId/token`（form `code=...`）→ `{ access_token }`（以实读 ../oauth2-dingtalk 源码核对为准，轮二 2.2 步强制）
-- `GET /:orgId/userinfo`（Bearer）→ `{ openId, nick, avatarUrl? }`
+> ⚠ 已实读 ../oauth2-dingtalk/src/index.ts 核对（2.2 步），修正了侦察期的字段假设：
+> 服务端**内部**从钉钉拿 `{openId,nick,avatarUrl}`，但**对外返回标准 OIDC 格式**。
+
+- `GET /:orgId/authorize` → 302 钉钉授权页（透传 state）
+- `POST /:orgId/token`（form `code=...`）→ `{ access_token, token_type: 'bearer', expires_in }`（src/index.ts:91-95）
+- `GET /:orgId/userinfo`（Bearer）→ `{ sub, name, email, picture }`（标准 OIDC；src/index.ts:124-129，
+  服务端已把 `openId→sub / nick→name / avatarUrl→picture`，email 为 `<openId>@dingtalk.internal`）
 - 默认 baseUrl https://dingtalk.auth.xrl.im；仅 code flow、无 refresh、无 client credentials
+- **映射责任在 3p 预设的 mapUser**：`sub←sub / nickname←name / avatarUrl←picture`（picture 空串归一 undefined）；
+  auth 包只认标准 `TokenResponse`，不含钉钉特有类型
 
 ## 输入 / 输出
-- 输入：OAuth2ClientConfig（endpoints 来自 3p 预设，鸭子类型互操作）
-- 输出：AuthUser { sub, nickname?, avatarUrl? }
+- 输入：OAuth2ClientConfig（endpoints 来自 3p 预设，鸭子类型互操作；stateKv 由 core 内存或 db 实现注入）
+- 输出：`callback()` → `{ user: AuthUser, returnTo }`；AuthUser = `{ sub, nickname?, avatarUrl? }`
 
 ## 验收标准
-- [ ] fetchImpl 桩全流程测试（authorize→callback→mapUser）
-- [ ] state 过期/重放/缺失拒绝；allowNoState 开关
-- [ ] 实读 oauth2-dingtalk 源码核对 token 响应字段，快照测试固化
+- [x] fetchImpl 桩全流程测试（authorize→callback→mapUser，form 编码 + Bearer 头断言）
+- [x] state 过期/重放/伪造/缺失拒绝；allowNoState 显式 opt-in
+- [x] 实读 oauth2-dingtalk 源码核对 token/userinfo 字段（修正 openId→sub 等），3p oauth 预设快照测试固化
+- [x] token/userinfo 端点非 2xx 抛错；mapUser 抛错透传；authorizeExtraParams 透传
