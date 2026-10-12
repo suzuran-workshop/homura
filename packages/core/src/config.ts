@@ -2,7 +2,7 @@
  * 类型安全的配置装载：配置即文档。
  *
  * defineConfig(specs) 返回 { load, help }：
- * - load(env?) 解析并校验环境变量（dev 下自动 process.loadEnvFile()）
+ * - load(env?) 解析并校验环境变量（未显式传 env 时自动 process.loadEnvFile()）
  * - help() 生成 .env.example 片段
  */
 export interface ConfigSpec<T> {
@@ -10,7 +10,7 @@ export interface ConfigSpec<T> {
   env: string
   default?: T
   parse: (raw: string) => T
-  /** true = 缺失即抛错 */
+  /** true = 缺失且无 default 即抛错 */
   required?: boolean
   /** true = help() 输出时打码 */
   secret?: boolean
@@ -30,7 +30,59 @@ export function defineConfig<S extends Record<string, ConfigSpec<unknown>>>(spec
   /** 生成 .env.example 片段——配置即文档 */
   help(): string
 } {
-  throw new Error('NotImplemented: defineConfig')
+  const loadFrom = (env: NodeJS.ProcessEnv): Record<string, unknown> => {
+    const out: Record<string, unknown> = {}
+    for (const [key, spec] of Object.entries(specs)) {
+      const raw = env[spec.env]
+      if (raw !== undefined && raw !== '') {
+        out[key] = spec.parse(raw)
+      } else if (spec.default !== undefined) {
+        out[key] = spec.default
+      } else if (spec.required) {
+        throw new Error(`缺少必需的环境变量 ${spec.env}（配置项 ${key}）`)
+      } else {
+        out[key] = undefined
+      }
+    }
+    return out
+  }
+
+  return {
+    load(env?: NodeJS.ProcessEnv): LoadedConfig<S> {
+      let source = env
+      if (!source) {
+        // dev 便捷：自动读取 .env（不存在则忽略）
+        try {
+          process.loadEnvFile()
+        } catch {
+          /* no .env */
+        }
+        source = process.env
+      }
+      const resolved = loadFrom(source)
+      return {
+        get: ((key: string) => {
+          if (!(key in resolved)) throw new Error(`未知配置项: ${key}`)
+          return resolved[key]
+        }) as LoadedConfig<S>['get'],
+        raw: () => resolved as {
+          [K in keyof S]: S[K] extends ConfigSpec<infer T> ? T | undefined : never
+        },
+      }
+    },
+    help(): string {
+      const lines: string[] = ['# 由 @homura/core defineConfig 生成（配置即文档）', '']
+      for (const [key, spec] of Object.entries(specs)) {
+        if (spec.description) lines.push(`# ${spec.description}`)
+        const example =
+          spec.secret ? `${spec.env}=<redacted>` : `${spec.env}=${spec.default ?? ''}`
+        lines.push(`${example}`)
+        lines.push('')
+        void key
+      }
+      return lines.join('\n')
+    },
+  }
 }
 
 /** 常用 parse 助手 */

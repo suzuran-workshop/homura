@@ -18,5 +18,18 @@ export interface RuntimeInfo {
 export const QW_PAGES_ENV_MARKERS: readonly string[] = ['QW_PAGES', 'QW_PAGES_APP_ID']
 
 export function detectRuntime(env: NodeJS.ProcessEnv): RuntimeInfo {
-  throw new Error('NotImplemented: detectRuntime')
+  const explicit = env['HOMURA_RUNTIME']
+  if (explicit !== undefined) {
+    if (explicit !== 'standalone' && explicit !== 'qw-pages') {
+      throw new Error(
+        `HOMURA_RUNTIME 非法值: ${explicit}（允许 'standalone' | 'qw-pages'）`,
+      )
+    }
+    return { target: explicit, explicit: true, reasons: [`HOMURA_RUNTIME=${explicit}`] }
+  }
+  const hits = QW_PAGES_ENV_MARKERS.filter((m) => env[m] !== undefined && env[m] !== '')
+  if (hits.length > 0) {
+    return { target: 'qw-pages', explicit: false, reasons: hits }
+  }
+  return { target: 'standalone', explicit: false, reasons: [] }
 }
