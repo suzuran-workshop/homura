@@ -1,0 +1,43 @@
+{
+  "name": "template-hono-react",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 全栈模板：Hono + React + Vite，双形态构建（standalone / qw-pages），AI 开发的起点与活文档",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "tsx watch src/server/index.ts",
+    "typecheck": "tsc -b --noEmit",
+    "build": "node scripts/build.mjs",
+    "build:qw-pages": "HOMURA_BUILD_TARGET=qw-pages node scripts/build.mjs",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate --config=drizzle.pg.config.ts && drizzle-kit generate --config=drizzle.sqlite.config.ts"
+  },
+  "dependencies": {
+    "@homura/app-kit": "workspace:*",
+    "@homura/auth": "workspace:*",
+    "@homura/core": "workspace:*",
+    "@homura/db": "workspace:*",
+    "@homura/license": "workspace:*",
+    "@homura/storage": "workspace:*",
+    "@homura/3p": "workspace:*",
+    "hono": "^4.10.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "drizzle-orm": "1.0.0-rc.4"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "drizzle-kit": "1.0.0-rc.4",
+    "postgres": "^3.4.0",
+    "tsdown": "^0.12.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0"
+  }
+}

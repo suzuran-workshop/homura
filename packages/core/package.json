@@ -1,0 +1,14 @@
+{
+  "name": "@homura/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 基座：运行环境探测、配置装载、日志、TTL-KV",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

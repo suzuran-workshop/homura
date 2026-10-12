@@ -1,0 +1,34 @@
+{
+  "name": "homura",
+  "private": true,
+  "type": "module",
+  "description": "Hono+React 全栈 Node 应用的 template/SDK monorepo，AI 开发，双形态部署（独立 Node 服务 / qw-pages 托管）",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --no-bail run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@tailwindcss/oxide",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "drizzle-orm": "1.0.0-rc.4",
+      "drizzle-kit": "1.0.0-rc.4"
+    }
+  }
+}

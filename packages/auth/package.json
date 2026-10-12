@@ -1,0 +1,29 @@
+{
+  "name": "@homura/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 认证：通用标准 OAuth2 (Authorization Code Flow) 客户端 + 自管 session（HS256 短 JWT + opaque refresh rotate）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./tables": "./src/tables.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@homura/core": "workspace:*",
+    "@homura/db": "workspace:*",
+    "jose": "^6.0.0"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "1.0.0-rc.4",
+    "hono": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": { "optional": true },
+    "hono": { "optional": true }
+  }
+}

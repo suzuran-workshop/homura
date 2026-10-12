@@ -1,0 +1,28 @@
+{
+  "name": "@homura/license",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 激活客户端：注册、心跳、停服守卫（对接 ../homura-genuine 中央授权服务，契约先行）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./hono": "./src/guard.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@homura/core": "workspace:*",
+    "@homura/db": "workspace:*"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "1.0.0-rc.4",
+    "hono": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": { "optional": true },
+    "hono": { "optional": true }
+  }
+}

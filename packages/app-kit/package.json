@@ -1,0 +1,26 @@
+{
+  "name": "@homura/app-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 组装入口：createApp 中间件链装配 + 双形态 RuntimeAdapter（standalone / qw-pages）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./serve": "./src/runtime/node.ts",
+    "./qw-pages": "./src/runtime/qw-pages.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@homura/core": "workspace:*",
+    "hono": "^4.10.0"
+  },
+  "peerDependencies": {
+    "@hono/node-server": "^1.19.0"
+  },
+  "peerDependenciesMeta": {
+    "@hono/node-server": { "optional": true }
+  }
+}

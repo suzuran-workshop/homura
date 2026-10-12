@@ -1,25 +1,16 @@
-# Go
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-/backend/api
-/backend/suzuran-cloud
-vendor/
-
-# Go workspace
-go.work
-go.work.sum
-
-# Node / Frontend
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build artifacts
 dist/
-.nuxt/
-.output/
-.vite/
+build/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+test-results/
+.last-run.json
 
 # Environment
 .env
@@ -31,7 +22,6 @@ dist/
 .vscode/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
@@ -40,26 +30,3 @@ Thumbs.db
 # Logs
 logs/
 *.log
-
-# Docker
-docker-compose.override.yml
-
-# Build artifacts
-target/
-build/
-/backend/main
-*.tsbuildinfo
-
-# Test artifacts
-screenshots/
-test-results/
-.last-run.json
-
-# Local debug scripts (puppeteer / manual verification)
-frontend/app/check-*.mjs
-frontend/app/debug-*.mjs
-frontend/app/screenshot*.mjs
-frontend/app/verify-*.mjs
-
-# Openyida
-.cache/

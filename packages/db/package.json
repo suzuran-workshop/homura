@@ -1,0 +1,32 @@
+{
+  "name": "@homura/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "homura 持久层：Drizzle 双 driver（postgres-js / node:sqlite）、双方言 schema 配方、迁移双轨、supabase 直连",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema-helpers": "./src/schema-helpers.ts",
+    "./pg": "./src/pg/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@homura/core": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.4"
+  },
+  "peerDependencies": {
+    "postgres": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "postgres": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "drizzle-kit": "1.0.0-rc.4",
+    "postgres": "^3.4.0"
+  }
+}
