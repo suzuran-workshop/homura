@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./tables": "./src/tables.ts",
     "./hono": "./src/guard.ts"
   },
   "scripts": {

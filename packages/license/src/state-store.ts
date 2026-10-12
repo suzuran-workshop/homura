@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { isSqlite } from '@homura/db'
-import { pgCol, pgTable, sqliteCol, sqliteTable } from '@homura/db/schema-helpers'
+
+// 表定义已抽到 ./tables.ts（./tables 子路径），此处 re-export 保持向后兼容
+export { pgLicenseTables, sqliteLicenseTables } from './tables.js'
 
 export interface LicenseState {
   licenseId?: string
@@ -12,26 +14,6 @@ export interface LicenseState {
 export interface LicenseStateStore {
   load(): Promise<LicenseState | null>
   save(state: LicenseState): Promise<void>
-}
-
-/** license_state 单行表（id 恒为 'default'）——双方言表定义（App 可 spread 进 schema 迁移） */
-
-export const pgLicenseTables = {
-  licenseState: pgTable('license_state', {
-    id: pgCol.text().primaryKey(),
-    licenseId: pgCol.text(),
-    instanceKey: pgCol.text().notNull(),
-    updatedAt: pgCol.updatedAt(),
-  }),
-}
-
-export const sqliteLicenseTables = {
-  licenseState: sqliteTable('license_state', {
-    id: sqliteCol.text().primaryKey(),
-    licenseId: sqliteCol.text(),
-    instanceKey: sqliteCol.text().notNull(),
-    updatedAt: sqliteCol.updatedAt(),
-  }),
 }
 
 export type DrizzleDb = PostgresJsDatabase | NodeSQLiteDatabase
