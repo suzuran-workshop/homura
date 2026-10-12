@@ -4,6 +4,7 @@
  */
 import { sql } from 'drizzle-orm'
 import {
+  bigint,
   integer,
   jsonb,
   pgTable,
@@ -20,6 +21,8 @@ export const pgCol = {
   updatedAt: () => pgTimestamp({ withTimezone: true }).notNull().defaultNow(),
   text: () => pgText(),
   int: () => integer(),
+  /** epoch 毫秒（bigint number 模式）：原生 SQL 读写双方言一致（node:sqlite 不接受 Date 对象） */
+  epochMs: () => bigint({ mode: 'number' }),
 } as const
 
 export const sqliteCol = {
@@ -34,6 +37,8 @@ export const sqliteCol = {
       .default(sql`(unixepoch() * 1000)`),
   text: () => sqliteText(),
   int: () => sqliteInteger(),
+  /** epoch 毫秒（sqlite integer 为 int64） */
+  epochMs: () => sqliteInteger(),
 } as const
 
 /** jsonb ↔ text-json 统一 JSON 列 */

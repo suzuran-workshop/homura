@@ -14,22 +14,29 @@ describe('dingtalkOAuth 预设', () => {
     expect(p.endpoints.authorizeUrl).toBe('https://custom.example/o/authorize')
   })
 
-  it('mapUser：openId→sub, nick→nickname, avatarUrl 透传', () => {
+  it('mapUser：标准 OIDC {sub,name,picture}（实读 oauth2-dingtalk 源码核对）', () => {
     const p = dingtalkOAuth({ orgId: 'o' })
-    expect(p.mapUser({ openId: 'op1', nick: '张三', avatarUrl: 'http://a' })).toEqual({
-      sub: 'op1',
-      nickname: '张三',
-      avatarUrl: 'http://a',
-    })
+    expect(
+      p.mapUser({ sub: 'op1', name: '张三', email: 'op1@dingtalk.internal', picture: 'http://a' }),
+    ).toEqual({ sub: 'op1', nickname: '张三', avatarUrl: 'http://a' })
   })
 
-  it('mapUser：缺 openId → 抛错', () => {
+  it('mapUser：缺 sub → 抛错', () => {
     const p = dingtalkOAuth({ orgId: 'o' })
-    expect(() => p.mapUser({ nick: 'x' })).toThrow(/openId/)
+    expect(() => p.mapUser({ name: 'x' })).toThrow(/sub/)
+  })
+
+  it('mapUser：picture 空串归一为 undefined', () => {
+    const p = dingtalkOAuth({ orgId: 'o' })
+    expect(p.mapUser({ sub: 'op2', name: '李四', picture: '' })).toEqual({
+      sub: 'op2',
+      nickname: '李四',
+      avatarUrl: undefined,
+    })
   })
 
   it('mapUser：可选字段缺省不报错', () => {
     const p = dingtalkOAuth({ orgId: 'o' })
-    expect(p.mapUser({ openId: 'op2' })).toEqual({ sub: 'op2', nickname: undefined, avatarUrl: undefined })
+    expect(p.mapUser({ sub: 'op3' })).toEqual({ sub: 'op3', nickname: undefined, avatarUrl: undefined })
   })
 })

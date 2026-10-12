@@ -1,4 +1,4 @@
-export type { AuthUser, OAuth2Endpoints, TokenResponse, DingtalkUserInfo } from './types.js'
+export type { AuthUser, OAuth2Endpoints, TokenResponse } from './types.js'
 export { OAuth2Client } from './oauth2/client.js'
 export type { OAuth2ClientConfig } from './oauth2/client.js'
 export { SessionManager } from './session/manager.js'

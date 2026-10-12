@@ -1,6 +1,8 @@
 /**
- * 上游契约唯一事实源（../oauth2-dingtalk 等）。
- * ⚠ 字段以 ../oauth2-dingtalk 实测为准，只改此文件。
+ * 上游契约唯一事实源。
+ * ⚠ 字段以实读 ../oauth2-dingtalk 源码为准（token/userinfo 端点见 specs/module-oauth2）。
+ *   钉钉特有的 userinfo 形状（Oauth2DingtalkUserInfo）在 @homura/3p/dingtalk/oauth.ts，
+ *   auth 包只认标准 OAuth2/OIDC 契约。
  */
 
 /** 规范化用户身份（各 IdP 的 mapUser 归一结果） */
@@ -16,16 +18,13 @@ export interface OAuth2Endpoints {
   userinfoUrl: string
 }
 
-/** 标准 OAuth2 token 响应（oauth2-dingtalk 实际返回字段以实读核对为准） */
+/**
+ * 标准 OAuth2 token 响应。
+ * 实读核对：oauth2-dingtalk POST /:orgId/token 返回
+ *   { access_token, token_type: 'bearer', expires_in }（src/index.ts:91-95）。
+ */
 export interface TokenResponse {
   access_token: string
   token_type?: string
   expires_in?: number
-}
-
-/** oauth2-dingtalk 服务端过滤后的 userinfo 形状（预设 mapUser 的输入） */
-export interface DingtalkUserInfo {
-  openId: string
-  nick: string
-  avatarUrl?: string
 }

@@ -1,3 +1,5 @@
 export { createAuthRoutes } from './routes.js'
+export type { AuthPaths, AuthRoutesOptions } from './routes.js'
 export { sessionMiddleware, requireAuth } from './middleware.js'
-export type { AuthPaths } from './routes.js'
+export type { SessionMiddlewareOptions } from './middleware.js'
+export type { SessionClaims } from '../session/manager.js'
