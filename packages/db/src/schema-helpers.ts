@@ -1,6 +1,6 @@
 /**
  * 双方言 schema 配方：压掉 schema/pg.ts 与 schema/sqlite.ts 之间 80% 的重复。
- * 仅支持双方言共有特性子集；差异映射见 docs/specs/005。
+ * 仅支持双方言共有特性子集；差异映射见 docs/specs/module-schema。
  */
 import { sql } from 'drizzle-orm'
 import {

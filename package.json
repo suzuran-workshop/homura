@@ -19,16 +19,5 @@
     "prettier": "^3.6.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "@tailwindcss/oxide",
-      "unrs-resolver"
-    ],
-    "overrides": {
-      "drizzle-orm": "1.0.0-rc.4",
-      "drizzle-kit": "1.0.0-rc.4"
-    }
   }
 }
