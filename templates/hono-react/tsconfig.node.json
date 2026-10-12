@@ -5,5 +5,5 @@
     "composite": true,
     "outDir": "dist/ts-node"
   },
-  "include": ["src/server", "src/shared", "vite.config.ts", "scripts"]
+  "include": ["src/server", "src/shared", "vite.config.ts", "scripts", "drizzle.pg.config.ts", "drizzle.sqlite.config.ts"]
 }

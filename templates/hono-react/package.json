@@ -10,7 +10,8 @@
     "typecheck": "tsc -b --noEmit",
     "build": "node scripts/build.mjs",
     "build:qw-pages": "HOMURA_BUILD_TARGET=qw-pages node scripts/build.mjs",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
+    "gen:env": "tsx scripts/gen-env-example.mjs",
     "db:generate": "drizzle-kit generate --config=drizzle.pg.config.ts && drizzle-kit generate --config=drizzle.sqlite.config.ts"
   },
   "dependencies": {
