@@ -20,7 +20,11 @@ function fingerprintPg(table: PgTable): TableFingerprint {
   const config = pgTableConfig(table)
   return {
     columns: config.columns.map((c) => c.name).sort(),
-    primaryKeys: config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)).sort(),
+    // 列级主键标记在 column.primary；表级 primaryKeys 收 composite builder
+    primaryKeys: [
+      ...config.columns.filter((c) => c.primary).map((c) => c.name),
+      ...config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)),
+    ].sort(),
   }
 }
 
@@ -28,7 +32,10 @@ function fingerprintSqlite(table: SQLiteTable): TableFingerprint {
   const config = sqliteTableConfig(table)
   return {
     columns: config.columns.map((c) => c.name).sort(),
-    primaryKeys: config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)).sort(),
+    primaryKeys: [
+      ...config.columns.filter((c) => c.primary).map((c) => c.name),
+      ...config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)),
+    ].sort(),
   }
 }
 
