@@ -8,7 +8,7 @@ export type { DbConfig, PgDbConfig, SqliteDbConfig, Database, PgDatabase } from 
 export { createDb, registerPgDriver, isPgRegistered } from './create-db.js'
 export { createSqliteDb } from './sqlite.js'
 export type { SqliteDatabase } from './sqlite.js'
-export { runMigrations } from './migrations.js'
+export { runMigrations, isSqlite } from './migrations.js'
 export { defineDrizzleKitConfig } from './kit-config.js'
 export { createDbTtlKv } from './ttlkv.js'
 export { assertSchemaParity } from './parity.js'
