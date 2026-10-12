@@ -22,5 +22,8 @@
   },
   "peerDependenciesMeta": {
     "@hono/node-server": { "optional": true }
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.19.0"
   }
 }

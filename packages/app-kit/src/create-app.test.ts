@@ -1,0 +1,282 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Hono } from 'hono'
+import type { MiddlewareHandler } from 'hono'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createApp } from './create-app.js'
+
+/** 假 guard：状态由外部切换 */
+function fakeGuard(getStatus: () => string): MiddlewareHandler {
+  return async (c, next) => {
+    if (getStatus() === 'suspended') return c.json({ error: 'service_suspended' }, 503)
+    await next()
+  }
+}
+
+describe('createApp — 基础与中间件链', () => {
+  it('零注入：纯 routes 也能跑', async () => {
+    const routes = new Hono()
+    routes.get('/hello', (c) => c.text('hi'))
+    const { app } = createApp({ routes })
+    const res = await app.request('/hello')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('hi')
+  })
+
+  it('requestId 中间件：生成并回写 X-Request-Id 头', async () => {
+    const { app } = createApp({ routes: new Hono().get('/', (c) => c.text('ok')) })
+    const res = await app.request('/')
+    expect(res.headers.get('x-request-id')).toMatch(/[0-9a-f-]{36}/)
+  })
+
+  it('传入 x-request-id 则复用', async () => {
+    const { app } = createApp({ routes: new Hono().get('/', (c) => c.text('ok')) })
+    const res = await app.request('/', { headers: { 'x-request-id': 'trace-abc' } })
+    expect(res.headers.get('x-request-id')).toBe('trace-abc')
+  })
+
+  it('basePath：全路由挂到子路径', async () => {
+    const routes = new Hono().get('/x', (c) => c.text('x'))
+    const { app } = createApp({ basePath: '/myapp', routes })
+    expect((await app.request('/myapp/x')).status).toBe(200)
+    expect((await app.request('/x')).status).toBe(404)
+  })
+
+  it('routes 回调收到汇总 deps（db/storage/sessions/platform/license）', async () => {
+    const seen: unknown[] = []
+    const routes = (deps: Record<string, unknown>) => {
+      seen.push(deps)
+      return new Hono().get('/', (c) => c.text('ok'))
+    }
+    createApp({
+      db: { tag: 'db' },
+      storage: { uploadFile: async () => ({}) },
+      thirdParty: { platform: { name: 'dingtalk', capabilities: ['message'] } },
+      routes: routes as never,
+    })
+    const deps = seen[0] as Record<string, unknown>
+    expect(deps.db).toMatchObject({ tag: 'db' })
+    expect(deps.storage).toBeDefined()
+    expect(deps.platform).toMatchObject({ name: 'dingtalk' })
+  })
+
+  it('onError：抛错走自定义处理', async () => {
+    const routes = new Hono().get('/boom', () => {
+      throw new Error('kaboom')
+    })
+    const { app } = createApp({
+      routes,
+      onError: (err) => new Response(JSON.stringify({ handled: err.message }), { status: 500 }),
+    })
+    const res = await app.request('/boom')
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toMatchObject({ handled: 'kaboom' })
+  })
+
+  it('默认 onError → 500 JSON', async () => {
+    const routes = new Hono().get('/boom', () => {
+      throw new Error('x')
+    })
+    const { app } = createApp({ routes })
+    const res = await app.request('/boom')
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toMatchObject({ error: 'internal_error' })
+  })
+})
+
+describe('createApp — healthz 与 licenseGuard 顺序', () => {
+  it('healthz 无 checks → ok', async () => {
+    const { app } = createApp()
+    const res = await app.request('/healthz')
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ status: 'ok' })
+  })
+
+  it('healthz checks：全 ok → 200；有 fail → 503 degraded', async () => {
+    const ok = createApp({ healthz: { checks: [{ name: 'a', check: () => true }] } })
+    expect((await ok.app.request('/healthz')).status).toBe(200)
+
+    const bad = createApp({
+      healthz: {
+        checks: [
+          { name: 'a', check: () => true },
+          { name: 'b', check: () => false },
+        ],
+      },
+    })
+    const res = await bad.app.request('/healthz')
+    expect(res.status).toBe(503)
+    await expect(res.json()).resolves.toMatchObject({ status: 'degraded', checks: { a: 'ok', b: 'fail' } })
+  })
+
+  it('healthz check 抛错 → fail（不炸健康检查）', async () => {
+    const { app } = createApp({
+      healthz: {
+        checks: [{ name: 'x', check: () => { throw new Error('down') } }],
+      },
+    })
+    const res = await app.request('/healthz')
+    expect(res.status).toBe(503)
+    await expect(res.json()).resolves.toMatchObject({ checks: { x: 'fail' } })
+  })
+
+  it('licenseGuard suspended → 业务 503，但 /healthz 豁免（注册于 guard 前）', async () => {
+    let status = 'active'
+    const routes = new Hono().get('/api/x', (c) => c.text('data'))
+    const { app } = createApp({
+      routes,
+      license: { client: { getStatus: () => status }, guard: fakeGuard(() => status) },
+    })
+    expect((await app.request('/api/x')).status).toBe(200)
+    status = 'suspended'
+    expect((await app.request('/api/x')).status).toBe(503)
+    // healthz 始终可达（探活用）
+    expect((await app.request('/healthz')).status).toBe(200)
+  })
+})
+
+describe('createApp — 认证链装配', () => {
+  it('auth 注入：sessionMiddleware 先于 routes，authRoutes 挂载', async () => {
+    const order: string[] = []
+    const sessionMiddleware: MiddlewareHandler = async (_c, next) => {
+      order.push('session')
+      await next()
+    }
+    const authRoutes = new Hono().get('/auth/login', (c) => {
+      order.push('authRoute')
+      return c.text('login')
+    })
+    const routes = new Hono().get('/api/x', (c) => {
+      order.push('route')
+      return c.text('x')
+    })
+    const { app } = createApp({
+      routes,
+      auth: { sessions: { verifyAccessToken: async () => null }, sessionMiddleware, authRoutes },
+    })
+    await app.request('/auth/login')
+    expect(order).toEqual(['session', 'authRoute'])
+    order.length = 0
+    await app.request('/api/x')
+    expect(order).toEqual(['session', 'route'])
+  })
+})
+
+describe('createApp — 静态资源 + SPA fallback', () => {
+  let dir: string
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'homura-static-'))
+    mkdirSync(join(dir, 'assets'), { recursive: true })
+    writeFileSync(join(dir, 'index.html'), '<html><body>SPA</body></html>')
+    writeFileSync(join(dir, 'assets', 'app.abc123.js'), 'console.log(1)')
+  })
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('命中静态文件 → 正确 content-type + 长缓存', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc123.js')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(res.headers.get('cache-control')).toContain('immutable')
+    expect(await res.text()).toBe('console.log(1)')
+  })
+
+  it('未命中路径（页面）→ SPA fallback index.html', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/some/spa/route')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('text/html')
+    expect(await res.text()).toContain('SPA')
+  })
+
+  it('根路径 → index.html', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('SPA')
+  })
+
+  it('API 路径未命中 → 404 JSON（不回落 index.html）', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/api/nope')
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toMatchObject({ error: 'not_found' })
+  })
+
+  it('路径穿越防护：../ 不逃逸 staticDir', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/../../etc/passwd')
+    // 绝不返回系统文件内容；命中 SPA fallback 或 404 均可接受
+    const body = await res.text()
+    expect(body).not.toContain('root:')
+    expect(res.headers.get('content-type') ?? '').not.toContain('text/plain')
+  })
+
+  it('业务路由优先于静态（同名路径 routes 赢）', async () => {
+    const routes = new Hono().get('/index.html', (c) => c.text('from-route'))
+    const { app } = createApp({ routes, staticDir: dir })
+    const res = await app.request('/index.html')
+    expect(await res.text()).toBe('from-route')
+  })
+})
+
+describe('runtime 探测透传', () => {
+  it('显式 runtime=qw-pages → runtime.target', () => {
+    const { runtime } = createApp({ runtime: 'qw-pages' })
+    expect(runtime.target).toBe('qw-pages')
+    expect(runtime.explicit).toBe(true)
+  })
+
+  it('auto → detectRuntime(process.env)', () => {
+    const { runtime } = createApp({ runtime: 'auto' })
+    expect(['standalone', 'qw-pages']).toContain(runtime.target)
+  })
+})
+
+describe('exportHandlers（qw-pages 三导出对冲）', () => {
+  it('default/fetch/app 三形态并存且可用', async () => {
+    const { exportHandlers } = await import('./runtime/qw-pages.js')
+    const routes = new Hono().get('/ping', (c) => c.text('pong'))
+    const { app } = createApp({ routes })
+    const handlers = exportHandlers(app)
+    expect(handlers.app).toBe(app)
+    expect(typeof handlers.default).toBe('function')
+    expect(typeof handlers.fetch).toBe('function')
+    const res = await handlers.fetch(new Request('http://x/ping'))
+    expect(await res.text()).toBe('pong')
+  })
+})
+
+describe('qw-pages adapter', () => {
+  it('start() 抛指引错误（不静默挂起）', async () => {
+    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
+    const adapter = createQwPagesAdapter()
+    await expect(adapter.start(new Hono(), {})).rejects.toThrow(/exportHandlers/)
+    expect(adapter.trustProxy()).toBe(true)
+  })
+
+  it('assetsDir 默认回溯 dist/client；HOMURA_ASSETS_DIR 覆盖', async () => {
+    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
+    const adapter = createQwPagesAdapter()
+    expect(adapter.assetsDir({})).toMatch(/client$/)
+    const custom = adapter.assetsDir({ HOMURA_ASSETS_DIR: '/tmp/xyz' })
+    expect(custom).toBe('/tmp/xyz')
+  })
+})
+
+describe('node adapter', () => {
+  it('trustProxy 由 TRUST_PROXY 控制；assetsDir 默认 dist/client', async () => {
+    const { createNodeAdapter } = await import('./runtime/node.js')
+    const adapter = createNodeAdapter()
+    expect(adapter.target).toBe('standalone')
+    const orig = process.env.TRUST_PROXY
+    delete process.env.TRUST_PROXY
+    expect(adapter.trustProxy()).toBe(false)
+    process.env.TRUST_PROXY = '1'
+    expect(adapter.trustProxy()).toBe(true)
+    if (orig === undefined) delete process.env.TRUST_PROXY
+    else process.env.TRUST_PROXY = orig
+    expect(adapter.assetsDir({})).toMatch(/dist\/client$/)
+  })
+})
