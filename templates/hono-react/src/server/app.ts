@@ -4,17 +4,21 @@
  * 纯函数式组装——从 AppConfig 读出「启用了哪些能力」，逐级注入 createApp：
  *   层级 0：纯 routes + 健康检查（永远可跑；路径按形态取，qw-pages 让开网关保留的 /healthz）
  *   层级 1：db（DIALECT，缺省按形态：standalone→sqlite / qw-pages→rest）→ todos repository
- *   层级 2：auth（OAUTH_DINGTALK_ORG_ID）→ 登录链（**仅 SQL 形态**，见下方说明）
+ *   层级 2：auth（OAUTH_DINGTALK_ORG_ID）→ 登录链（SQL 与 REST 形态均支持）
  *   层级 3：3p（DINGTALK_APP_KEY）→ 平台能力协商
  *   层级 4：storage（STORAGE_BACKEND）→ 上传/下载
- *   层级 5：license（GENUINE_SERVER）→ 激活守卫（**仅 SQL 形态**）
+ *   层级 5：license（GENUINE_SERVER）→ 激活守卫（SQL 与 REST 形态均支持）
  *
  * e2e 测试通过 overrides 注入桩实例（db/fetch），走真实装配路径。
  *
- * ⚠ REST 形态（qw-pages）的能力缺口：@homurajs/auth 的 session store 与 @homurajs/license
- * 的 state store 目前只有 drizzle 实现，REST 侧没有对应实现，故这两层在 dialect=rest 时
- * **不启用**并打 warn，而不是静默降级或运行时崩。补齐需要 createRestSessionStore /
- * createRestStateStore（表结构与 SQL 版一致，走 PostgREST upsert + delete-returning）。
+ * 形态差异全部收在 store/repo 的选择上：todos repository、auth 的 session store、
+ * license 的 state store 各有 SQL 与 REST 两套实现，接口语义严格对齐（REST 版的「原子抢占」
+ * 用 PATCH + 过滤 + return=representation 表达，等价于 UPDATE...WHERE...RETURNING）。
+ *
+ * ⚠ REST 形态的表必须预先存在（App 无 DDL 权限）：todos / refresh_tokens / license_state /
+ * homura_ttlkv 四张表 + anon 的 RLS policy，由部署期的平台受控迁移执行 drizzle/pg 的
+ * 迁移 SQL 创建。缺 policy 时 PostgREST 是静默失败（SELECT 返回 200 空数组，INSERT 返回 401）。
+ * ⚠ 对象存储在 qw-pages 上不可用（anon 与受控迁移角色都建不出桶），见 docs/specs/module-qw-pages.md。
  */
 import { Hono } from 'hono'
 import {
@@ -25,7 +29,6 @@ import {
   type LicenseInject,
 } from '@homurajs/app-kit'
 import { detectRuntime, healthzPathFor, type Logger, type RuntimeInfo } from '@homurajs/core'
-import type { Database } from '@homurajs/db'
 import type { FileStorage } from '@homurajs/storage'
 import { resolveDialect, type AppConfig } from './env.js'
 import { buildDb, migrate, type DbBundle } from './db.js'
@@ -89,17 +92,11 @@ export async function buildApp(
       ? buildTodoRepo(dbBundle.db, dbBundle.dialect)
       : buildRestTodoRepo(dbBundle.rest)
 
-  // ── 层级 2：auth（OAUTH_DINGTALK_ORG_ID 配置即启用；仅 SQL 形态）──
+  // ── 层级 2：auth（OAUTH_DINGTALK_ORG_ID 配置即启用；SQL 与 REST 形态均支持）──
   let auth: AuthInject | false = false
   const oauthOrgId = config.get('oauthOrgId')
-  if (oauthOrgId && dbBundle.kind === 'sql') {
-    auth = await buildAuth(config, dbBundle.db, oauthOrgId, fetchImpl, secureCookies)
-  } else if (oauthOrgId) {
-    logger?.warn('auth 未启用：dialect=rest 尚无 REST 版 session store', {
-      dialect,
-      missing: 'createRestSessionStore',
-      impact: '登录链不可用；补齐前 qw-pages 形态请只做匿名业务',
-    })
+  if (oauthOrgId) {
+    auth = await buildAuth(config, dbBundle, oauthOrgId, fetchImpl, secureCookies)
   }
 
   // ── 层级 3：3p 平台（DINGTALK_APP_KEY 配置即启用）──
@@ -123,20 +120,14 @@ export async function buildApp(
   // ── 层级 4：storage（STORAGE_BACKEND != none 即启用）──
   const storage = overrides.storage ?? (await buildStorage(config))
 
-  // ── 层级 5：license（GENUINE_SERVER 配置即启用；仅 SQL 形态）──
+  // ── 层级 5：license（GENUINE_SERVER 配置即启用；SQL 与 REST 形态均支持）──
   let license: LicenseInject | false = false
   let licenseClient: import('@homurajs/license').LicenseClient | undefined
   const genuineServer = config.get('genuineServer')
-  if (genuineServer && dbBundle.kind === 'sql') {
-    const built = await buildLicense(config, dbBundle.db, genuineServer, healthzPath, fetchImpl)
+  if (genuineServer) {
+    const built = await buildLicense(config, dbBundle, genuineServer, healthzPath, fetchImpl)
     license = built.inject
     licenseClient = built.client
-  } else if (genuineServer) {
-    logger?.warn('license 未启用：dialect=rest 尚无 REST 版 state store', {
-      dialect,
-      missing: 'createRestStateStore',
-      impact: '激活状态无法持久化，停服守卫不生效',
-    })
   }
 
   // ── 业务路由汇总 ──
@@ -198,15 +189,23 @@ export async function buildApp(
 
 async function buildAuth(
   config: AppConfig,
-  db: Database,
+  bundle: DbBundle,
   oauthOrgId: string,
   fetchImpl?: typeof fetch,
   secureCookies = false,
 ) {
-  const { OAuth2Client, SessionManager, createDrizzleSessionStore } = await import('@homurajs/auth')
+  const { OAuth2Client, SessionManager, createDrizzleSessionStore, createRestSessionStore } =
+    await import('@homurajs/auth')
   const { sessionMiddleware, createAuthRoutes } = await import('@homurajs/auth/hono')
   const { dingtalkOAuth } = await import('@homurajs/3p/dingtalk')
-  const { createMemoryTtlKv } = await import('@homurajs/core')
+
+  // OAuth state KV：REST 形态用 DB 版（内存 KV 在 Pages 上进程重启即清空，
+  // 登录会断在「跳转 → 回调」两条腿之间）；SQL 形态沿用内存版（ADR-010：单实例足够，
+  // 多实例可换 createDbTtlKv）。REST 版需要 homura_ttlkv 表（部署期受控迁移创建）。
+  const stateKv =
+    bundle.kind === 'rest'
+      ? (await import('@homurajs/db')).createRestTtlKv(bundle.rest)
+      : (await import('@homurajs/core')).createMemoryTtlKv()
 
   const preset = dingtalkOAuth({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
   const client = new OAuth2Client({
@@ -214,16 +213,16 @@ async function buildAuth(
     clientSecret: config.get('oauthClientSecret') ?? '',
     redirectUri: config.get('oauthRedirectUri') ?? '',
     scopes: ['openid'],
-    // ⚠ OAuth state 用内存 KV：qw-pages 上进程重启即失效（跨发布必换实例）。
-    // 多实例/重发布敏感场景应换 createDbTtlKv（SQL 形态）或 createRestTtlKv（REST 形态）。
-    stateKv: createMemoryTtlKv(),
+    stateKv,
     fetchImpl,
     ...preset,
   })
-  const sessions = new SessionManager(
-    { secret: config.get('sessionSecret') },
-    createDrizzleSessionStore(db),
-  )
+  // session store 按形态选实现：两套接口语义严格对齐（含 consume 的原子抢占与复用检出）
+  const store =
+    bundle.kind === 'sql'
+      ? createDrizzleSessionStore(bundle.db)
+      : createRestSessionStore(bundle.rest)
+  const sessions = new SessionManager({ secret: config.get('sessionSecret') }, store)
   return {
     sessions: sessions as unknown as AuthInject['sessions'],
     sessionMiddleware: sessionMiddleware(sessions, { secure: secureCookies }),
@@ -265,19 +264,23 @@ async function buildStorage(config: AppConfig): Promise<FileStorage | undefined>
 
 async function buildLicense(
   config: AppConfig,
-  db: Database,
+  bundle: DbBundle,
   server: string,
   healthzPath: string,
   fetchImpl?: typeof fetch,
 ) {
-  const { LicenseClient, createDrizzleStateStore } = await import('@homurajs/license')
+  const { LicenseClient, createDrizzleStateStore, createRestStateStore } =
+    await import('@homurajs/license')
   const { licenseGuard } = await import('@homurajs/license/hono')
+  // state store 按形态选实现；REST 版不建表（无 DDL 权限），license_state 须由受控迁移预建
+  const stateStore =
+    bundle.kind === 'sql' ? createDrizzleStateStore(bundle.db) : createRestStateStore(bundle.rest)
   const client = new LicenseClient({
     server,
     productId: config.get('genuineProductId') ?? 'template',
     appId: config.get('genuineAppId') ?? 'template-app',
     licenseKey: config.get('genuineLicenseKey'),
-    stateStore: createDrizzleStateStore(db),
+    stateStore,
     fetchImpl,
   })
   return {

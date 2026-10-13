@@ -3,14 +3,19 @@
  *
  * 双形态（99% 共用，差异仅 entry + 打包策略 + manifest）：
  *   standalone（默认）：entry=src/server/index.ts，外部化第三方依赖（node_modules 运行时解析）
- *   qw-pages（HOMURA_BUILD_TARGET=qw-pages）：entry=src/server/qw-pages.ts，自包含单文件 + manifest
+ *   qw-pages（HOMURA_BUILD_TARGET=qw-pages）：entry=src/server/qw-pages.ts，自包含产物目录 + manifest
  *
  * qw-pages 约定已于 2026-10-13 全部实测确认（docs/specs/module-qw-pages.md）。
  * 其中「是否执行 npm install」一项的结论修正了本文件原先的依据：
  *   平台**不装**依赖，但发布目录里现成的 node_modules 会被原样打包，且运行时能直接解析
  *   （实测 /opt/qwenwork-page/app/node_modules/... 被 import 成功）。
- * 所以「自包含单文件」不再是保命手段，而降级为体积/简单性的选择；这里继续保留全打包，
+ * 所以「全打包」不再是保命手段，而降级为体积/简单性的选择；这里继续保留，
  * 因为它同时规避了「node_modules 里混入符号链接」这类发布物约束问题。
+ *
+ * ⚠ 产物不是「单文件」：tsdown/rolldown 会代码分割，实测 30 个文件 / 2.1MB
+ *   （入口 server/index.mjs + 26 个 chunk）。自包含性仍然成立——真实 import 语句里的
+ *   裸包只剩 Node 内置。校验时别用宽松的 grep：drizzle 源码 JSDoc 里有
+ *   `* import { union } from 'drizzle-orm/pg-core'` 这类示例文本会误报。
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
