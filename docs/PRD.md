@@ -21,16 +21,16 @@
 
 ## 功能及其意义
 
-| 功能 | 解决什么 | 为什么需要 |
-|------|----------|------------|
-| @homurajs/core | 环境探测/配置/日志/TTL-KV | 一切包的公共基座，环境差异单点收口 |
-| @homurajs/db | 双 driver 双方言持久层 | 独立部署用 sqlite/pgsql，qw-pages 用 supabase 直连，App 零改动切换 |
-| @homurajs/storage | 图床/对象存储三后端 | 图床刚需 + 后端由部署形态决定 |
-| @homurajs/auth | 钉钉登录（OAuth2 客户端）+ session | 所有 App 都要对接登录；oauth2-dingtalk 已有服务端 |
-| @homurajs/3p | 平台消息/审批/通讯录封装 | 推送与流程是企业场景核心；平台可插拔 |
-| @homurajs/license | 激活心跳 + 远程停服 | 制作人对散布 App 的运行控制权 |
-| @homurajs/app-kit | createApp 渐进式装配 | AI 开发的统一组装范式 |
-| templates/hono-react | 起步模板（活文档） | 模板即 AI 的说明书 |
+| 功能                 | 解决什么                                        | 为什么需要                                                                                               |
+| -------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| @homurajs/core       | 环境探测/形态常量/配置/配置文件投递/日志/TTL-KV | 一切包的公共基座，环境差异单点收口                                                                       |
+| @homurajs/db         | 三方言持久层（sqlite / pg / PostgREST）         | 独立部署用 sqlite/pgsql，qw-pages 用 PostgREST（实测 PG 直连与 sqlite 在该形态均不可用），App 零改动切换 |
+| @homurajs/storage    | 图床/对象存储三后端                             | 图床刚需 + 后端由部署形态决定（⚠ qw-pages 上三后端当前均不可用，见 specs/module-qw-pages）               |
+| @homurajs/auth       | 钉钉登录（OAuth2 客户端）+ session              | 所有 App 都要对接登录；oauth2-dingtalk 已有服务端                                                        |
+| @homurajs/3p         | 平台消息/审批/通讯录封装                        | 推送与流程是企业场景核心；平台可插拔                                                                     |
+| @homurajs/license    | 激活心跳 + 远程停服                             | 制作人对散布 App 的运行控制权                                                                            |
+| @homurajs/app-kit    | createApp 渐进式装配                            | AI 开发的统一组装范式                                                                                    |
+| templates/hono-react | 起步模板（活文档）                              | 模板即 AI 的说明书                                                                                       |
 
 ## 功能之间的关系
 
