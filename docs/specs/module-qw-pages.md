@@ -121,10 +121,36 @@ RETURNING family_id, sid, sub, profile
 
 结论：REST 版与 drizzle 版的「先占后判」语义等价（教训 8 在 REST 侧同样成立），并发下不会重复发放会话。
 
+## 配置与密钥投递（已实现并实测）
+
+平台只注入固定 12 个 env 且无自定义注入口，故 `SESSION_SECRET` / `OAUTH_CLIENT_SECRET` 无法用环境变量投递。此前"烘进产物 = 把密钥发布到公网"的判断**已被实测推翻**：
+
+| 请求                                       | 结果                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------- |
+| `/homura.config.env`                       | 200，返回 SPA 的 index.html（14435B），canary 未出现             |
+| `/server/index.mjs`、`/server/<chunk>.mjs` | 同上                                                             |
+| `/config/homura.config.env`                | 同上                                                             |
+| `/.env`                                    | **403**（网关层拒绝，1020B 错误页）——平台对点文件另有防护        |
+| `/../server/index.mjs`                     | 200 SPA HTML（`safeResolve` 挡住穿越后落 fallback）              |
+| `/%2e%2e/server/index.mjs`                 | 400（网关拒绝）                                                  |
+| 对照组 `/assets/index-*.js`                | 200，225927B 真实 JS → 证明上述结果不是"什么都返回 HTML"的假阴性 |
+
+原因：App 只从 `client/` 提供静态文件，服务端产物不在静态根下；未知路径被 SPA fallback 兜成 index.html。故**随产物携带配置文件**的信任边界与代码本身相同。
+
+落地方式（core 新增 `env-file.ts`）：`homura.config.env`（KEY=VALUE 行格式，dotenv 语义子集，零依赖）在 `loadConfig()` 里先并入 env 再走 `defineConfig`，**真实 env 优先于文件**。定位顺序：`HOMURA_CONFIG_FILE` → `<cwd>/homura.config.env`（= 产物根）→ `QWENWORK_WRITABLE_DIR/homura.config.env`（平台可写区，可在不改产物的前提下投放/轮换）。选 env 行格式而非 yaml/json：配置面已经是 env 形状，能力包零改动，且不引解析器；需要 yaml 时是加法。
+
+`build.mjs` 把 `config/homura.config.env` 拷进 `dist/`；该路径已被 `.gitignore` 覆盖（源目录与产物两处）。
+
+**顺带修掉一个真实漏洞**：`SESSION_SECRET` 的缺省值 `dev-only-insecure-secret-change-me-32bytes!` 是**提交在仓库里的**，而 Pages 上又无法用 env 覆盖 → 任何启用 auth 的 Pages 部署都在用公开密钥签 HS256，任何人都能伪造 access/refresh token。现在 `loadConfig` 末尾调 `assertSecretsOverridden`：qw-pages 形态或 `NODE_ENV=production` 下若仍是缺省值，**启动即拒绝**并给出可行动信息（standalone 开发态放行，不挡本地开发）。
+
+实测验证（V10，真实产物 + canary 配置）：`/auth/login` → **302**，`Location: https://dingtalk.auth.xrl.im/canary_org_9f3a/authorize?client_id=canary-client-id&redirect_uri=…&state=…`。orgId 与 clientId 只可能来自配置文件 → 文件确实在启动期被读取；`SESSION_SECRET` 也通过了断言（否则进程启动即退出）。又因 `OAuth2Client.authorizeUrl` 在返回 URL 前 `await stateKv.set(...)`，这个 302 同时证明 **`createRestTtlKv` 的 upsert 已在部署态对真实 PostgREST 跑通**（`homura_ttlkv` 表 + policy 生效）。
+
 ## 仍未验证 / 已知缺口
 
-- [ ] **登录链在 Pages 上仍不可用，但阻塞点已不是 store**：`createRestSessionStore` 已实现，真正卡住的是**配置与密钥投递**——平台没有自定义 env 注入口，`OAUTH_CLIENT_SECRET` 无处安放，而烘进 bundle 等于把密钥发布到公网产物里。可行方案：部署期用受控迁移把配置写入一张 `homura_config` 表，启动时经 PostgREST 读取（anon key 只在服务端 env，不下发浏览器，故该表的 anon SELECT policy 不构成泄露）。**此方案未实现、未实测。**
-- [x] `consume` 依赖的 PostgREST 语义已实测（见上节）。残留风险仅剩：store 函数本身未在部署态执行过（受上一条阻塞），但它发出的请求形状与单测断言逐条一致、且这些形状已在线上验证。
+- [x] **配置与密钥投递**（见上节）：登录链的机制性阻塞已解除，`/auth/login` 在 Pages 上实测可用。
+- [x] `consume` 依赖的 PostgREST 原子抢占语义已实测（见上节）。
+- [ ] `createRestSessionStore` / `createRestStateStore` 的**函数体仍未在部署态执行过**：前者要等真实 IdP 走完 `/auth/callback`，后者要等 ../homura-genuine 上线。已验证的是它们依赖的 PostgREST 语义与请求形状（单测逐条断言）。
+- [ ] **平台产物存储自身的 ACL 未验证**：本文只证明了"经运行中的 App 读不到"。若平台另有产物下载入口，"随产物携带密钥"的前提就不成立——正式承载真实凭据前值得向平台确认一次。
 - [ ] 多实例是否真会扩容（只观测到单实例）。
 - [ ] `/storage/v1` 的 upload/download 全链路（因建不出桶而无法测）。
 - [ ] `Accept-Profile: public` 与 `Accept-Profile: tenant_<instance>_schema` 返回相同结果的原因未查（结论：Pages 上不需要设置该头，默认 schema 已含租户 schema）。

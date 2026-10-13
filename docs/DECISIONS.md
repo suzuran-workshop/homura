@@ -180,3 +180,20 @@
 - 为什么：只改 app-kit 会让停服时健康检查一起被 503，正好毁掉 ADR-011 的语义；三处各写一份必然漂移（教训 2）
 - 后果：`/healthz` 在 Pages 上不能用作应用健康判据（网关的 `ok` 与 App 无关）；健康检查改看 `/_healthz`
 - 何时重新审视：平台放开 `/healthz` 时
+
+## ADR-019：配置与密钥随产物携带（env 行格式文件）+ 启动期缺省密钥断言
+
+- 日期：2026-10-13
+- 状态：已采纳
+- 背景：Pages 只注入固定 12 个 env 且**无自定义注入口**，`SESSION_SECRET` / `OAUTH_CLIENT_SECRET` 无处投递。原先判断"烘进产物等于把密钥发到公网"，实测推翻：`/homura.config.env`、`/server/*.mjs`、`/config/*` 一律被 SPA fallback 兜成 index.html，`%2e%2e` 变体被网关 400，`/.env` 被网关 403；对照组 `/assets/*.js` 正常返回 225KB JS（排除假阴性）。产物不可读的原因是 App 只从 `client/` 提供静态文件
+- 考虑过的方案：① 随产物携带配置文件；② 部署期写入 `homura_config` 表、启动时经 PostgREST 读；③ 烘进 bundle 常量
+- 决策：选 ①，格式用 **env 行（KEY=VALUE）而非 yaml/json**。core 新增 `env-file.ts`（`parseEnvFile` / `resolveConfigFilePath` / `applyEnvFile`，零依赖），模板 `loadConfig()` 先并入文件再走 `defineConfig`。定位优先级 `HOMURA_CONFIG_FILE` → `<cwd>/homura.config.env` → `QWENWORK_WRITABLE_DIR/homura.config.env`；**真实 env 优先于文件**
+- 为什么是 env 行格式：配置面已经是 env 形状（`configSpecs` + `defineConfig`），并入 `process.env` 后能力包零改动、`secret:true` 的日志脱敏继续生效，且不引 YAML 解析器。要 yaml 时加一个 source 适配即可，属加法
+- 为什么不选 ②：`homura_config` 表的 anon SELECT policy 意味着**持有 anon key 即可读到密钥**，信任边界比"随产物携带"更宽；且启动多一次网络依赖、部署配方多一张表。可作为将来的"免重建轮换"叠加层，不作主通道
+- 配套安全修复：`SESSION_SECRET` 的缺省值是**提交在仓库里的公开字符串**，Pages 上又无法用 env 覆盖 → 启用 auth 的部署等于用公开密钥签 HS256，任何人可伪造会话。故 `loadConfig` 末尾 `assertSecretsOverridden`：qw-pages 或 `NODE_ENV=production` 下仍是缺省值则**启动即拒绝**（standalone 开发态放行）
+- 后果：
+  - `config/homura.config.env` 由 build 拷进 `dist/`，已加入 `.gitignore`（源与产物两处）；派生 App 的部署流程需要"填配置 → build → 发布"这一步
+  - 密钥轮换需重新发布，或把文件投放到 `QWENWORK_WRITABLE_DIR`（该目录跨发布清空，只适合临时覆盖）
+  - **残留风险**：只验证了"经运行中的 App 读不到"，平台产物存储自身的 ACL 未验证；正式承载真实凭据前应向平台确认有无产物下载入口
+- 实测：V10 部署带 canary 配置 → `/auth/login` 返回 302，`Location` 含只可能来自文件的 `canary_org_9f3a` 与 `canary-client-id`；且因 `authorizeUrl` 在返回前 `await stateKv.set()`，该 302 同时证明 `createRestTtlKv` 的 upsert 在部署态跑通。全站扫 canary 零命中
+- 何时重新审视：平台开放自定义 env/secret 注入时（届时文件通道降级为本地开发用途）
