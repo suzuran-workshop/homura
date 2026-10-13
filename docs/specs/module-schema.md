@@ -52,9 +52,10 @@ src/server/schema/
 - rc.4 产物格式：每迁移一个子目录 `<yyyyMMddHHmmss_name>/migration.sql`，语句以 `--> statement-breakpoint` 分隔（无 meta/_journal.json）
 - 运行（轨一/轨二）：`runMigrations(db, folder)` 按实例分发 migrator（幂等，drizzle 自动记录已应用）
 - **轨三：qw-pages 的平台受控迁移**。App 侧无 DDL 权限（PostgREST 只能读写数据），建表与 RLS policy 必须在部署期用 `qwenwork_pages_apply_migration` 执行 `drizzle/pg` 的 SQL（改成幂等：`CREATE TABLE IF NOT EXISTS` / `DROP POLICY IF EXISTS` + `CREATE POLICY`）。模板 `migrate()` 在 rest 形态改为**探活校验**（`rest.ping(table)`），失败时把 `RestError` 的 hint 一并抛出
-  - 需要建的四张表：`todos`（业务）、`refresh_tokens`（auth）、`license_state`（license）、`homura_ttlkv`（OAuth state 的 TTL-KV）
+  - 需要建的表 = 模板缺省四张（`todos` 业务、`refresh_tokens` auth、`license_state` license、`homura_ttlkv` OAuth state 的 TTL-KV）**加上派生 App 新增的每张业务表**。哪些表真的必需由模板 `app.ts` 的 `requiredTables` 决定（业务表来自 `schema/rest.ts` 的 `restBusinessTables`，能力表按 `OAUTH_DINGTALK_ORG_ID` / `GENUINE_SERVER` 是否配置追加）——新增业务表登记进 `restBusinessTables` 即自动纳入探活与健康检查
   - 每张表都要 `ENABLE ROW LEVEL SECURITY` + `FOR ALL TO anon USING (true) WITH CHECK (true)`，否则是静默失败（SELECT 返回 `200 []`、INSERT 返回 401+42501）
-  - `GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是语法错误（该位置不接受函数调用）；这四张表都没有 serial 序列，若有则要在 DO 块里 `EXECUTE format(...)` 逐条授权
+  - ⚠ 首次部署要按目录时间序应用 `drizzle/pg/` 下**全部**迁移，不是只应用最新那份（最新那份只含新增表，基础表在更早的目录里）
+  - `GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是语法错误（该位置不接受函数调用）；模板缺省那四张表都没有 serial 序列，若有则要在 DO 块里 `EXECUTE format(...)` 逐条授权
 - supabase 侧执行通道（自托管）：drizzle-kit migrate 直连（Supavisor session 模式）或 supabase CLI
 
 ## 验收标准

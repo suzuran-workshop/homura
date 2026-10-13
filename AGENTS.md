@@ -50,7 +50,7 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 
 图例：✅ 已验证可用 · 🟡 代码就绪但未端到端验证 · ⚪ 未测 · ⚠️ 有前置条件 · ❌ 平台限制导致不可用
 
-**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的；② 四张表（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）+ anon policy 要在部署期建；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
+**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
 
 ## 目录速查
 

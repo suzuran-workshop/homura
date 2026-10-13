@@ -33,7 +33,7 @@
 | @homurajs/3p         | Capability 分片（oauth/message/approval/contacts）+ supports 守卫协商 + dingtalk 实现（CorpTokenManager 缓存+single-flight、三组 v1.0 API、OAuth 预设）                                                                                                                                                    |
 | @homurajs/license    | genuine 契约（contract.ts 单一事实源）+ LicenseClient（register/心跳±抖动/宽限状态机）+ licenseGuard（503/警告头/fail-open）                                                                                                                                                                               |
 | @homurajs/app-kit    | createApp 固定中间件链装配（健康检查路径按形态取）+ RuntimeAdapter（两形态均为端口监听，差异只剩缺省值：standalone 3000/dist/client，qw-pages 8081+HOST/client）                                                                                                                                           |
-| templates/hono-react | 渐进式装配示范（env.ts 定义每能力独立 env 开关 + resolveDialect 按形态定数据方言 + app.ts buildApp 逐级注入）+ 双形态 build（standalone dist / qw-pages 自包含单文件 + manifest）                                                                                                                          |
+| templates/hono-react | 渐进式装配示范（env.ts 定义每能力独立 env 开关 + resolveDialect 按形态定数据方言 + app.ts buildApp 逐级注入）+ 双形态 build（standalone dist / qw-pages 自包含产物目录：tsdown 代码分割成多 chunk，约 30 文件，非单文件 + manifest）                                                                       |
 
 ## 模块关系
 
@@ -45,7 +45,7 @@
 - 刷新：sessionMiddleware 检出 access 过期 → refresh cookie → store.consume（一次性）→ rotate 签新；复用检出 → revokeFamily
 - 上传：App → storage.uploadFile(ns,...) → 后端落对象（key=ns/files/ts_name）→ 返回代理 URL `/files/<key>`；下载走 createFileProxyRoutes
 - 激活：App 启动 → license.register（instanceKey 持久化）→ startHeartbeat（server 下发间隔±10%）→ genuine 下发 suspended → guard 503
-- 部署：`pnpm build`（standalone：vite + tsdown index.ts）/ `pnpm build:qw-pages`（entry=qw-pages.ts 自包含单文件 + homura.manifest.json）
+- 部署：`pnpm build`（standalone：vite + tsdown index.ts）/ `pnpm build:qw-pages`（entry=qw-pages.ts，全打包成自包含**产物目录**：tsdown 会代码分割，实测约 30 文件 / 2.1MB，不是单文件；+ homura.manifest.json + 拷入 config/homura.config.env）
 
 ## 外部系统
 

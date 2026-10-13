@@ -85,9 +85,9 @@
 
 > 排查提示：用 `grep "from 'drizzle-orm/pg-core'"` 这类宽松模式检查自包含性会**误报**——drizzle 源码的 JSDoc 里有 `* import { union } from 'drizzle-orm/pg-core'` 这样的示例文本。必须只匹配行首的真实 `import`/`export` 语句。
 
-## 部署配方（REST 形态必需的四张表）
+## 部署配方（REST 形态必需的表）
 
-App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_migration` 建。SQL 直接取 `drizzle/pg` 的迁移产物并改成幂等（`IF NOT EXISTS`），另加 REST 版 TTL-KV 用的 `homura_ttlkv`：
+App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_migration`（需传 provision 返回的 `domain`）建。SQL 取 `drizzle/pg` 的迁移产物并改成幂等（`IF NOT EXISTS`），另加 REST 版 TTL-KV 用的 `homura_ttlkv`：
 
 | 表               | 用途                                                | 来源                                                |
 | ---------------- | --------------------------------------------------- | --------------------------------------------------- |
@@ -95,6 +95,10 @@ App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_m
 | `refresh_tokens` | session store（snake_case 列）                      | 同上（由 `@homurajs/auth/tables` spread 进 schema） |
 | `license_state`  | license state store                                 | 同上（由 `@homurajs/license/tables` spread）        |
 | `homura_ttlkv`   | OAuth state 的 TTL-KV（`key`/`value`/`expires_at`） | 无 drizzle schema，SQL 见 `createDbTtlKv` 的 DDL    |
+
+上表是**模板缺省**的四张，不是平台常量：派生 App 新增的每张业务表都要一并建（登记进 `schema/rest.ts` 的 `restBusinessTables` 后，模板的 `requiredTables` 会自动把它纳入部署期探活与 `/_healthz` 的 db 检查）。实际必需集由 `app.ts` 的 `requiredTables` 决定：业务表恒需，`refresh_tokens`+`homura_ttlkv` 仅在配了 `OAUTH_DINGTALK_ORG_ID` 时需要，`license_state` 仅在配了 `GENUINE_SERVER` 时需要。
+
+⚠ **首次部署要按目录时间序应用 `drizzle/pg/` 下全部迁移**，不是只应用最新那份——最新那份只含新增的表，基础表在更早的迁移目录里，漏了会启动探活失败。
 
 每张表都要 `ENABLE ROW LEVEL SECURITY` + 一条 `FOR ALL TO anon USING (true) WITH CHECK (true)` 的 policy，否则就是前述静默失败（SELECT 200 空数组 / INSERT 401+42501）。这四张表都没有 serial 序列，无需 sequence 授权；`GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是**语法错误**（该位置不接受函数调用），有 serial 表时要在 DO 块里用 `EXECUTE format(...)` 逐条授权。
 
