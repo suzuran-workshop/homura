@@ -28,28 +28,42 @@ describe('buildSupabaseDbConfig', () => {
   })
 
   it('缺 region 且缺 host 时抛错', () => {
-    expect(() =>
-      buildSupabaseDbConfig({ projectRef: 'r', password: 'p' }),
-    ).toThrow(/region.*host/)
+    expect(() => buildSupabaseDbConfig({ projectRef: 'r', password: 'p' })).toThrow(/region.*host/)
   })
 })
 
-describe('loadSupabaseEnv', () => {
-  it('完整 env → dbConfig + 平台 URL 缺省推导', () => {
-    const { dbConfig, platformUrl, anonKey } = loadSupabaseEnv({
+describe('loadSupabaseEnv — 仅 PG 直连（REST 侧 env 归 @homurajs/storage）', () => {
+  it('完整 env → dbConfig（Supavisor transaction 模式）', () => {
+    const { dbConfig } = loadSupabaseEnv({
       SUPABASE_PROJECT_REF: 'proj',
       SUPABASE_DB_PASSWORD: 'pw',
       SUPABASE_REGION: 'ap-northeast-1',
       SUPABASE_ANON_KEY: 'anon',
     })
     expect(dbConfig.url).toContain('postgres.proj:pw@aws-0-ap-northeast-1')
-    expect(platformUrl).toBe('https://proj.supabase.co')
-    expect(anonKey).toBe('anon')
+    expect(dbConfig.prepare).toBe(false)
   })
 
-  it('缺必需项抛错', () => {
+  it('不再返回 platformUrl/anonKey（避免与 storage 的 REST env 混淆）', () => {
+    const loaded = loadSupabaseEnv({
+      SUPABASE_PROJECT_REF: 'proj',
+      SUPABASE_DB_PASSWORD: 'pw',
+      SUPABASE_REGION: 'r',
+    }) as Record<string, unknown>
+    expect(Object.keys(loaded)).toEqual(['dbConfig'])
+  })
+
+  it('缺必需项抛错，并指路 PostgREST（qw-pages 场景）', () => {
     expect(() => loadSupabaseEnv({ SUPABASE_PROJECT_REF: 'x' })).toThrow(
       /SUPABASE_PROJECT_REF.*SUPABASE_DB_PASSWORD/,
     )
+    // 只有 qw-pages 实测注入的那三项 → 仍然抛，且错误信息指向 rest
+    expect(() =>
+      loadSupabaseEnv({
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_INSTANCE_ID: 'i',
+      }),
+    ).toThrow(/PostgREST/)
   })
 })

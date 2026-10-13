@@ -14,7 +14,12 @@ async function main(): Promise<void> {
   const adapter = createNodeAdapter()
   const staticDir = config.get('assetsDir') ?? adapter.assetsDir(process.env)
 
-  const built = await buildApp(config, { logger, staticDir })
+  const built = await buildApp(config, {
+    logger,
+    staticDir,
+    // standalone 默认直连（不 Secure）；置于自建网关后时设 TRUST_PROXY=1 即自动开启
+    secureCookies: adapter.trustProxy(),
+  })
   const port = config.get('port')
 
   // 优雅关闭
@@ -30,7 +35,7 @@ async function main(): Promise<void> {
 
   await adapter.start(built.app, { port, signal: ac.signal })
   await built.onStart?.()
-  logger.info('listening', { port, runtime: built.runtime.target })
+  logger.info('listening', { port, runtime: built.runtime.target, healthz: built.healthzPath })
 }
 
 void main().catch((err: Error) => {

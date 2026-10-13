@@ -6,6 +6,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import type { Context, MiddlewareHandler } from 'hono'
 import { Readable } from 'node:stream'
+import { HEALTHZ_PATH } from '@homurajs/core'
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -30,9 +31,16 @@ function mimeOf(file: string): string {
   return MIME[extname(file).toLowerCase()] ?? 'application/octet-stream'
 }
 
-/** 路径穿越防护：解析后必须仍在 root 内 */
+/** 路径穿越防护：解析后必须仍在 root 内；畸形百分号编码返回 null（404），不抛（避免 500） */
 function safeResolve(root: string, reqPath: string): string | null {
-  const decoded = decodeURIComponent(reqPath)
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(reqPath)
+  } catch {
+    // 形如 /bad%zz：decodeURIComponent 抛 URIError。交给 SPA fallback 判 404，
+    // 不要冒到 onError 变成 500（standalone 形态下网关不会先拦，会真的 500）。
+    return null
+  }
   // 去掉前导斜杠：resolve(root, '/abs') 会丢弃 root（绝对路径语义）
   const rel = decoded.replace(/^\/+/, '')
   const abs = resolve(root, normalize(rel))
@@ -66,14 +74,24 @@ export function createStaticMiddleware(root: string): MiddlewareHandler {
 
 /**
  * SPA fallback（notFound 处理器）：
- * - API/鉴权/文件路径 → 404 JSON
+ * - API/鉴权/文件/健康检查路径 → 404 JSON
  * - 其余 GET（页面请求）→ index.html（前端路由接管）
+ *
+ * 保留前缀含两形态的健康检查路径（core HEALTHZ_PATH 同源）：qw-pages 用 '/_healthz'，
+ * standalone 用 '/healthz'，两个都列入，避免路径改名后 fallback 把健康检查当页面请求。
  */
+const RESERVED_PREFIXES: readonly string[] = [
+  '/api',
+  '/auth',
+  '/files',
+  HEALTHZ_PATH.standalone,
+  HEALTHZ_PATH['qw-pages'],
+]
+
 export function createSpaFallback(root: string): (c: Context) => Response | Promise<Response> {
   return async (c) => {
     const path = new URL(c.req.url).pathname
-    const isApi =
-      path.startsWith('/api') || path.startsWith('/auth') || path.startsWith('/files') || path.startsWith('/healthz')
+    const isApi = RESERVED_PREFIXES.some((prefix) => path.startsWith(prefix))
     if (isApi || c.req.method !== 'GET') {
       return c.json({ error: 'not_found', path }, 404)
     }

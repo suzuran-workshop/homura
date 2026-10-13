@@ -2,12 +2,15 @@
  * 构建编排：vite build（前端）+ tsdown（后端 bundle）。
  *
  * 双形态（99% 共用，差异仅 entry + 打包策略 + manifest）：
- *   standalone（默认）：entry=src/server/index.ts，外部化依赖（node_modules 运行时解析）
- *   qw-pages（HOMURA_BUILD_TARGET=qw-pages）：entry=src/server/qw-pages.ts，
- *     自包含单文件（noExternal 全打进 bundle——不赌 qw-pages 侧 npm install），
- *     + 根部 homura.manifest.json（继承旧 app.json 的 SemVer 清单思想）
+ *   standalone（默认）：entry=src/server/index.ts，外部化第三方依赖（node_modules 运行时解析）
+ *   qw-pages（HOMURA_BUILD_TARGET=qw-pages）：entry=src/server/qw-pages.ts，自包含单文件 + manifest
  *
- * qw-pages 约定确认后，只需改此文件与 src/server/qw-pages.ts（见 docs/specs/module-qw-pages）。
+ * qw-pages 约定已于 2026-10-13 全部实测确认（docs/specs/module-qw-pages.md）。
+ * 其中「是否执行 npm install」一项的结论修正了本文件原先的依据：
+ *   平台**不装**依赖，但发布目录里现成的 node_modules 会被原样打包，且运行时能直接解析
+ *   （实测 /opt/qwenwork-page/app/node_modules/... 被 import 成功）。
+ * 所以「自包含单文件」不再是保命手段，而降级为体积/简单性的选择；这里继续保留全打包，
+ * 因为它同时规避了「node_modules 里混入符号链接」这类发布物约束问题。
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
@@ -63,6 +66,9 @@ const finalOut = resolve(dist, 'server', 'index.mjs')
 if (existsSync(rawOut)) renameSync(rawOut, finalOut)
 
 // ── ③ qw-pages：产物清单 homura.manifest.json ──
+// 注意：平台发布时的 entrypoint/port 由受控发布工具的参数决定，并不读这份 manifest
+// （推断依据：发布参数里已有 entrypoint/port，且平台对 HTML 只做 chrome 注入）。
+// 保留它是作为产物自描述 + 继承旧 app.json 的 SemVer 清单思想，供人/Agent 查阅。
 if (isQwPages) {
   const manifest = {
     name: pkg.name,
@@ -71,6 +77,15 @@ if (isQwPages) {
     entrypoint: 'server/index.mjs',
     assets: 'client/',
     apiVersion: 'v1',
+    // 实测运行时常量，便于排查（Node v22.23.1 / cwd=/opt/qwenwork-page/app / 注入 12 个 env）
+    measured: {
+      nodeVersion: '22.23.1',
+      appRoot: '/opt/qwenwork-page/app',
+      port: 8081,
+      host: '127.0.0.1',
+      healthzPath: '/_healthz',
+      dataDialect: 'rest',
+    },
   }
   writeFileSync(resolve(dist, 'homura.manifest.json'), JSON.stringify(manifest, null, 2))
   console.log('[build] manifest → dist/homura.manifest.json')

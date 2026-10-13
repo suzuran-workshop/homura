@@ -32,10 +32,16 @@ function stubIdpFetch() {
   return vi.fn(async (url: string | URL | Request) => {
     const u = String(url)
     if (u.includes('/token')) {
-      return new Response(JSON.stringify({ access_token: 'at-1', token_type: 'bearer', expires_in: 3600 }), { status: 200 })
+      return new Response(
+        JSON.stringify({ access_token: 'at-1', token_type: 'bearer', expires_in: 3600 }),
+        { status: 200 },
+      )
     }
     if (u.includes('/userinfo')) {
-      return new Response(JSON.stringify({ sub: 'user-1', name: '张三', picture: 'http://a/p.png' }), { status: 200 })
+      return new Response(
+        JSON.stringify({ sub: 'user-1', name: '张三', picture: 'http://a/p.png' }),
+        { status: 200 },
+      )
     }
     return new Response('', { status: 404 })
   }) as unknown as typeof fetch
@@ -83,7 +89,7 @@ describe('模板 e2e — 渐进式全链路', () => {
       STORAGE_LOCAL_DIR: storageDir,
     })
     built = await buildApp(config, {
-      db: { db, dialect: 'sqlite' },
+      db: { kind: 'sql', db, dialect: 'sqlite' },
       skipMigrate: true, // 已手动迁移
       fetchImpl: stubIdpFetch(),
     })
@@ -105,7 +111,9 @@ describe('模板 e2e — 渐进式全链路', () => {
       body: JSON.stringify({ title: '买牛奶' }),
     })
     expect(created.status).toBe(201)
-    const { todo } = (await created.json()) as { todo: { id: string; title: string; done: boolean } }
+    const { todo } = (await created.json()) as {
+      todo: { id: string; title: string; done: boolean }
+    }
     expect(todo.title).toBe('买牛奶')
     expect(todo.done).toBe(false)
 
@@ -172,7 +180,9 @@ describe('模板 e2e — 渐进式全链路', () => {
       body: JSON.stringify({ title: '登录用户的待办' }),
     })
     const mine = await built.app.request('/api/todos', { headers: { cookie: jar.header() } })
-    const { todos } = (await mine.json()) as { todos: Array<{ title: string; ownerSub: string | null }> }
+    const { todos } = (await mine.json()) as {
+      todos: Array<{ title: string; ownerSub: string | null }>
+    }
     expect(todos.every((t) => t.ownerSub === 'user-1')).toBe(true)
     expect(todos.some((t) => t.title === '登录用户的待办')).toBe(true)
   })
@@ -185,7 +195,10 @@ describe('模板 e2e — 渐进式全链路', () => {
     jar.absorb(cb)
     const oldRt = jar.get('homura_rt')!
 
-    const res = await built.app.request('/auth/refresh', { method: 'POST', headers: { cookie: jar.header() } })
+    const res = await built.app.request('/auth/refresh', {
+      method: 'POST',
+      headers: { cookie: jar.header() },
+    })
     expect(res.status).toBe(200)
     jar.absorb(res)
     expect(jar.get('homura_rt')).not.toBe(oldRt)
@@ -253,7 +266,7 @@ describe('模板 e2e — license 停服守卫', () => {
       GENUINE_APP_ID: 'a',
     })
     const built = await buildApp(config, {
-      db: { db, dialect: 'sqlite' },
+      db: { kind: 'sql', db, dialect: 'sqlite' },
       skipMigrate: true,
       fetchImpl: fakeGenuine,
     })
@@ -297,7 +310,7 @@ describe('模板 e2e — license 停服守卫', () => {
       GENUINE_APP_ID: 'a',
     })
     const built = await buildApp(config, {
-      db: { db, dialect: 'sqlite' },
+      db: { kind: 'sql', db, dialect: 'sqlite' },
       skipMigrate: true,
       fetchImpl: fakeGenuine,
     })

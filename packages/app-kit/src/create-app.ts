@@ -6,7 +6,13 @@
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import { randomUUID } from 'node:crypto'
-import { detectRuntime, type Logger, type RuntimeInfo, type RuntimeTarget } from '@homurajs/core'
+import {
+  detectRuntime,
+  healthzPathFor,
+  type Logger,
+  type RuntimeInfo,
+  type RuntimeTarget,
+} from '@homurajs/core'
 import { createSpaFallback, createStaticMiddleware } from './static.js'
 
 /** 能力实例的结构化契约（鸭子类型，避免包依赖；运行时由 App 传入） */
@@ -65,7 +71,12 @@ export interface CreateAppOptions {
   /** 注入 db/storage 汇总进 deps（供 routes 回调用） */
   db?: Record<string, unknown>
   storage?: StorageLike
-  healthz?: { checks?: HealthCheck[] }
+  /**
+   * 健康检查：路径缺省按形态取 core healthzPathFor(target)——
+   * qw-pages 上 '/healthz' 被 Page Gateway 保留（网关自答，请求不下发到 App），故用 '/_healthz'。
+   * 显式传 path 时，license guard 的豁免清单必须用同一个值（见 license createDefaultBypass）。
+   */
+  healthz?: { path?: string; checks?: HealthCheck[] }
   /** 静态资源目录（adapter.assetsDir() 算出）；提供则挂 static + SPA fallback */
   staticDir?: string
   logger?: Logger
@@ -75,17 +86,23 @@ export interface CreateAppOptions {
 export interface HomuraApp {
   app: Hono
   runtime: RuntimeInfo
+  /** 实际注册的健康检查路径（供 license guard 豁免清单等同源消费） */
+  healthzPath: string
 }
 
 /**
  * 固定中间件链（模板文档逐环解释）：
- * basePath → requestId+访问日志 → /healthz（注册于 guard 前，天然豁免）→ licenseGuard
+ * basePath → requestId+访问日志 → healthz（注册于 guard 前，天然豁免；路径按形态取）→ licenseGuard
  * → sessionMiddleware → authRoutes → App routes → 静态资源 → SPA fallback → onError
  */
 export function createApp(options: CreateAppOptions = {}): HomuraApp {
   const runtime =
     options.runtime && options.runtime !== 'auto'
-      ? { target: options.runtime, explicit: true, reasons: [`createApp runtime=${options.runtime}`] }
+      ? {
+          target: options.runtime,
+          explicit: true,
+          reasons: [`createApp runtime=${options.runtime}`],
+        }
       : detectRuntime(process.env)
 
   const basePath = options.basePath && options.basePath !== '/' ? options.basePath : undefined
@@ -115,8 +132,10 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
   })
 
   // ② healthz（注册于 licenseGuard 之前 → 天然豁免守卫）
+  //    路径按形态取：qw-pages 让开被网关保留的 '/healthz'（实测网关自答 ok，App 路由不可达）
+  const healthzPath = options.healthz?.path ?? healthzPathFor(runtime.target)
   const checks = options.healthz?.checks ?? []
-  app.get('/healthz', async (c) => {
+  app.get(healthzPath, async (c) => {
     if (checks.length === 0) return c.json({ status: 'ok', runtime: runtime.target })
     const results: Record<string, 'ok' | 'fail'> = {}
     let allOk = true
@@ -130,7 +149,10 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
         allOk = false
       }
     }
-    return c.json({ status: allOk ? 'ok' : 'degraded', runtime: runtime.target, checks: results }, allOk ? 200 : 503)
+    return c.json(
+      { status: allOk ? 'ok' : 'degraded', runtime: runtime.target, checks: results },
+      allOk ? 200 : 503,
+    )
   })
 
   // ③ licenseGuard（注入即启用）
@@ -144,7 +166,8 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
 
   // ⑥ App 业务路由
   if (options.routes) {
-    const businessRoutes = typeof options.routes === 'function' ? options.routes(deps) : options.routes
+    const businessRoutes =
+      typeof options.routes === 'function' ? options.routes(deps) : options.routes
     app.route('/', businessRoutes)
   }
 
@@ -158,12 +181,16 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
 
   // ⑧ onError
   app.onError((err, c) => {
-    options.logger?.error('unhandled', { err: err.message, path: c.req.path, requestId: c.get('requestId') })
+    options.logger?.error('unhandled', {
+      err: err.message,
+      path: c.req.path,
+      requestId: c.get('requestId'),
+    })
     if (options.onError) return Promise.resolve(options.onError(err, { path: c.req.path }))
     return c.json({ error: 'internal_error', message: err.message }, 500)
   })
 
-  return { app, runtime }
+  return { app, runtime, healthzPath }
 }
 
 declare module 'hono' {

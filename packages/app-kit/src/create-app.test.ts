@@ -107,13 +107,23 @@ describe('createApp — healthz 与 licenseGuard 顺序', () => {
     })
     const res = await bad.app.request('/healthz')
     expect(res.status).toBe(503)
-    await expect(res.json()).resolves.toMatchObject({ status: 'degraded', checks: { a: 'ok', b: 'fail' } })
+    await expect(res.json()).resolves.toMatchObject({
+      status: 'degraded',
+      checks: { a: 'ok', b: 'fail' },
+    })
   })
 
   it('healthz check 抛错 → fail（不炸健康检查）', async () => {
     const { app } = createApp({
       healthz: {
-        checks: [{ name: 'x', check: () => { throw new Error('down') } }],
+        checks: [
+          {
+            name: 'x',
+            check: () => {
+              throw new Error('down')
+            },
+          },
+        ],
       },
     })
     const res = await app.request('/healthz')
@@ -234,34 +244,66 @@ describe('runtime 探测透传', () => {
   })
 })
 
-describe('exportHandlers（qw-pages 三导出对冲）', () => {
-  it('default/fetch/app 三形态并存且可用', async () => {
-    const { exportHandlers } = await import('./runtime/qw-pages.js')
-    const routes = new Hono().get('/ping', (c) => c.text('pong'))
-    const { app } = createApp({ routes })
-    const handlers = exportHandlers(app)
-    expect(handlers.app).toBe(app)
-    expect(typeof handlers.default).toBe('function')
-    expect(typeof handlers.fetch).toBe('function')
-    const res = await handlers.fetch(new Request('http://x/ping'))
-    expect(await res.text()).toBe('pong')
+describe('qw-pages 形态（2026-10-13 线上实测校准）', () => {
+  it('不再导出 exportHandlers：平台从不调用导出函数（探针 handler 命中 0 次）', async () => {
+    const mod = await import('./runtime/qw-pages.js')
+    expect('exportHandlers' in mod).toBe(false)
+  })
+
+  it('start() 真的监听端口（与 standalone 共用实现），不再抛「不监听端口」', async () => {
+    const { QW_PAGES_DEFAULT_PORT, createQwPagesAdapter } = await import('./runtime/qw-pages.js')
+    const adapter = createQwPagesAdapter()
+    expect(QW_PAGES_DEFAULT_PORT).toBe(8081)
+    expect(adapter.trustProxy()).toBe(true)
+    const { app } = createApp({ routes: new Hono().get('/ping', (c) => c.text('pong')) })
+    const ac = new AbortController()
+    await expect(adapter.start(app, { port: 0, signal: ac.signal })).resolves.toBeUndefined()
+    ac.abort()
+  })
+
+  it('assetsDir 默认 client（发布根即产物根），不再落到 node_modules 内', async () => {
+    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
+    const adapter = createQwPagesAdapter()
+    expect(adapter.assetsDir({})).toBe(join(process.cwd(), 'client'))
+    expect(adapter.assetsDir({})).not.toContain('node_modules')
+    expect(adapter.assetsDir({ HOMURA_ASSETS_DIR: '/tmp/xyz' })).toBe('/tmp/xyz')
   })
 })
 
-describe('qw-pages adapter', () => {
-  it('start() 抛指引错误（不静默挂起）', async () => {
-    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
-    const adapter = createQwPagesAdapter()
-    await expect(adapter.start(new Hono(), {})).rejects.toThrow(/exportHandlers/)
-    expect(adapter.trustProxy()).toBe(true)
+describe('healthz 路径按形态取（qw-pages 让开被网关保留的 /healthz）', () => {
+  it('standalone → /healthz', async () => {
+    const { app, healthzPath } = createApp({ runtime: 'standalone' })
+    expect(healthzPath).toBe('/healthz')
+    expect((await app.request('/healthz')).status).toBe(200)
   })
 
-  it('assetsDir 默认回溯 dist/client；HOMURA_ASSETS_DIR 覆盖', async () => {
-    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
-    const adapter = createQwPagesAdapter()
-    expect(adapter.assetsDir({})).toMatch(/client$/)
-    const custom = adapter.assetsDir({ HOMURA_ASSETS_DIR: '/tmp/xyz' })
-    expect(custom).toBe('/tmp/xyz')
+  it('qw-pages → /_healthz，且 App 不再注册 /healthz', async () => {
+    const { app, healthzPath } = createApp({ runtime: 'qw-pages' })
+    expect(healthzPath).toBe('/_healthz')
+    const res = await app.request('/_healthz')
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ status: 'ok', runtime: 'qw-pages' })
+    expect((await app.request('/healthz')).status).toBe(404)
+  })
+
+  it('显式 healthz.path 覆盖形态缺省', async () => {
+    const { app, healthzPath } = createApp({ runtime: 'qw-pages', healthz: { path: '/ready' } })
+    expect(healthzPath).toBe('/ready')
+    expect((await app.request('/ready')).status).toBe(200)
+  })
+
+  it('healthzPath 与 license guard 豁免清单同源（core healthzPathFor）', async () => {
+    const { healthzPathFor } = await import('@homurajs/core')
+    expect(createApp({ runtime: 'qw-pages' }).healthzPath).toBe(healthzPathFor('qw-pages'))
+    expect(createApp({ runtime: 'standalone' }).healthzPath).toBe(healthzPathFor('standalone'))
+  })
+
+  it('畸形百分号编码路径不再 500（decodeURIComponent 抛错被吞 → 交 fallback）', async () => {
+    const badDir = mkdtempSync(join(tmpdir(), 'homura-bad-'))
+    writeFileSync(join(badDir, 'index.html'), '<html></html>')
+    const { app } = createApp({ staticDir: badDir })
+    expect((await app.request('/bad%zz')).status).not.toBe(500)
+    rmSync(badDir, { recursive: true, force: true })
   })
 })
 

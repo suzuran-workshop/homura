@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createSupabaseStorage } from './supabase.js'
+import { createSupabaseStorage, loadSupabaseStorageEnv } from './supabase.js'
 
 function stubFetch() {
   const calls: Array<{ url: string; init: RequestInit }> = []
@@ -57,18 +57,20 @@ describe('createSupabaseStorage（REST 契约快照）', () => {
 
   it('list：POST object/list，prefix 限 ns', async () => {
     const { calls, fetchImpl } = stubFetch()
-    fetchImpl.mockImplementationOnce(
-      async (url: string | URL | Request, init?: RequestInit) => {
-        calls.push({ url: String(url), init: init ?? {} })
-        return new Response(
-          JSON.stringify([
-            { name: 'a.png', id: '1', metadata: { size: 5, mimetype: 'image/png', lastModified: '2026-01-01T00:00:00Z' } },
-            { name: 'dir', id: null },
-          ]),
-          { status: 200 },
-        )
-      },
-    )
+    fetchImpl.mockImplementationOnce(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} })
+      return new Response(
+        JSON.stringify([
+          {
+            name: 'a.png',
+            id: '1',
+            metadata: { size: 5, mimetype: 'image/png', lastModified: '2026-01-01T00:00:00Z' },
+          },
+          { name: 'dir', id: null },
+        ]),
+        { status: 200 },
+      )
+    })
     const s = createSupabaseStorage({
       platformUrl: 'https://p.co',
       apiKey: 'k',
@@ -77,8 +79,40 @@ describe('createSupabaseStorage（REST 契约快照）', () => {
     })
     const files = await s.listFiles('ns', 'files/', 10)
     expect(calls[0]!.url).toBe('https://p.co/storage/v1/object/list/b')
-    expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ prefix: 'ns/files/', limit: 10 })
+    expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({
+      prefix: 'ns/files/',
+      limit: 10,
+    })
     expect(files).toHaveLength(1) // 目录条目（id null）被过滤
     expect(files[0]).toMatchObject({ objectKey: 'ns/files/a.png', size: 5 })
+  })
+})
+
+describe('loadSupabaseStorageEnv — 只需 URL + anon key（不牵连 PG 凭据）', () => {
+  it('qw-pages 实测注入集即可解析（无 PROJECT_REF / DB_PASSWORD）', () => {
+    const env = loadSupabaseStorageEnv({
+      SUPABASE_URL: 'https://supabase.example/',
+      SUPABASE_ANON_KEY: 'anon-key',
+      SUPABASE_INSTANCE_ID: 'inst-1',
+    })
+    expect(env).toEqual({ platformUrl: 'https://supabase.example', apiKey: 'anon-key' })
+  })
+
+  it('兼容旧变量名 SUPABASE_PLATFORM_URL', () => {
+    expect(
+      loadSupabaseStorageEnv({ SUPABASE_PLATFORM_URL: 'https://p.co', SUPABASE_ANON_KEY: 'k' })
+        .platformUrl,
+    ).toBe('https://p.co')
+  })
+
+  it('缺项时报错点名缺失变量，且不误导用户去设 PG 凭据', () => {
+    expect(() => loadSupabaseStorageEnv({})).toThrow(/SUPABASE_URL/)
+    expect(() => loadSupabaseStorageEnv({ SUPABASE_URL: 'https://p.co' })).toThrow(
+      /SUPABASE_ANON_KEY/,
+    )
+    // 只有 PG 直连凭据时依然失败——storage 不复用那条路
+    expect(() =>
+      loadSupabaseStorageEnv({ SUPABASE_PROJECT_REF: 'r', SUPABASE_DB_PASSWORD: 'p' }),
+    ).toThrow(/SUPABASE_URL/)
   })
 })
