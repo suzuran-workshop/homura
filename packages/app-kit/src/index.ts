@@ -13,4 +13,4 @@ export type {
 } from './create-app.js'
 export type { RuntimeAdapter } from './runtime/adapter.js'
 export { createStaticMiddleware, createSpaFallback } from './static.js'
-export { detectRuntime } from '@homura/core'
+export { detectRuntime } from '@homurajs/core'

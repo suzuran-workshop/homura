@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Hono } from 'hono'
-import { createSqliteDb } from '@homura/db'
+import { createSqliteDb } from '@homurajs/db'
 import { createDrizzleStateStore } from './state-store.js'
 
 describe('createDrizzleStateStore（sqlite）', () => {

@@ -1,5 +1,5 @@
-import { randomToken } from '@homura/core'
-import type { TtlKv } from '@homura/core'
+import { randomToken } from '@homurajs/core'
+import type { TtlKv } from '@homurajs/core'
 import type { AuthUser, OAuth2Endpoints, TokenResponse } from '../types.js'
 
 export interface OAuth2ClientConfig {
@@ -8,7 +8,7 @@ export interface OAuth2ClientConfig {
   redirectUri: string
   scopes?: string[]
   endpoints: OAuth2Endpoints
-  /** 上游原始 userinfo → 规范身份（预设来自 @homura/3p/*） */
+  /** 上游原始 userinfo → 规范身份（预设来自 @homurajs/3p/*） */
   mapUser: (raw: unknown) => AuthUser
   /** state 存储（core 的内存或 db 实现），TTL 5min 一次性消费 */
   stateKv: TtlKv

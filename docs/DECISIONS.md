@@ -17,7 +17,7 @@
 - 考虑过的方案：drizzle stable + 自写 30 行 proxy 适配 / 无 ORM 自研薄适配层 / drizzle 1.0-rc
 - 决策：drizzle-orm@1.0.0-rc.4 + drizzle-kit@1.0.0-rc.4 精确锁（根 pnpm.overrides 强制统一）；postgres-js 罩 pgsql+supabase，node-sqlite 罩单机
 - 为什么选这个：官方 migrator 全套（已验证 rc.4 含 node-sqlite/migrator）；自研适配层维护成本长期更高
-- 后果：rc 期间 API 动荡风险 → 升级只走独立 PR，必跑 parity + 迁移往返测试；drizzle import 收敛 @homura/db 缩小波及面
+- 后果：rc 期间 API 动荡风险 → 升级只走独立 PR，必跑 parity + 迁移往返测试；drizzle import 收敛 @homurajs/db 缩小波及面
 - 何时重新审视：drizzle 1.0 正式发布时
 
 ## ADR-003：双方言双文件 + 配方 + parity 测试，而非运行时包装器
@@ -25,7 +25,7 @@
 - 状态：已采纳
 - 背景：drizzle pg-core/sqlite-core 必须分别声明 schema
 - 考虑过的方案：运行时包装器统一 API / colocated 双文件
-- 决策：App 写 colocated `schema/pg.ts` + `schema/sqlite.ts`；@homura/db 提供 pgCol/sqliteCol 列配方与 pgJson/sqliteJson 压重复；assertSchemaParity 测试硬门禁（表名/列名/主键，含列级 primary 标记）
+- 决策：App 写 colocated `schema/pg.ts` + `schema/sqlite.ts`；@homurajs/db 提供 pgCol/sqliteCol 列配方与 pgJson/sqliteJson 压重复；assertSchemaParity 测试硬门禁（表名/列名/主键，含列级 primary 标记）
 - 为什么不选包装器：与 drizzle 泛型系统打架，类型推导损失大
 - 后果：特性限双方言共有子集；差异映射文档化（specs/module-schema）
 - 何时重新审视：drizzle 1.0 若提供单 schema 双方言生成
@@ -46,7 +46,7 @@
 - 后果：sqlite-only App 零 postgres 依赖；不用钉钉的 App 零钉钉代码进 bundle
 - 何时重新审视：无需（结构性原则）
 
-## ADR-006：@homura/3p 第三方平台能力分片抽象
+## ADR-006：@homurajs/3p 第三方平台能力分片抽象
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：钉钉只是平台之一（未来企微/飞书）；平台只实现部分能力

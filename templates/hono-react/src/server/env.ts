@@ -3,7 +3,7 @@
  * 渐进式：每能力一组独立 env，缺省则不启用该能力。
  * .env.example 由 `node scripts/gen-env-example.mjs` 生成（见 package.json gen:env）。
  */
-import { defineConfig, parses } from '@homura/core'
+import { defineConfig, parses } from '@homurajs/core'
 
 export const configSpecs = {
   // ── 基础 ──

@@ -1,5 +1,5 @@
 /**
- * @homura/3p/dingtalk：钉钉平台实现。
+ * @homurajs/3p/dingtalk：钉钉平台实现。
  * 能力按配置动态声明：oauth 仅在 oauthOrgId（oauth2-dingtalk 组织标识）配置时声明；
  * message/approval/contacts 在 appKey/appSecret 配置时声明。
  * （webhook 回调为未来 capability，本轮不做——见 docs/specs/module-3p 占位章节）

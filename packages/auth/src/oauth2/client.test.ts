@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTtlKv } from '@homura/core'
+import { createMemoryTtlKv } from '@homurajs/core'
 import { OAuth2Client } from './client.js'
 import type { OAuth2ClientConfig } from './client.js'
 import type { AuthUser } from '../types.js'

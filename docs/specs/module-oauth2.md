@@ -1,4 +1,4 @@
-# Spec — OAuth2 客户端（@homura/auth + @homura/3p 预设）
+# Spec — OAuth2 客户端（@homurajs/auth + @homurajs/3p 预设）
 
 ## 要构建什么
 - 目标：通用标准 OAuth2 Authorization Code Flow 客户端；钉钉登录经 ../oauth2-dingtalk

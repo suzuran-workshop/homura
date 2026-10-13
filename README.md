@@ -38,7 +38,7 @@ cd templates/hono-react && pnpm dev   # 模板开发（轮二完善）
 - 已知限制：
   - drizzle-orm 1.0.0-rc.4 精确锁版（node:sqlite driver 仅 1.0 线存在），升级需独立 PR 过 parity 测试
   - qw-pages 真实平台约定未知（Node 版本/入口形态/静态服务方/装依赖/实例数），已用 RuntimeAdapter + 三导出 + 自包含 bundle + manifest 四重对冲，待确认清单见 docs/specs/module-qw-pages.md
-  - 钉钉 webhook 回调本轮不做（未来为 @homura/3p 的 webhook capability）
+  - 钉钉 webhook 回调本轮不做（未来为 @homurajs/3p 的 webhook capability）
   - pg 侧迁移往返、s3 真实 minio 集成测试待 CI services 覆盖（本地 sqlite + 桩已验证）
   - 中央授权服务 ../homura-genuine 未建，license 契约先行（contract.ts 为需求输入）
 

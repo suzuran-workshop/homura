@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createSqliteDb } from '@homura/db'
+import { createSqliteDb } from '@homurajs/db'
 import { SessionManager } from './manager.js'
 import { createDrizzleSessionStore } from './store.js'
 import type { AuthUser } from '../types.js'

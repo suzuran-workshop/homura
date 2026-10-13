@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { isSqlite } from '@homura/db'
+import { isSqlite } from '@homurajs/db'
 
 // 表定义已抽到 ./tables.ts（./tables 子路径），此处 re-export 保持向后兼容
 export { pgLicenseTables, sqliteLicenseTables } from './tables.js'

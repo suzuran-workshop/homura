@@ -1,10 +1,10 @@
-# @homura/3p
+# @homurajs/3p
 
 第三方平台能力分片抽象：capability 声明 + `supports()` 守卫运行时协商。平台只实现部分能力，App 零 if-else 协商。
 
 ```ts
-import { supports } from '@homura/3p'
-import { createDingtalkPlatform } from '@homura/3p/dingtalk'
+import { supports } from '@homurajs/3p'
+import { createDingtalkPlatform } from '@homurajs/3p/dingtalk'
 
 const platform = createDingtalkPlatform({
   appKey: '...', appSecret: '...', agentId: '...',
@@ -27,7 +27,7 @@ if (supports(platform, 'approval')) {
   })
 }
 
-// OAuth 预设喂给 @homura/auth（鸭子类型，零 import 依赖）
+// OAuth 预设喂给 @homurajs/auth（鸭子类型，零 import 依赖）
 const preset = supports(platform, 'oauth') ? platform.oauth() : null
 ```
 

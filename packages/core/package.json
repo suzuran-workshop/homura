@@ -1,14 +1,33 @@
 {
-  "name": "@homura/core",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@homurajs/core",
+  "version": "26.10.13",
   "type": "module",
   "description": "homura 基座：运行环境探测、配置装载、日志、TTL-KV",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.1"
   }
 }

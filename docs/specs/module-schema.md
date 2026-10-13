@@ -26,12 +26,12 @@
 ## App schema 写法（colocated 双文件）
 ```
 src/server/schema/
-├── pg.ts      # import { pgTable, pgCol, pgJson } from '@homura/db/schema-helpers'
-├── sqlite.ts  # import { sqliteTable, sqliteCol, sqliteJson } from '@homura/db/schema-helpers'
+├── pg.ts      # import { pgTable, pgCol, pgJson } from '@homurajs/db/schema-helpers'
+├── sqlite.ts  # import { sqliteTable, sqliteCol, sqliteJson } from '@homurajs/db/schema-helpers'
 └── parity.test.ts  # assertSchemaParity(pgSchema, sqliteSchema) 硬门禁
 ```
 第三方包的表从子路径 spread 进两侧 schema 参与迁移：
-`@homura/auth/tables`（refresh_tokens）、`@homura/license/tables`（license_state）。
+`@homurajs/auth/tables`（refresh_tokens）、`@homurajs/license/tables`（license_state）。
 
 ## 迁移双轨
 - 生成：`drizzle-kit generate --config=drizzle.pg.config.ts`（PG 方言，supabase/pgsql 共用 → drizzle/pg/）与 `drizzle.sqlite.config.ts`（→ drizzle/sqlite/）

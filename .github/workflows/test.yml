@@ -1,4 +1,4 @@
-name: CI
+name: Test
 
 on:
   push:
@@ -25,7 +25,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       minio:
-        image: bitnami/minio:latest
+        # MinIO 社区版官方容器分发渠道已全线关闭（Docker Hub 撤库 / quay 转私），
+        # 暂用 Bitnami 归档镜像（2025.7.23 版，只读不再更新）；
+        # 长期方案：docker-minio.yml 从源码自建 GHCR 镜像，构建并设 public 后
+        # 将 image 切为 ghcr.io/suzuran-workshop/minio:latest
+        image: bitnamilegacy/minio:2025.7.23-debian-12-r5
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
@@ -38,9 +42,9 @@ jobs:
           --health-retries 10
 
     env:
-      # pg 集成（@homura/db pg driver / migrations）
+      # pg 集成（@homurajs/db pg driver / migrations）
       PG_TEST_URL: postgresql://homura:homura@localhost:5432/homura_test
-      # minio 集成（@homura/storage s3 后端）
+      # minio 集成（@homurajs/storage s3 后端）
       S3_TEST_ENDPOINT: http://localhost:9000
       S3_TEST_ACCESS_KEY: minioadmin
       S3_TEST_SECRET_KEY: minioadmin
@@ -48,9 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # version 不在此指定：pnpm/action-setup 会读根 package.json 的 packageManager，
+      # 两处同时声明会触发 "Multiple versions of pnpm specified" 硬错误
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
 
       - uses: actions/setup-node@v4
         with:
@@ -72,9 +76,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 同上：pnpm 版本以根 package.json 的 packageManager 为唯一事实来源
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
 
       - uses: actions/setup-node@v4
         with:

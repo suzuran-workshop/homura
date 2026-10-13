@@ -7,7 +7,7 @@
  *   parity 测试只比对 pg↔sqlite 两侧一致，测不出与原生 SQL 的偏差——
  *   改列名务必同步 store.ts，并以 drizzle-kit generate 的产物为准复核。
  */
-import { pgCol, pgTable, sqliteCol, sqliteTable } from '@homura/db/schema-helpers'
+import { pgCol, pgTable, sqliteCol, sqliteTable } from '@homurajs/db/schema-helpers'
 import { index } from 'drizzle-orm/pg-core'
 import { index as sqliteIndex } from 'drizzle-orm/sqlite-core'
 

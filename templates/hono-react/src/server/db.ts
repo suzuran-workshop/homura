@@ -1,8 +1,8 @@
 /**
  * db 装配：按 DIALECT 建库 + 选择对应方言 schema + 跑迁移。
- * 渐进式：dialect=sqlite 零 postgres 依赖；dialect=pg 才 import '@homura/db/pg'。
+ * 渐进式：dialect=sqlite 零 postgres 依赖；dialect=pg 才 import '@homurajs/db/pg'。
  */
-import { createDb, runMigrations, type Database } from '@homura/db'
+import { createDb, runMigrations, type Database } from '@homurajs/db'
 import type { AppConfig } from './env.js'
 
 export interface DbBundle {
@@ -11,7 +11,7 @@ export interface DbBundle {
 }
 
 /**
- * 按配置建库。pg 分支动态 import '@homura/db/pg'（注册 driver）——
+ * 按配置建库。pg 分支动态 import '@homurajs/db/pg'（注册 driver）——
  * sqlite-only 的 App 不触发该 import，不装 postgres 也能跑（渐进式耦合）。
  */
 export async function buildDb(config: AppConfig): Promise<DbBundle> {
@@ -23,7 +23,7 @@ export async function buildDb(config: AppConfig): Promise<DbBundle> {
   }
 
   // pg：动态注册 driver（副作用 import）
-  await import('@homura/db/pg')
+  await import('@homurajs/db/pg')
   const supabaseRef = config.get('supabaseProjectRef')
   const databaseUrl = config.get('databaseUrl')
 
@@ -31,7 +31,7 @@ export async function buildDb(config: AppConfig): Promise<DbBundle> {
   let prepare = true
   if (supabaseRef && config.get('supabaseDbPassword')) {
     // supabase：Supavisor 直连（qw-pages 形态）
-    const { buildSupabaseDbConfig } = await import('@homura/db/pg')
+    const { buildSupabaseDbConfig } = await import('@homurajs/db/pg')
     const sb = buildSupabaseDbConfig({
       projectRef: supabaseRef,
       password: config.get('supabaseDbPassword')!,

@@ -27,7 +27,7 @@ pnpm build:qw-pages   # qw-pages：自包含单文件 + homura.manifest.json（�
 ```
 
 两形态 99% 共用（同一 buildApp），差异仅入口（index.ts / qw-pages.ts）与打包策略
-（standalone 外部化第三方、qw-pages 全打包）。⚠ `@homura/*` 源码直出，两形态都必须打进 bundle。
+（standalone 外部化第三方、qw-pages 全打包）。⚠ `@homurajs/*` 源码直出，两形态都必须打进 bundle。
 详见 docs/specs/module-qw-pages.md。
 
 ## 开发

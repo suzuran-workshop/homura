@@ -1,7 +1,7 @@
 /**
  * 上游契约唯一事实源。
  * ⚠ 字段以实读 ../oauth2-dingtalk 源码为准（token/userinfo 端点见 specs/module-oauth2）。
- *   钉钉特有的 userinfo 形状（Oauth2DingtalkUserInfo）在 @homura/3p/dingtalk/oauth.ts，
+ *   钉钉特有的 userinfo 形状（Oauth2DingtalkUserInfo）在 @homurajs/3p/dingtalk/oauth.ts，
  *   auth 包只认标准 OAuth2/OIDC 契约。
  */
 

@@ -7,7 +7,7 @@
  * 两 driver 的 query builder 方法签名一致，故收敛为一个最小接口，只在此处转型一次。
  */
 import { and, desc, eq, isNull } from 'drizzle-orm'
-import type { Database } from '@homura/db'
+import type { Database } from '@homurajs/db'
 import { pgSchema } from './schema/pg.js'
 import { sqliteSchema } from './schema/sqlite.js'
 import type { Todo } from '../shared/types.js'

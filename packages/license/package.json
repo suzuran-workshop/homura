@@ -1,22 +1,50 @@
 {
-  "name": "@homura/license",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@homurajs/license",
+  "version": "26.10.13",
   "type": "module",
   "description": "homura 激活客户端：注册、心跳、停服守卫（对接 ../homura-genuine 中央授权服务，契约先行）",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./tables": "./src/tables.ts",
     "./hono": "./src/guard.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./contract": {
+        "types": "./dist/contract.d.ts",
+        "import": "./dist/contract.js"
+      },
+      "./tables": {
+        "types": "./dist/tables.d.ts",
+        "import": "./dist/tables.js"
+      },
+      "./hono": {
+        "types": "./dist/hono.d.ts",
+        "import": "./dist/hono.js"
+      }
+    }
+  },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@homura/core": "workspace:*",
-    "@homura/db": "workspace:*"
+    "@homurajs/core": "workspace:*",
+    "@homurajs/db": "workspace:*"
   },
   "peerDependencies": {
     "drizzle-orm": "1.0.0-rc.4",
@@ -25,5 +53,8 @@
   "peerDependenciesMeta": {
     "drizzle-orm": { "optional": true },
     "hono": { "optional": true }
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.1"
   }
 }

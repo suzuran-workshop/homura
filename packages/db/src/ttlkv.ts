@@ -3,7 +3,7 @@
  * take = DELETE ... RETURNING，双方言通用；秒级 expires_at（32 位安全）。
  */
 import { sql, type SQL } from 'drizzle-orm'
-import type { TtlKv } from '@homura/core'
+import type { TtlKv } from '@homurajs/core'
 import type { Database } from './types.js'
 import { isSqlite } from './migrations.js'
 

@@ -1,5 +1,5 @@
 import type { Hono } from 'hono'
-import type { RuntimeTarget } from '@homura/core'
+import type { RuntimeTarget } from '@homurajs/core'
 
 /**
  * 双形态运行时适配器——qw-pages 全部未知约定的单点收口。

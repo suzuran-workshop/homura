@@ -6,7 +6,7 @@
  * ⚠ 列名显式 snake_case，必须与 state-store.ts 的原生 SQL 严格对齐
  *   （id/license_id/instance_key/updated_at）。
  */
-import { pgCol, pgTable, sqliteCol, sqliteTable } from '@homura/db/schema-helpers'
+import { pgCol, pgTable, sqliteCol, sqliteTable } from '@homurajs/db/schema-helpers'
 
 export const pgLicenseTables = {
   licenseState: pgTable('license_state', {

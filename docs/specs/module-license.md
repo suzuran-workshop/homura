@@ -1,4 +1,4 @@
-# Spec — license 契约（@homura/license ↔ homura-genuine）
+# Spec — license 契约（@homurajs/license ↔ homura-genuine）
 
 ## 要构建什么
 - 目标：App 与中央授权服务的激活/心跳/停服契约。**契约先行**：homura-genuine（../homura-genuine，待建）实现时逐字同步 `packages/license/src/contract.ts`

@@ -34,9 +34,9 @@ execFileSync(process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js'), 
 })
 
 // ── ② 后端：tsdown → dist/server/index.mjs ──
-// 关键：@homura/* 是源码直出包（exports → src/*.ts），external 化后运行时
-// 会去 import .ts 而崩溃，故两个形态都必须打包 @homura/*。
-//   standalone：只打包 @homura/*，第三方（drizzle/hono/postgres）走运行时 node_modules
+// 关键：@homurajs/* 是源码直出包（exports → src/*.ts），external 化后运行时
+// 会去 import .ts 而崩溃，故两个形态都必须打包 @homurajs/*。
+//   standalone：只打包 @homurajs/*，第三方（drizzle/hono/postgres）走运行时 node_modules
 //   qw-pages：全打包（noExternal /.*/）—— 不赌平台侧 npm install（自包含单文件）
 const entry = isQwPages ? 'src/server/qw-pages.ts' : 'src/server/index.ts'
 console.log(`[build] server (tsdown, entry=${entry})...`)
@@ -47,7 +47,7 @@ await build({
   format: 'esm',
   target: 'node22',
   platform: 'node',
-  noExternal: isQwPages ? [/.*/] : [/^@homura\//],
+  noExternal: isQwPages ? [/.*/] : [/^@homurajs\//],
   // 禁用配置文件自动加载（否则 tsdown 误读 vite/vitest.config 触发 define 警告）
   config: false,
   clean: false,

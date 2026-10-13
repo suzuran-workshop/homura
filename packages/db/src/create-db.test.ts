@@ -15,7 +15,7 @@ describe('createDb（sqlite 路径）', () => {
   })
 
   it('pg 未注册时抛出指引性错误', () => {
-    expect(() => createDb({ dialect: 'pg', url: 'postgresql://x' })).toThrow(/@homura\/db\/pg/)
+    expect(() => createDb({ dialect: 'pg', url: 'postgresql://x' })).toThrow(/@homurajs\/db\/pg/)
   })
 
   it('dispatch 到 sqlite 成功', () => {

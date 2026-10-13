@@ -20,12 +20,12 @@
 - 任何确认只改上表适配点文件，不散落到能力包
 
 ## 本轮 build 实现结论（scripts/build.mjs，双形态已实测）
-- **standalone**：tsdown entry=index.ts，`noExternal: [/^@homura\//]`——只打包 workspace 源码包，
+- **standalone**：tsdown entry=index.ts，`noExternal: [/^@homurajs\//]`——只打包 workspace 源码包，
   第三方（drizzle/hono/postgres）走运行时 node_modules；产物 `node dist/server/index.mjs` 真实进程验证通过
 - **qw-pages**：tsdown entry=qw-pages.ts，`noExternal: [/.*/]`——全打包成自包含单文件，
   外部 import 仅剩 `node:` 内置（实测确认）；exportHandlers 三导出（default/fetch/app）对冲入口约定；
   产物 + homura.manifest.json；直接 import 产物调 fetch handler 验证通过
-- ⚠ **`@homura/*` 两个形态都必须打包**：它们是源码直出包（exports→src/*.ts），
+- ⚠ **`@homurajs/*` 两个形态都必须打包**：它们是源码直出包（exports→src/*.ts），
   external 化后运行时会去 import `.ts` 直接崩——这是 build 的头号陷阱
 - ⚠ tsdown 须 `config: false`：否则误读 vite/vitest.config 触发 `define` 无效选项警告
 - tsdown ESM 产出 `index.js`，build 脚本统一 rename 为 `index.mjs`（上传后无 package.json type 上下文也安全）

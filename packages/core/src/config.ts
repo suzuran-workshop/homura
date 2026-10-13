@@ -71,7 +71,7 @@ export function defineConfig<S extends Record<string, ConfigSpec<unknown>>>(spec
       }
     },
     help(): string {
-      const lines: string[] = ['# 由 @homura/core defineConfig 生成（配置即文档）', '']
+      const lines: string[] = ['# 由 @homurajs/core defineConfig 生成（配置即文档）', '']
       for (const [key, spec] of Object.entries(specs)) {
         if (spec.description) lines.push(`# ${spec.description}`)
         const example =

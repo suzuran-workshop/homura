@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { jwtVerify, SignJWT } from 'jose'
-import { randomToken } from '@homura/core'
+import { randomToken } from '@homurajs/core'
 import type { AuthUser } from '../types.js'
 import type { RefreshTokenStore } from './store.js'
 

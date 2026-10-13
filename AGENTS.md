@@ -17,9 +17,9 @@ homura：Hono+React 全栈 template/SDK monorepo。派生 App 的能力都来自
 
 - 全局规则 / 约定：
   - **渐进式耦合是最高设计原则**：任何能力包不得硬依赖其他能力包（app-kit 只依赖 hono+core）；可选依赖走 peer + 动态 import + 子路径导出
-  - 依赖方向：core ← 其余包；auth/license 可依赖 @homura/db 的 schema-helpers；禁止反向依赖
+  - 依赖方向：core ← 其余包；auth/license 可依赖 @homurajs/db 的 schema-helpers；禁止反向依赖
   - **契约文件不许随手改**：`auth/src/types.ts`（OAuth2 上游）、`3p/src/index.ts`（平台能力契约）、`license/src/contract.ts`（genuine 契约）——修改需同步对应外部 repo 并过快照测试
-  - drizzle-orm / drizzle-kit 版本精确锁 `1.0.0-rc.4`（根 pnpm.overrides 强制），drizzle import 尽量收敛在 @homura/db
+  - drizzle-orm / drizzle-kit 版本精确锁 `1.0.0-rc.4`（根 pnpm.overrides 强制），drizzle import 尽量收敛在 @homurajs/db
   - TS strict 全开（含 noUncheckedIndexedAccess）；测试与实现同文件 colocate（`*.test.ts`）
   - 新导出必有测试；外呼类构造函数一律收 `fetchImpl` 注入口，测试不 mock 全局 fetch
   - 双方言 schema：App 写 colocated `schema/pg.ts` + `schema/sqlite.ts`，用 `pgCol/sqliteCol` 配方，parity 测试锁一致

@@ -1,5 +1,5 @@
 /**
- * @homura/db/pg 子路径：postgres-js driver + supabase 直连构造。
+ * @homurajs/db/pg 子路径：postgres-js driver + supabase 直连构造。
  * import 本模块即注册 pg driver（副作用），App 需自行安装 postgres 依赖。
  */
 import { drizzle } from 'drizzle-orm/postgres-js'

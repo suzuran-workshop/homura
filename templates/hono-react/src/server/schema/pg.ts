@@ -3,9 +3,9 @@
  * 业务表 todos + spread 进 auth/license 的第三方表（refresh_tokens / license_state）。
  * 与 sqlite.ts 严格对应，parity 测试锁一致。
  */
-import { pgCol, pgTable, pgJson } from '@homura/db/schema-helpers'
-import { pgAuthTables } from '@homura/auth/tables'
-import { pgLicenseTables } from '@homura/license/tables'
+import { pgCol, pgTable, pgJson } from '@homurajs/db/schema-helpers'
+import { pgAuthTables } from '@homurajs/auth/tables'
+import { pgLicenseTables } from '@homurajs/license/tables'
 import { boolean } from 'drizzle-orm/pg-core'
 
 export const todos = pgTable('todos', {

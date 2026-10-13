@@ -12,10 +12,10 @@
  * e2e 测试通过 overrides 注入桩实例（db/fetch），走真实装配路径。
  */
 import { Hono } from 'hono'
-import { createApp, type AppDeps, type AuthInject, type LicenseInject } from '@homura/app-kit'
-import type { Logger } from '@homura/core'
-import type { Database } from '@homura/db'
-import type { FileStorage } from '@homura/storage'
+import { createApp, type AppDeps, type AuthInject, type LicenseInject } from '@homurajs/app-kit'
+import type { Logger } from '@homurajs/core'
+import type { Database } from '@homurajs/db'
+import type { FileStorage } from '@homurajs/storage'
 import type { AppConfig } from './env.js'
 import { buildDb, migrate, type DbBundle } from './db.js'
 import { buildTodoRepo, type TodoRepo } from './todos-repo.js'
@@ -76,11 +76,11 @@ export async function buildApp(
   }
 
   // ── 层级 3：3p 平台（DINGTALK_APP_KEY 配置即启用）──
-  let thirdParty: { platform: import('@homura/app-kit').PlatformLike } | undefined
+  let thirdParty: { platform: import('@homurajs/app-kit').PlatformLike } | undefined
   let platformRoutes: Hono | undefined
   const dingtalkAppKey = config.get('dingtalkAppKey')
   if (dingtalkAppKey && config.get('dingtalkAppSecret')) {
-    const { createDingtalkPlatform } = await import('@homura/3p/dingtalk')
+    const { createDingtalkPlatform } = await import('@homurajs/3p/dingtalk')
     const platform = createDingtalkPlatform({
       appKey: dingtalkAppKey,
       appSecret: config.get('dingtalkAppSecret')!,
@@ -101,7 +101,7 @@ export async function buildApp(
 
   // ── 层级 5：license（GENUINE_SERVER 配置即启用）──
   let license: LicenseInject | false = false
-  let licenseClient: import('@homura/license').LicenseClient | undefined
+  let licenseClient: import('@homurajs/license').LicenseClient | undefined
   const genuineServer = config.get('genuineServer')
   if (genuineServer && dbBundle) {
     const built = await buildLicense(config, dbBundle.db, genuineServer, fetchImpl)
@@ -158,10 +158,10 @@ async function buildAuth(
   oauthOrgId: string,
   fetchImpl?: typeof fetch,
 ) {
-  const { OAuth2Client, SessionManager, createDrizzleSessionStore } = await import('@homura/auth')
-  const { sessionMiddleware, createAuthRoutes } = await import('@homura/auth/hono')
-  const { dingtalkOAuth } = await import('@homura/3p/dingtalk')
-  const { createMemoryTtlKv } = await import('@homura/core')
+  const { OAuth2Client, SessionManager, createDrizzleSessionStore } = await import('@homurajs/auth')
+  const { sessionMiddleware, createAuthRoutes } = await import('@homurajs/auth/hono')
+  const { dingtalkOAuth } = await import('@homurajs/3p/dingtalk')
+  const { createMemoryTtlKv } = await import('@homurajs/core')
 
   const preset = dingtalkOAuth({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
   const client = new OAuth2Client({
@@ -188,11 +188,11 @@ async function buildStorage(config: AppConfig): Promise<FileStorage | undefined>
   const backend = config.get('storageBackend')
   if (backend === 'none') return undefined
   if (backend === 'local') {
-    const { createLocalStorage } = await import('@homura/storage/local')
+    const { createLocalStorage } = await import('@homurajs/storage/local')
     return createLocalStorage({ rootDir: config.get('localStorageDir') })
   }
   if (backend === 's3') {
-    const { createS3Storage } = await import('@homura/storage/s3')
+    const { createS3Storage } = await import('@homurajs/storage/s3')
     return createS3Storage({
       endpoint: config.get('s3Endpoint')!,
       region: config.get('s3Region'),
@@ -202,8 +202,8 @@ async function buildStorage(config: AppConfig): Promise<FileStorage | undefined>
     })
   }
   if (backend === 'supabase') {
-    const { createSupabaseStorage } = await import('@homura/storage/supabase')
-    const { loadSupabaseEnv } = await import('@homura/db/pg')
+    const { createSupabaseStorage } = await import('@homurajs/storage/supabase')
+    const { loadSupabaseEnv } = await import('@homurajs/db/pg')
     const { platformUrl, anonKey } = loadSupabaseEnv(process.env)
     return createSupabaseStorage({ platformUrl, apiKey: anonKey, bucket: 'files' })
   }
@@ -216,8 +216,8 @@ async function buildLicense(
   server: string,
   fetchImpl?: typeof fetch,
 ) {
-  const { LicenseClient, createDrizzleStateStore } = await import('@homura/license')
-  const { licenseGuard } = await import('@homura/license/hono')
+  const { LicenseClient, createDrizzleStateStore } = await import('@homurajs/license')
+  const { licenseGuard } = await import('@homurajs/license/hono')
   const client = new LicenseClient({
     server,
     productId: config.get('genuineProductId') ?? 'template',

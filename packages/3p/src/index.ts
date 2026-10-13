@@ -5,13 +5,13 @@
  * supports() 类型守卫做运行时协商。App 代码：
  *   if (supports(p, 'approval')) { await p.createApprovalInstance(...) }
  *
- * OAuth 预设采用结构化契约（与 @homura/auth 的 OAuth2ClientConfig 鸭子类型互操作），
+ * OAuth 预设采用结构化契约（与 @homurajs/auth 的 OAuth2ClientConfig 鸭子类型互操作），
  * 3p 与 auth 之间零 import 依赖，避免包依赖环。
  */
 
 export type Capability = 'oauth' | 'message' | 'approval' | 'contacts' | 'webhook'
 
-/** 结构化 OAuth 预设（喂给 @homura/auth 的 OAuth2Client.config） */
+/** 结构化 OAuth 预设（喂给 @homurajs/auth 的 OAuth2Client.config） */
 export interface OAuthPreset {
   endpoints: {
     authorizeUrl: string

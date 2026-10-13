@@ -1,6 +1,6 @@
 /**
  * /api 业务路由：todos CRUD + /api/me。
- * 活文档：示范 auth 的 sessionMiddleware 注入的 c.get('auth')（类型由 @homura/auth/hono
+ * 活文档：示范 auth 的 sessionMiddleware 注入的 c.get('auth')（类型由 @homurajs/auth/hono
  * 的 ContextVariableMap 增强），以及 todos repository 的双方言无关访问。
  *
  * 归属模型：登录用户操作自己的 todos；匿名操作无主 todos（ownerSub IS NULL）。

@@ -6,14 +6,14 @@
 
 | 遗产 | 去向 |
 |------|------|
-| 存储适配器六方法 + org 前缀 key 隔离 + 代理 URL + presign 降级 + 工厂分发 | @homura/storage（接口平移，ns 语义化） |
+| 存储适配器六方法 + org 前缀 key 隔离 + 代理 URL + presign 降级 + 工厂分发 | @homurajs/storage（接口平移，ns 语义化） |
 | 钉钉新版 OAuth 三端点流程与 state TTL-KV 一次性消费 | 归 ../oauth2-dingtalk（服务端）；homura 只留客户端语义 |
-| 企业 access_token 无缓存的债（oapi gettoken 每次重取） | @homura/3p/dingtalk CorpTokenManager（7200s 缓存+提前刷新+single-flight） |
-| JWT + 不透明 refresh（SHA-256 入库、rotate）模式 | @homura/auth SessionManager（升级为 familyId 复用检测族吊销） |
-| TTL-KV 双通道（Redis 可用则用，否则进程内 map） | @homura/core createMemoryTtlKv + @homura/db createDbTtlKv（去 Redis） |
+| 企业 access_token 无缓存的债（oapi gettoken 每次重取） | @homurajs/3p/dingtalk CorpTokenManager（7200s 缓存+提前刷新+single-flight） |
+| JWT + 不透明 refresh（SHA-256 入库、rotate）模式 | @homurajs/auth SessionManager（升级为 familyId 复用检测族吊销） |
+| TTL-KV 双通道（Redis 可用则用，否则进程内 map） | @homurajs/core createMemoryTtlKv + @homurajs/db createDbTtlKv（去 Redis） |
 | app.json 清单（name/version/runtime/entrypoint/routes）+ SemVer 契约思想 | homura.manifest.json（qw-pages 产物） |
 | Vite dev proxy 约定前缀（前端零 CORS）+ 三 tsconfig 拆分 | templates/hono-react |
-| 多 IdP provider 抽象接口签名（OAuthProvider interface） | @homura/3p 能力分片（更彻底的 capability 协商） |
+| 多 IdP provider 抽象接口签名（OAuthProvider interface） | @homurajs/3p 能力分片（更彻底的 capability 协商） |
 
 ## 明确抛弃
 
@@ -47,9 +47,9 @@
    查询列名不匹配，运行时崩。parity 测试测不出（两侧都 camelCase 自然一致）。
    → 靠「模板真实跑 drizzle-kit generate 并检查 DDL」发现。教训：集成测试要覆盖真实迁移产物，
      不能只测单元测试层的 schema 对象。详见 specs/module-schema 的列名规则。
-7. **源码直出的 workspace 包，打包时必须 noExternal**（新坑）：`@homura/*` 的 exports 指向
+7. **源码直出的 workspace 包，打包时必须 noExternal**（新坑）：`@homurajs/*` 的 exports 指向
    `src/*.ts`，tsdown 默认 external 化后，`node dist/server/index.mjs` 运行时会去 import `.ts`
-   直接崩。→ 两个形态都必须 `noExternal: [/^@homura\//]`（qw-pages 更是全打包）。
+   直接崩。→ 两个形态都必须 `noExternal: [/^@homurajs\//]`（qw-pages 更是全打包）。
    教训：「内部包不预编译」的决策（ADR-004）把打包责任推给了消费方 build，必须在模板
    build 脚本里显式处理，且靠「实测 node 跑产物」兜底（不能只 typecheck）。
 8. **UPDATE...RETURNING 返回更新后的值，不能用它判「更新前状态」**（新坑）：session refresh

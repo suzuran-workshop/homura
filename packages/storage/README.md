@@ -1,11 +1,11 @@
-# @homura/storage
+# @homurajs/storage
 
 对象存储/图床：三后端（local-fs / s3 兼容 / supabase）+ `/files/<key>` 代理路由。
 
 ```ts
-import { createLocalStorage } from '@homura/storage/local'   // 独立形态
-// import { createS3Storage } from '@homura/storage/s3'      // minio/oss（AWS SDK 动态加载）
-// import { createSupabaseStorage } from '@homura/storage/supabase' // qw-pages（手写 REST）
+import { createLocalStorage } from '@homurajs/storage/local'   // 独立形态
+// import { createS3Storage } from '@homurajs/storage/s3'      // minio/oss（AWS SDK 动态加载）
+// import { createSupabaseStorage } from '@homurajs/storage/supabase' // qw-pages（手写 REST）
 
 const storage = createLocalStorage({ rootDir: './data/files' })
 
@@ -19,7 +19,7 @@ await storage.deleteFile(r.objectKey)
 const files = await storage.listFiles('imgs', '', 20)
 
 // 代理路由（Hono）：统一下载入口，presign 弱后端自动降级到它
-import { createFileProxyRoutes } from '@homura/storage/proxy'
+import { createFileProxyRoutes } from '@homurajs/storage/proxy'
 app.route('/', createFileProxyRoutes(storage))
 ```
 

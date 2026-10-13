@@ -1,4 +1,4 @@
-import { randomToken } from '@homura/core'
+import { randomToken } from '@homurajs/core'
 import {
   GENUINE_ENDPOINTS,
   type HeartbeatResponse,

@@ -1,0 +1,62 @@
+name: Release
+
+# push main 即发版：CalVer（YY.MM.DD）bump 后推送即发布 @homurajs/* 到 npm；
+# 版本未变化时自动跳过（npm 已存在同版本），日常 push 不受影响。
+# 测试与类型检查由 test.yml 负责——三条流水线各司其职，互不重复。
+# 需要在仓库 Settings → Secrets → Actions 配置 NPM_TOKEN（npmjs.com 的 Automation token）。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build & publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # version 不在此指定：pnpm/action-setup 会读根 package.json 的 packageManager
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: 校验版本号为 CalVer（YY.MM.DD）
+        run: |
+          V="$(node -p "require('./packages/core/package.json').version")"
+          if ! echo "$V" | grep -Eq '^[0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2}$'; then
+            echo "版本号 $V 不是 CalVer（YY.MM.DD）格式" >&2
+            exit 1
+          fi
+          echo "✓ CalVer 格式：$V"
+
+      - name: 检查 npm 是否已有该版本（未 bump 则跳过发布）
+        id: check
+        run: |
+          V="$(node -p "require('./packages/core/package.json').version")"
+          if npm view "@homurajs/core@$V" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "@homurajs/core@$V 已在 npm，本次推送跳过发布"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "@homurajs/core@$V 未发布，将发布全部 @homurajs/* 包"
+          fi
+
+      - name: Publish @homurajs/* to npm
+        if: steps.check.outputs.exists == 'false'
+        run: pnpm -r --filter './packages/*' publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

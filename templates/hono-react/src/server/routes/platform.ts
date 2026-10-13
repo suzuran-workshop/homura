@@ -4,7 +4,7 @@
  * App 代码用守卫收窄后安全调用，未声明的能力端点直接不挂载。
  */
 import { Hono } from 'hono'
-import { supports, type ThirdPartyPlatform } from '@homura/3p'
+import { supports, type ThirdPartyPlatform } from '@homurajs/3p'
 
 export function buildPlatformRoutes(platform: ThirdPartyPlatform): Hono {
   const app = new Hono()

@@ -5,7 +5,7 @@
  */
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineConfig } from '@homura/core'
+import { defineConfig } from '@homurajs/core'
 import { configSpecs } from '../src/server/env.ts'
 
 const help = defineConfig(configSpecs).help()

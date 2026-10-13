@@ -1,9 +1,14 @@
 {
-  "name": "@homura/storage",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@homurajs/storage",
+  "version": "26.10.13",
   "type": "module",
   "description": "homura 对象存储/图床适配：supabase-storage / s3 兼容(minio/oss) / local-fs 三后端 + 代理路由",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./local": "./src/local.ts",
@@ -11,12 +16,39 @@
     "./supabase": "./src/supabase.ts",
     "./proxy": "./src/proxy.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./local": {
+        "types": "./dist/local.d.ts",
+        "import": "./dist/local.js"
+      },
+      "./s3": {
+        "types": "./dist/s3.d.ts",
+        "import": "./dist/s3.js"
+      },
+      "./supabase": {
+        "types": "./dist/supabase.d.ts",
+        "import": "./dist/supabase.js"
+      },
+      "./proxy": {
+        "types": "./dist/proxy.d.ts",
+        "import": "./dist/proxy.js"
+      }
+    }
+  },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@homura/core": "workspace:*"
+    "@homurajs/core": "workspace:*"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3.0.0",
@@ -31,6 +63,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.700.0",
     "@aws-sdk/s3-request-presigner": "^3.700.0",
-    "hono": "^4.10.0"
+    "hono": "^4.10.0",
+    "tsdown": "^0.23.1"
   }
 }

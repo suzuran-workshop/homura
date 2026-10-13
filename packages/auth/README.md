@@ -1,12 +1,12 @@
-# @homura/auth
+# @homurajs/auth
 
 认证：通用标准 OAuth2 (Authorization Code Flow) 客户端 + 自管 session（HS256 短 JWT + opaque refresh rotate + 族吊销）。
 
 ```ts
-// OAuth 预设来自 @homura/3p（结构化契约，鸭子类型互操作）
-import { dingtalkOAuth } from '@homura/3p/dingtalk'
-import { OAuth2Client, SessionManager } from '@homura/auth'
-import { createMemoryTtlKv } from '@homura/core'
+// OAuth 预设来自 @homurajs/3p（结构化契约，鸭子类型互操作）
+import { dingtalkOAuth } from '@homurajs/3p/dingtalk'
+import { OAuth2Client, SessionManager } from '@homurajs/auth'
+import { createMemoryTtlKv } from '@homurajs/core'
 
 const preset = dingtalkOAuth({ orgId: 'my_org' }) // 对接 ../oauth2-dingtalk
 const client = new OAuth2Client({
@@ -21,7 +21,7 @@ const sessions = new SessionManager(
 )
 
 // Hono 集成
-import { createAuthRoutes, sessionMiddleware, requireAuth } from '@homura/auth/hono'
+import { createAuthRoutes, sessionMiddleware, requireAuth } from '@homurajs/auth/hono'
 app.use('*', sessionMiddleware(sessions))
 app.route('/', createAuthRoutes({ client, sessions }))
 app.use('/api/*', requireAuth)

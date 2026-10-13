@@ -1,18 +1,41 @@
 {
-  "name": "@homura/3p",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@homurajs/3p",
+  "version": "26.10.13",
   "type": "module",
   "description": "homura 第三方平台能力抽象：能力分片接口（capability 声明 + supports 守卫协商），钉钉为第一个实现",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./dingtalk": "./src/dingtalk/index.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./dingtalk": {
+        "types": "./dist/dingtalk.d.ts",
+        "import": "./dist/dingtalk.js"
+      }
+    }
+  },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@homura/core": "workspace:*"
+    "@homurajs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.1"
   }
 }

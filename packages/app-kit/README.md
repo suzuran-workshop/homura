@@ -1,9 +1,9 @@
-# @homura/app-kit
+# @homurajs/app-kit
 
 组装入口：`createApp` 渐进式装配（零注入也能跑）+ 双形态 RuntimeAdapter（qw-pages 全部未知约定的单点收口）。
 
 ```ts
-import { createApp } from '@homura/app-kit'
+import { createApp } from '@homurajs/app-kit'
 import { Hono } from 'hono'
 
 // 最小 App：零能力注入
@@ -23,8 +23,8 @@ const composed = createApp({
 
 双形态启动：
 ```ts
-import { createNodeAdapter } from '@homura/app-kit/serve'      // 独立：监听端口
-import { createQwPagesAdapter, exportHandlers } from '@homura/app-kit/qw-pages' // qw-pages：三导出对冲
+import { createNodeAdapter } from '@homurajs/app-kit/serve'      // 独立：监听端口
+import { createQwPagesAdapter, exportHandlers } from '@homurajs/app-kit/qw-pages' // qw-pages：三导出对冲
 ```
 
 使用示范见模板 `src/server/index.ts` 与 `src/server/qw-pages.ts`。

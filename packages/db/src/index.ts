@@ -1,8 +1,8 @@
 /**
- * @homura/db 主入口：driver 注册制工厂 + sqlite driver（零外部依赖）。
+ * @homurajs/db 主入口：driver 注册制工厂 + sqlite driver（零外部依赖）。
  *
  * 渐进式耦合：sqlite-only 的 App 只 import 本入口，不装 postgres；
- * 需要 pg/supabase 时 `import '@homura/db/pg'`（注册副作用）。
+ * 需要 pg/supabase 时 `import '@homurajs/db/pg'`（注册副作用）。
  */
 export type { DbConfig, PgDbConfig, SqliteDbConfig, Database, PgDatabase } from './types.js'
 export { createDb, registerPgDriver, isPgRegistered } from './create-db.js'

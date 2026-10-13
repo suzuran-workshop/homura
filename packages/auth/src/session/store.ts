@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm'
-import { isSqlite } from '@homura/db'
+import { isSqlite } from '@homurajs/db'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { ConsumedToken, RefreshTokenRecord } from './record.js'
 
-/** 双方言数据库实例（与 @homura/db 的 Database 结构一致，但保持本包 peer 边界独立） */
+/** 双方言数据库实例（与 @homurajs/db 的 Database 结构一致，但保持本包 peer 边界独立） */
 export type DrizzleDb = PostgresJsDatabase | NodeSQLiteDatabase
 
 export interface RefreshTokenStore {
@@ -27,7 +27,7 @@ async function query<T>(db: DrizzleDb, q: ReturnType<typeof sql>): Promise<T[]> 
 }
 
 /**
- * drizzle 双方言实现（表定义见 @homura/auth/tables，App spread 进 schema 迁移）。
+ * drizzle 双方言实现（表定义见 @homurajs/auth/tables，App spread 进 schema 迁移）。
  * consume 用 UPDATE ... RETURNING 原子标记 used_at，已 used 的行返回 revoked:true。
  */
 export function createDrizzleSessionStore(db: DrizzleDb, opts?: { now?: () => number }): RefreshTokenStore {

@@ -16,7 +16,7 @@ export interface Oauth2DingtalkUserInfo {
 
 /**
  * oauth2-dingtalk 预设：填 orgId（+可选 baseUrl）即用。
- * 返回结构化预设喂给 @homura/auth 的 OAuth2Client（鸭子类型互操作，零 import 依赖）。
+ * 返回结构化预设喂给 @homurajs/auth 的 OAuth2Client（鸭子类型互操作，零 import 依赖）。
  */
 export function dingtalkOAuth(opts: { orgId: string; baseUrl?: string }): OAuthPreset {
   const base = (opts.baseUrl ?? DEFAULT_OAUTH2_DINGTALK_BASE).replace(/\/$/, '')

@@ -1,11 +1,11 @@
-# @homura/license
+# @homurajs/license
 
 激活客户端：注册 → 心跳 → 远程停服守卫。对接中央授权服务 `../homura-genuine`（契约先行，见 `./contract` 与 `docs/specs/module-license`）。
 
 ```ts
-import { LicenseClient } from '@homura/license'
-import { licenseGuard } from '@homura/license/hono'
-import { createDrizzleStateStore } from '@homura/license'
+import { LicenseClient } from '@homurajs/license'
+import { licenseGuard } from '@homurajs/license/hono'
+import { createDrizzleStateStore } from '@homurajs/license'
 
 const license = new LicenseClient({
   server: 'https://genuine.example', // homura-genuine

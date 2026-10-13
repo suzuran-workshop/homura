@@ -3,9 +3,9 @@
  * 与 pg.ts 严格对应，parity 测试锁一致（表名/列名/主键）。
  * 差异映射见 docs/specs/module-schema：boolean→integer(mode:boolean)、jsonb→text(mode:json)。
  */
-import { sqliteCol, sqliteTable, sqliteJson } from '@homura/db/schema-helpers'
-import { sqliteAuthTables } from '@homura/auth/tables'
-import { sqliteLicenseTables } from '@homura/license/tables'
+import { sqliteCol, sqliteTable, sqliteJson } from '@homurajs/db/schema-helpers'
+import { sqliteAuthTables } from '@homurajs/auth/tables'
+import { sqliteLicenseTables } from '@homurajs/license/tables'
 import { integer } from 'drizzle-orm/sqlite-core'
 
 export const todos = sqliteTable('todos', {

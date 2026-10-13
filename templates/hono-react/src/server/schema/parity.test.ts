@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertSchemaParity } from '@homura/db'
+import { assertSchemaParity } from '@homurajs/db'
 import { pgSchema } from './pg.js'
 import { sqliteSchema } from './sqlite.js'
 

@@ -4,8 +4,8 @@
  */
 import { loadConfig } from './env.js'
 import { buildApp } from './app.js'
-import { createLogger } from '@homura/core'
-import { createNodeAdapter } from '@homura/app-kit/serve'
+import { createLogger } from '@homurajs/core'
+import { createNodeAdapter } from '@homurajs/app-kit/serve'
 
 const logger = createLogger({ level: (process.env.LOG_LEVEL as never) ?? 'info' }).child('server')
 

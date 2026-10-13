@@ -1,6 +1,6 @@
 /**
  * TTL-KV 抽象：OAuth state 等「一次性消费」语义的最小存储。
- * 内存实现为缺省；多实例部署用 @homura/db 的 createDbTtlKv 兜底。
+ * 内存实现为缺省；多实例部署用 @homurajs/db 的 createDbTtlKv 兜底。
  */
 import { randomBytes } from 'node:crypto'
 

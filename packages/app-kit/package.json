@@ -1,20 +1,44 @@
 {
-  "name": "@homura/app-kit",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@homurajs/app-kit",
+  "version": "26.10.13",
   "type": "module",
   "description": "homura 组装入口：createApp 中间件链装配 + 双形态 RuntimeAdapter（standalone / qw-pages）",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./serve": "./src/runtime/node.ts",
     "./qw-pages": "./src/runtime/qw-pages.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./serve": {
+        "types": "./dist/serve.d.ts",
+        "import": "./dist/serve.js"
+      },
+      "./qw-pages": {
+        "types": "./dist/qw-pages.d.ts",
+        "import": "./dist/qw-pages.js"
+      }
+    }
+  },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@homura/core": "workspace:*",
+    "@homurajs/core": "workspace:*",
     "hono": "^4.10.0"
   },
   "peerDependencies": {
@@ -24,6 +48,7 @@
     "@hono/node-server": { "optional": true }
   },
   "devDependencies": {
-    "@hono/node-server": "^1.19.0"
+    "@hono/node-server": "^1.19.0",
+    "tsdown": "^0.23.1"
   }
 }

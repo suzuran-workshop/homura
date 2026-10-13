@@ -7,6 +7,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# VitePress
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
 # Test artifacts
 coverage/
 test-results/

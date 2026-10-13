@@ -7,8 +7,8 @@
  */
 import { loadConfig } from './env.js'
 import { buildApp } from './app.js'
-import { createLogger } from '@homura/core'
-import { createQwPagesAdapter, exportHandlers } from '@homura/app-kit/qw-pages'
+import { createLogger } from '@homurajs/core'
+import { createQwPagesAdapter, exportHandlers } from '@homurajs/app-kit/qw-pages'
 
 const logger = createLogger({ level: (process.env.LOG_LEVEL as never) ?? 'info' }).child('qw-pages')
 

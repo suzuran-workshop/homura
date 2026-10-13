@@ -1,11 +1,11 @@
 /**
  * /api/files 上传路由 + /files 代理下载。
- * 活文档：示范 @homura/storage 的三后端（由 STORAGE_BACKEND env 切换）+ 代理 URL 模式。
+ * 活文档：示范 @homurajs/storage 的三后端（由 STORAGE_BACKEND env 切换）+ 代理 URL 模式。
  * 上传返回的 url 是 /files/<key> 代理路径（不直接暴露存储地址）。
  */
 import { Hono } from 'hono'
-import type { FileStorage } from '@homura/storage'
-import { createFileProxyRoutes } from '@homura/storage/proxy'
+import type { FileStorage } from '@homurajs/storage'
+import { createFileProxyRoutes } from '@homurajs/storage/proxy'
 
 export function buildFileRoutes(storage: FileStorage): Hono {
   const app = new Hono()

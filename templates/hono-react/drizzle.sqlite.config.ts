@@ -2,7 +2,7 @@
  * SQLite 方言迁移生成配置（node:sqlite 独立形态）。
  * 用法：pnpm db:generate（内部调 drizzle-kit generate --config=drizzle.sqlite.config.ts）
  */
-import { defineDrizzleKitConfig } from '@homura/db'
+import { defineDrizzleKitConfig } from '@homurajs/db'
 
 export default defineDrizzleKitConfig({
   dialect: 'sqlite',

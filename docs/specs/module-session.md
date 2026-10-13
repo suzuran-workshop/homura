@@ -1,4 +1,4 @@
-# Spec — session 管理（@homura/auth）
+# Spec — session 管理（@homurajs/auth）
 
 ## 要构建什么
 - 目标：自管 session 生命周期（上游无 refresh token），可吊销、可检测复用
@@ -30,7 +30,7 @@
 - cookie：HttpOnly + SameSite=Lax；qw-pages（trust proxy）下 Secure
 
 ## 存储
-- refresh_tokens 表（pgAuthTables/sqliteAuthTables 从 `@homura/auth/tables` spread 进 App schema 参与迁移）
+- refresh_tokens 表（pgAuthTables/sqliteAuthTables 从 `@homurajs/auth/tables` spread 进 App schema 参与迁移）
 - createDrizzleSessionStore 双方言实现（原生 SQL，**列名 snake_case 须与 tables.ts 严格对齐**——见 module-schema 教训）；now 时钟可注入（对齐 manager 测试时钟）
 
 ## 验收标准

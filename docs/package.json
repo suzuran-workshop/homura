@@ -1,0 +1,14 @@
+{
+  "name": "homura-docs",
+  "private": true,
+  "type": "module",
+  "description": "homura 文档站（VitePress 2 alpha）",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "2.0.0-alpha.20"
+  }
+}

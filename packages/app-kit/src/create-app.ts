@@ -6,7 +6,7 @@
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import { randomUUID } from 'node:crypto'
-import { detectRuntime, type Logger, type RuntimeInfo, type RuntimeTarget } from '@homura/core'
+import { detectRuntime, type Logger, type RuntimeInfo, type RuntimeTarget } from '@homurajs/core'
 import { createSpaFallback, createStaticMiddleware } from './static.js'
 
 /** 能力实例的结构化契约（鸭子类型，避免包依赖；运行时由 App 传入） */
@@ -33,14 +33,14 @@ export interface LicenseClientLike {
   getStatus(): string
 }
 
-/** auth 注入包（由 @homura/auth/hono 构造后传入） */
+/** auth 注入包（由 @homurajs/auth/hono 构造后传入） */
 export interface AuthInject {
   sessions: SessionManagerLike
   sessionMiddleware: MiddlewareHandler
   authRoutes: Hono
 }
 
-/** license 注入包（由 @homura/license/hono 构造后传入） */
+/** license 注入包（由 @homurajs/license/hono 构造后传入） */
 export interface LicenseInject {
   client: LicenseClientLike
   guard: MiddlewareHandler
