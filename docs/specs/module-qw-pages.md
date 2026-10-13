@@ -98,10 +98,33 @@ App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_m
 
 每张表都要 `ENABLE ROW LEVEL SECURITY` + 一条 `FOR ALL TO anon USING (true) WITH CHECK (true)` 的 policy，否则就是前述静默失败（SELECT 200 空数组 / INSERT 401+42501）。这四张表都没有 serial 序列，无需 sequence 授权；`GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是**语法错误**（该位置不接受函数调用），有 serial 表时要在 DO 块里用 `EXECUTE format(...)` 逐条授权。
 
+## consume 原子抢占语义（已实测）
+
+`createRestSessionStore.consume` 把 SQL 版的
+
+```sql
+UPDATE refresh_tokens SET used_at = ts
+WHERE token_hash = ? AND expires_at > ts AND used_at IS NULL
+RETURNING family_id, sid, sub, profile
+```
+
+翻译成 `PATCH /refresh_tokens?token_hash=eq.X&expires_at=gt.ts&used_at=is.null` + `Prefer: return=representation`。用零依赖探针（只用 `node:http` + 全局 fetch）直打真实 PostgREST 的结果：
+
+| 判决项           | 结果                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| 首次抢占         | 200，返回 1 行                                                                               |
+| 同 token 再抢    | 200，返回 **0 行**（= 抢占失败，store 据此进入查因分支）                                     |
+| **三路并发抢占** | 三个请求都 200，返回行数 `[1,0,0]` → **恰好一个赢家**，原子性成立                            |
+| 抢占后 `used_at` | 非空 → 复用检出（`revoked:true` → 吊销整族）可靠                                             |
+| 过期 token       | 抢占 0 行且 `used_at` 仍为 null → store 返回 null，不会误报成复用                            |
+| `revokeFamily`   | `?family_id=eq.F&used_at=is.null` 只命中未消费的行（5 行中命中 2 行，已消费的 3 行未被触碰） |
+
+结论：REST 版与 drizzle 版的「先占后判」语义等价（教训 8 在 REST 侧同样成立），并发下不会重复发放会话。
+
 ## 仍未验证 / 已知缺口
 
 - [ ] **登录链在 Pages 上仍不可用，但阻塞点已不是 store**：`createRestSessionStore` 已实现，真正卡住的是**配置与密钥投递**——平台没有自定义 env 注入口，`OAUTH_CLIENT_SECRET` 无处安放，而烘进 bundle 等于把密钥发布到公网产物里。可行方案：部署期用受控迁移把配置写入一张 `homura_config` 表，启动时经 PostgREST 读取（anon key 只在服务端 env，不下发浏览器，故该表的 anon SELECT policy 不构成泄露）。**此方案未实现、未实测。**
-- [ ] REST 版 session/license store 只过了单测（桩 RestDb），**未在真实 PostgREST 上跑过**——尤其 `consume` 的原子抢占语义（PATCH + 过滤 + return=representation 是否真等价于 `UPDATE...WHERE...RETURNING`）。受上一条阻塞，端到端验证需要配置投递方案先落地。
+- [x] `consume` 依赖的 PostgREST 语义已实测（见上节）。残留风险仅剩：store 函数本身未在部署态执行过（受上一条阻塞），但它发出的请求形状与单测断言逐条一致、且这些形状已在线上验证。
 - [ ] 多实例是否真会扩容（只观测到单实例）。
 - [ ] `/storage/v1` 的 upload/download 全链路（因建不出桶而无法测）。
 - [ ] `Accept-Profile: public` 与 `Accept-Profile: tenant_<instance>_schema` 返回相同结果的原因未查（结论：Pages 上不需要设置该头，默认 schema 已含租户 schema）。
@@ -109,6 +132,10 @@ App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_m
 ## 复现方法
 
 最小发布目录 = `package.json`（依赖 `@homurajs/app-kit` + `@homurajs/core` + `hono` + `@hono/node-server`，用 `npm install --omit=dev --no-bin-links` 预装，避免 `.bin` 符号链接违反发布物约束）+ 单文件 ESM 入口 + `client/`。入口同时挂 `serve()` 与三重导出并各自计数，即可一次判决入口约定；`/api/db`、`/api/fs`、`/api/camel` 分别判决 PostgREST 权限、落盘持久性、camelCase 列名。发布用受控工具（`category: dynamic`、`entrypoint`、`port: 8081`、`with_database: true`），建表与 policy 用 `qwenwork_pages_apply_migration`。
+
+判决 `consume` 原子抢占的探针更简单：**零依赖**（只用 `node:http` + 全局 fetch），发布目录只要 `package.json`（`type: module`）+ 一个 `server.mjs`，直接对 `refresh_tokens` 发同形请求并做三路 `Promise.all` 并发抢占，数返回行数即可。
+
+真实产物验证则不需要探针：`pnpm build:qw-pages` 后直接把 `dist/` 发布（`entrypoint: server/index.mjs`），看 `/_healthz` 的 `runtime` 与 `checks.db` 就能一次确认形态识别、方言选择与 PostgREST 连通。
 
 ## 约束
 
