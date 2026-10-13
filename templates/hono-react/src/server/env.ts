@@ -175,7 +175,21 @@ export const configSpecs = {
     env: 'GENUINE_LICENSE_KEY',
     parse: parses.string,
     secret: true,
-    description: 'license key（可选）',
+    description: 'license key（可选；中心预签发时用它绑定实例）',
+  },
+  genuinePublicKey: {
+    env: 'GENUINE_PUBLIC_KEY',
+    parse: parses.string,
+    description:
+      '中心 Ed25519 公钥 PEM。**配了才验签**，生产必配（否则中心响应可被中间人改成 active）。' +
+      'PEM 是多行，写进 homura.config.env 时用双引号包裹并把换行写成 \\n',
+  },
+  genuineCorePaths: {
+    env: 'GENUINE_CORE_PATHS',
+    default: '/api',
+    parse: parses.string,
+    description:
+      "enforcement=core 时视为核心功能的路径前缀，逗号分隔（如 '/api,/admin'）；命中即 503，其余放行 + 强提醒",
   },
 
   // ── 静态资源 ──

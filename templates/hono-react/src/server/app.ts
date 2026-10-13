@@ -140,7 +140,12 @@ export async function buildApp(
   let license: LicenseInject | false = false
   let licenseClient: import('@homurajs/license').LicenseClient | undefined
   if (genuineServer) {
-    const built = await buildLicense(config, dbBundle, genuineServer, healthzPath, fetchImpl)
+    const built = await buildLicense(config, dbBundle, {
+      server: genuineServer,
+      healthzPath,
+      fetchImpl,
+      logger,
+    })
     license = built.inject
     licenseClient = built.client
   }
@@ -150,6 +155,23 @@ export async function buildApp(
   routes.route('/api', buildApiRoutes(todoRepo))
   if (storage) routes.route('/', buildFileRoutes(storage))
   if (platformRoutes) routes.route('/api/platform', platformRoutes)
+
+  // 授权状态端点：在 guard 的豁免清单里，故 enforcement=all 时仍可读——
+  // 否则前端连"为什么全站 503"都问不到，"每次使用强提醒"就无从展示。
+  if (licenseClient) {
+    const { LICENSE_STATUS_PATH } = await import('@homurajs/license/hono')
+    const lc = licenseClient
+    routes.get(LICENSE_STATUS_PATH, (c) =>
+      c.json({
+        status: lc.getStatus(),
+        enforcement: lc.getEnforcement(),
+        notice: lc.getNotice(),
+        expiresAt: lc.getEntitlement()?.expiresAt ?? null,
+        features: lc.getEntitlement()?.features ?? [],
+        signature: lc.getSignatureState(),
+      }),
+    )
+  }
 
   // ── 健康检查：REST 形态逐表真探活（能查出「表没建 / policy 没给」这类静默失败）──
   const bundle = dbBundle
@@ -190,7 +212,18 @@ export async function buildApp(
     deps,
     onStart: licenseClient
       ? async () => {
-          await licenseClient!.register()
+          // ⚠ 注册失败**不能让 App 起不来**：ADR-011 的 fail-open 必须覆盖启动期，
+          // 否则授权中心在 App 启动那一刻不可达（或返回 4xx）就等于全站宕机。
+          // 失败时状态停在 'unknown'，守卫按 fail-open 放行（strict 模式才 503），
+          // 心跳循环会继续尝试；同时把原因打进日志与 /_license 端点。
+          try {
+            await licenseClient!.register()
+          } catch (err) {
+            logger?.warn('license 注册失败，按 fail-open 继续启动（心跳会重试）', {
+              err: (err as Error).message,
+              impact: '状态为 unknown，功能范围不可用（requireFeature 一律 403）',
+            })
+          }
           licenseClient!.startHeartbeat({
             onError: (e) => logger?.warn('license heartbeat error', { err: e.message }),
           })
@@ -280,9 +313,7 @@ async function buildStorage(config: AppConfig): Promise<FileStorage | undefined>
 async function buildLicense(
   config: AppConfig,
   bundle: DbBundle,
-  server: string,
-  healthzPath: string,
-  fetchImpl?: typeof fetch,
+  opts: { server: string; healthzPath: string; fetchImpl?: typeof fetch; logger?: Logger },
 ) {
   const { LicenseClient, createDrizzleStateStore, createRestStateStore } =
     await import('@homurajs/license')
@@ -290,20 +321,32 @@ async function buildLicense(
   // state store 按形态选实现；REST 版不建表（无 DDL 权限），license_state 须由受控迁移预建
   const stateStore =
     bundle.kind === 'sql' ? createDrizzleStateStore(bundle.db) : createRestStateStore(bundle.rest)
+  const publicKey = config.get('genuinePublicKey')
+  if (!publicKey) {
+    // 不验签 = 中心响应可被中间人改成 active。开发期方便，生产必须配。
+    opts.logger?.warn('未配置 GENUINE_PUBLIC_KEY：授权响应不验签，生产环境必须配置', {
+      impact: '中间人可伪造 active 状态绕过到期与停服',
+    })
+  }
   const client = new LicenseClient({
-    server,
+    server: opts.server,
     productId: config.get('genuineProductId') ?? 'template',
     appId: config.get('genuineAppId') ?? 'template-app',
     licenseKey: config.get('genuineLicenseKey'),
     stateStore,
-    fetchImpl,
+    fetchImpl: opts.fetchImpl,
+    publicKey,
   })
+  const corePaths = (config.get('genuineCorePaths') ?? '/api')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
   return {
     client,
     inject: {
       client: client as unknown as LicenseInject['client'],
       // 豁免清单与 createApp 注册的健康检查路径同源（qw-pages 上是 /_healthz）
-      guard: licenseGuard(client, { healthzPath }),
+      guard: licenseGuard(client, { healthzPath: opts.healthzPath, corePaths }),
     } satisfies LicenseInject,
   }
 }
