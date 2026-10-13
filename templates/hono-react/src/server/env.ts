@@ -3,7 +3,7 @@
  * 渐进式：每能力一组独立 env，缺省则不启用该能力。
  * .env.example 由 `node scripts/gen-env-example.mjs` 生成（见 package.json gen:env）。
  */
-import { defineConfig, detectRuntime, parses } from '@homurajs/core'
+import { applyEnvFile, defineConfig, detectRuntime, parses } from '@homurajs/core'
 
 export type Dialect = 'sqlite' | 'pg' | 'rest'
 
@@ -188,8 +188,57 @@ export const configSpecs = {
 
 export type AppConfig = ReturnType<typeof loadConfig>
 
-export function loadConfig(env?: NodeJS.ProcessEnv) {
-  return defineConfig(configSpecs).load(env)
+/** 仓库里公开的缺省密钥：生产 / qw-pages 形态禁止沿用（HS256 密钥公开 = 会话可伪造） */
+export const INSECURE_SESSION_SECRET = 'dev-only-insecure-secret-change-me-32bytes!'
+
+export interface LoadConfigOptions {
+  /** false = 不读配置文件；string = 指定路径；缺省 = 按 core resolveConfigFilePath 的优先级自动定位 */
+  configFile?: string | false
+}
+
+/**
+ * 载入配置：先把部署期配置文件并入 env，再走 defineConfig，最后校验密钥。
+ *
+ * 为什么必须有配置文件这条路：qw-pages 只注入固定 12 个 env 且**无自定义注入口**（实测），
+ * SESSION_SECRET / OAUTH_CLIENT_SECRET 这类值无法用环境变量投递；而部署产物不可被公网读取
+ * （实测：/server/*.mjs 与 /homura.manifest.json 一律被 SPA fallback 兜成 index.html，
+ * %2e%2e 变体被网关 400，真实 /assets/*.js 正常返回），故随产物携带 homura.config.env
+ * 是可行通道，其信任边界与代码本身相同。
+ *
+ * 优先级：真实 env > 文件。文件位置优先级见 core 的 resolveConfigFilePath
+ * （HOMURA_CONFIG_FILE → <cwd>/homura.config.env → QWENWORK_WRITABLE_DIR/homura.config.env）。
+ */
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfigOptions = {}) {
+  if (opts.configFile !== false) {
+    applyEnvFile(env, typeof opts.configFile === 'string' ? { path: opts.configFile } : {})
+  }
+  const config = defineConfig(configSpecs).load(env)
+  assertSecretsOverridden(config, env)
+  return config
+}
+
+/**
+ * 生产 / qw-pages 形态禁止沿用仓库里公开的缺省 SESSION_SECRET。
+ *
+ * 这不是洁癖：session 用 HS256 自签自验，签名密钥一旦公开，任何人都能伪造
+ * access/refresh token 冒充任意用户（含绕过 license 停服后的用户态）。
+ * 而 Pages 上无法用 env 投递密钥，很容易顺手拿缺省值上线，故在启动期直接拒绝。
+ *
+ * 新增带 default 的 secret 配置项时，请一并加入这里的检查。
+ */
+export function assertSecretsOverridden(
+  config: AppConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const production = detectRuntime(env).target === 'qw-pages' || env['NODE_ENV'] === 'production'
+  if (!production) return
+  if (config.get('sessionSecret') === INSECURE_SESSION_SECRET) {
+    throw new Error(
+      'SESSION_SECRET 仍是仓库里公开的缺省值，生产 / qw-pages 形态拒绝启动' +
+        '（HS256 密钥公开等于任何人可伪造会话）。请通过 homura.config.env' +
+        '（随部署产物携带，或放平台的 QWENWORK_WRITABLE_DIR）或真实环境变量提供 >=32B 随机值。',
+    )
+  }
 }
 
 /**

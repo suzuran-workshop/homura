@@ -18,7 +18,7 @@
  *   `* import { union } from 'drizzle-orm/pg-core'` 这类示例文本会误报。
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, rmSync, existsSync, copyFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { build } from 'tsdown'
 
@@ -94,6 +94,22 @@ if (isQwPages) {
   }
   writeFileSync(resolve(dist, 'homura.manifest.json'), JSON.stringify(manifest, null, 2))
   console.log('[build] manifest → dist/homura.manifest.json')
+}
+
+// ── ④ 部署期配置文件（可选，含密钥）──
+// qw-pages 无自定义 env 注入口（实测），SESSION_SECRET / OAUTH_CLIENT_SECRET 只能随产物携带。
+// 产物不可被公网读取（实测：/server/*.mjs 与 /homura.manifest.json 均被 SPA fallback 兜成
+// index.html，%2e%2e 变体被网关 400），故此通道的信任边界与代码本身相同。
+// 运行时定位顺序见 core 的 resolveConfigFilePath：HOMURA_CONFIG_FILE → <cwd> → 平台可写区。
+const configSrc = resolve(root, 'config', 'homura.config.env')
+if (existsSync(configSrc)) {
+  copyFileSync(configSrc, resolve(dist, 'homura.config.env'))
+  console.log('[build] config → dist/homura.config.env（含密钥：已被 .gitignore 忽略，勿提交）')
+} else if (isQwPages) {
+  console.warn(
+    '[build] 未找到 config/homura.config.env：qw-pages 上 SESSION_SECRET 会沿用仓库公开的缺省值，' +
+      '启用 auth 时会被启动期断言拒绝（见 src/server/env.ts 的 assertSecretsOverridden）',
+  )
 }
 
 console.log(`[build] done → ${dist}`)

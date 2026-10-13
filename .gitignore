@@ -21,6 +21,11 @@ test-results/
 .env.local
 .env.*.local
 
+# 部署期配置（含密钥，随产物携带；qw-pages 无 env 注入口，见 docs/specs/module-qw-pages.md）
+homura.config.env
+config/homura.config.env
+!*homura.config.env.example
+
 # IDE
 .idea/
 .vscode/
