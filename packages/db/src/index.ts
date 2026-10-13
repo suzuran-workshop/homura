@@ -9,6 +9,7 @@
  * 实测依据见 postgrest.ts 头部与 docs/specs/module-qw-pages.md）。
  */
 export type { DbConfig, PgDbConfig, SqliteDbConfig, Database, PgDatabase } from './types.js'
+export type { DrizzleQueryable, DrizzleSelectFrom } from './types.js'
 export { createDb, registerPgDriver, isPgRegistered } from './create-db.js'
 export { createSqliteDb } from './sqlite.js'
 export type { SqliteDatabase } from './sqlite.js'
