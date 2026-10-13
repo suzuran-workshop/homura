@@ -167,7 +167,7 @@
   - 迁移从双轨变三轨——Pages 形态的建表与 RLS policy 只能在部署期用平台受控迁移执行 `drizzle/pg` 的 SQL（App 无 DDL 权限）
   - 两类静默失败必须在代码里显式化：RLS 缺 policy 时 SELECT 返回 `200 []`、INSERT 返回 **401**（PG code 42501，不是 403）；upsert 在唯一列非主键时必须给 `?on_conflict=`，否则 409/23505。`RestError` 对这几类附中文 hint
   - 被 RLS 拒掉的写入仍消耗序列值 → 不能用 id 连续性判断写入成功
-  - **能力缺口**：`@homurajs/auth` 的 session store 与 `@homurajs/license` 的 state store 只有 drizzle 实现，REST 形态下这两层不启用（app.ts 打 warn）。PRD 场景 2 的"钉扫码登录"在 Pages 上待补 `createRestSessionStore` / `createRestStateStore`
+  - **能力缺口（已部分补齐）**：`createRestSessionStore`（auth）与 `createRestStateStore`（license）已实现，REST 形态下两层照常启用；consume 的原子抢占用 `PATCH + 过滤 + return=representation` 表达，与 SQL 版 `UPDATE...WHERE used_at IS NULL RETURNING` 等价。**剩余阻塞不是 store 而是配置投递**：平台无自定义 env 注入口，`OAUTH_CLIENT_SECRET` 无处安放（烘进 bundle = 把密钥发到公网产物），故 PRD 场景 2 的"钉扫码登录"在 Pages 上仍不可用，待做方案是部署期把配置写入 `homura_config` 表、启动时经 PostgREST 读取。两个 REST store 目前只过单测（桩 RestDb），未在真实 PostgREST 上验证
   - 对象存储在 Pages 上不可用：anon 建桶被 RLS 拒，受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来
 - 何时重新审视：平台开放 service-role 凭据或 storage 建桶能力时
 

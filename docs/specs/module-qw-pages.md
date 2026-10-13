@@ -48,33 +48,62 @@
 
 ## 已落地的适配点
 
-| 适配点文件                                       | 改动                                                                                                                                                                                                                                    |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/core/src/runtime.ts`                   | `QW_PAGES_ENV_MARKERS` 换成实测注入的 `QWENWORK_WRITABLE_DIR` / `SUPABASE_INSTANCE_ID`；新增 `HEALTHZ_PATH` + `healthzPathFor()` 同源常量                                                                                               |
-| `packages/app-kit/src/runtime/qw-pages.ts`       | `start()` 改为真监听（复用 `listenWithNodeServer`，缺省 8081 + `HOST`）；删除 `exportHandlers` 三导出对冲；`assetsDir` 不再用 `import.meta.url` 回溯（按 npm 依赖消费时会指到 `node_modules` 内），改为 `HOMURA_ASSETS_DIR ?? 'client'` |
-| `packages/app-kit/src/runtime/node.ts`           | 抽出 `listenWithNodeServer`（读 PORT + HOST）供两形态共用                                                                                                                                                                               |
-| `packages/app-kit/src/create-app.ts`             | `healthz.path` 可配，缺省按形态取；返回值新增 `healthzPath`                                                                                                                                                                             |
-| `packages/app-kit/src/static.ts`                 | SPA fallback 保留前缀含两形态健康检查路径；`decodeURIComponent` 异常吞掉转 404（旧行为 500）                                                                                                                                            |
-| `packages/license/src/guard.ts`                  | 豁免清单改为 `createDefaultBypass({ healthzPath })`，与 app-kit 注册路径同源                                                                                                                                                            |
-| `packages/db/src/postgrest.ts`                   | 新增 PostgREST 客户端（select/insert/update/remove + upsert + RestError hint）                                                                                                                                                          |
-| `packages/db/src/rest-schema.ts`                 | 新增：从 pg schema **派生**表描述符（不手写第三份 schema）                                                                                                                                                                              |
-| `packages/db/src/rest-ttlkv.ts`                  | 新增：ADR-010 的 DB 版 TTL-KV 在 REST 形态的实现                                                                                                                                                                                        |
-| `packages/db/src/pg/supabase.ts`                 | 删除"qw-pages 允许 TCP 出网 → PG 直连可行"的错误前提；`loadSupabaseEnv` 只返回 `dbConfig`（不再顺带 platformUrl/anonKey）                                                                                                               |
-| `packages/storage/src/supabase.ts`               | 新增 `loadSupabaseStorageEnv`（只需 `SUPABASE_URL` + `SUPABASE_ANON_KEY`），解除对 PG 凭据的连带依赖                                                                                                                                    |
-| `templates/hono-react/src/server/env.ts`         | `DIALECT` 增加 `rest` 且**去掉默认值**；新增 `resolveDialect()`（standalone→sqlite，qw-pages→rest）；新增 `SUPABASE_URL` / `STORAGE_SUPABASE_BUCKET`                                                                                    |
-| `templates/hono-react/src/server/db.ts`          | `DbBundle` 改为 `kind` 判别联合；rest 分支；在 Pages 上显式选 sqlite/pg 时抛可行动错误；`migrate()` 对 rest 改为探活校验                                                                                                                |
-| `templates/hono-react/src/server/schema/rest.ts` | 新增（派生，零手写）                                                                                                                                                                                                                    |
-| `templates/hono-react/src/server/todos-repo.ts`  | 新增 `buildRestTodoRepo`（ISO 时间串 → epoch）                                                                                                                                                                                          |
-| `templates/hono-react/src/server/app.ts`         | 按 `kind` 选 repo；auth/license 在 rest 形态**不启用并 warn**；storage 换用 REST env loader；`secureCookies` 由 `adapter.trustProxy()` 接线；健康检查路径与 guard 同源                                                                  |
-| `templates/hono-react/src/server/qw-pages.ts`    | 改为监听形态，与 `index.ts` 同构；顺带移除 `export const fetch` 对全局 fetch 的遮蔽                                                                                                                                                     |
-| `templates/hono-react/scripts/build.mjs`         | 更正"不赌平台装依赖"的依据；manifest 增加 `measured` 段                                                                                                                                                                                 |
+| 适配点文件                                       | 改动                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/runtime.ts`                   | `QW_PAGES_ENV_MARKERS` 换成实测注入的 `QWENWORK_WRITABLE_DIR` / `SUPABASE_INSTANCE_ID`；新增 `HEALTHZ_PATH` + `healthzPathFor()` 同源常量                                                                                                                                                      |
+| `packages/app-kit/src/runtime/qw-pages.ts`       | `start()` 改为真监听（复用 `listenWithNodeServer`，缺省 8081 + `HOST`）；删除 `exportHandlers` 三导出对冲；`assetsDir` 不再用 `import.meta.url` 回溯（按 npm 依赖消费时会指到 `node_modules` 内），改为 `HOMURA_ASSETS_DIR ?? 'client'`                                                        |
+| `packages/app-kit/src/runtime/node.ts`           | 抽出 `listenWithNodeServer`（读 PORT + HOST）供两形态共用                                                                                                                                                                                                                                      |
+| `packages/app-kit/src/create-app.ts`             | `healthz.path` 可配，缺省按形态取；返回值新增 `healthzPath`                                                                                                                                                                                                                                    |
+| `packages/app-kit/src/static.ts`                 | SPA fallback 保留前缀含两形态健康检查路径；`decodeURIComponent` 异常吞掉转 404（旧行为 500）                                                                                                                                                                                                   |
+| `packages/license/src/guard.ts`                  | 豁免清单改为 `createDefaultBypass({ healthzPath })`，与 app-kit 注册路径同源                                                                                                                                                                                                                   |
+| `packages/auth/src/session/rest-store.ts`        | 新增 `createRestSessionStore`：PostgREST 版 RefreshTokenStore。consume 的**原子抢占**用 `PATCH ?token_hash=eq&expires_at=gt&used_at=is.null` + `return=representation` 表达，返回空数组即抢占失败——与 SQL 版 `UPDATE...WHERE used_at IS NULL RETURNING` 等价（延续教训 8「先占后判」）         |
+| `packages/license/src/rest-state-store.ts`       | 新增 `createRestStateStore`：PostgREST 版 LicenseStateStore（save 用 `on_conflict=id` upsert；**不建表**，无 DDL 权限）                                                                                                                                                                        |
+| `packages/db/src/postgrest.ts`                   | 新增 PostgREST 客户端（select/insert/update/remove + upsert + RestError hint）                                                                                                                                                                                                                 |
+| `packages/db/src/rest-schema.ts`                 | 新增：从 pg schema **派生**表描述符（不手写第三份 schema）                                                                                                                                                                                                                                     |
+| `packages/db/src/rest-ttlkv.ts`                  | 新增：ADR-010 的 DB 版 TTL-KV 在 REST 形态的实现                                                                                                                                                                                                                                               |
+| `packages/db/src/pg/supabase.ts`                 | 删除"qw-pages 允许 TCP 出网 → PG 直连可行"的错误前提；`loadSupabaseEnv` 只返回 `dbConfig`（不再顺带 platformUrl/anonKey）                                                                                                                                                                      |
+| `packages/storage/src/supabase.ts`               | 新增 `loadSupabaseStorageEnv`（只需 `SUPABASE_URL` + `SUPABASE_ANON_KEY`），解除对 PG 凭据的连带依赖                                                                                                                                                                                           |
+| `templates/hono-react/src/server/env.ts`         | `DIALECT` 增加 `rest` 且**去掉默认值**；新增 `resolveDialect()`（standalone→sqlite，qw-pages→rest）；新增 `SUPABASE_URL` / `STORAGE_SUPABASE_BUCKET`                                                                                                                                           |
+| `templates/hono-react/src/server/db.ts`          | `DbBundle` 改为 `kind` 判别联合；rest 分支；在 Pages 上显式选 sqlite/pg 时抛可行动错误；`migrate()` 对 rest 改为探活校验                                                                                                                                                                       |
+| `templates/hono-react/src/server/schema/rest.ts` | 新增（派生，零手写）                                                                                                                                                                                                                                                                           |
+| `templates/hono-react/src/server/todos-repo.ts`  | 新增 `buildRestTodoRepo`（ISO 时间串 → epoch）                                                                                                                                                                                                                                                 |
+| `templates/hono-react/src/server/app.ts`         | 按 `kind` 选 repo 与 store（todos/auth/license 三处各有 SQL 与 REST 两套实现）；REST 形态的 OAuth state 用 `createRestTtlKv`（内存 KV 在 Pages 上重启即清，登录会断在跳转与回调之间）；storage 换用 REST env loader；`secureCookies` 由 `adapter.trustProxy()` 接线；健康检查路径与 guard 同源 |
+| `templates/hono-react/src/server/qw-pages.ts`    | 改为监听形态，与 `index.ts` 同构；顺带移除 `export const fetch` 对全局 fetch 的遮蔽                                                                                                                                                                                                            |
+| `templates/hono-react/scripts/build.mjs`         | 更正"不赌平台装依赖"的依据；manifest 增加 `measured` 段                                                                                                                                                                                                                                        |
+
+## 真实产物端到端验证（已做）
+
+`pnpm build:qw-pages` 的 tsdown 全打包产物直接发布，实测通过：
+
+- `/_healthz` → `{"status":"ok","runtime":"qw-pages","checks":{"db":"ok"}}`。这一条同时证明四件事：真实产物能启动、`detectRuntime` 在线上正确识别为 **qw-pages**（标记修复生效）、`resolveDialect` 自动选了 **rest**（若误选 sqlite 会在建库时撞 EACCES 而起不来）、PostgREST 探活成功
+- `/healthz` → 仍是网关自答的 `ok`（text/plain），印证健康检查必须让开这个路径
+- todos 全链路：`GET {"todos":[]}` → `POST` 201（uuid 由 DB 生成、`createdAt` 由 ISO 串正确转成 epoch ms）→ `GET` 返回该行 → `PATCH` 200 且 `done:true` → `DELETE` 200 `{"ok":true}` → `GET` 空 → 再 `DELETE` 404
+- SPA 与静态：`/` 200（title `homura app`，被平台注入 chrome 后 14435B），`/assets/index-*.js` 200 `text/javascript` → 新的 `assetsDir` 缺省 `client` 正确
+- `/api/me` → `{"user":null}`（未配 OAuth，符合预期）
+
+**产物形态更正**：不是「自包含单文件」。tsdown/rolldown 会代码分割，实测产出 **30 个文件 / 2.1MB**（入口 `server/index.mjs` + 26 个 chunk）。自包含性成立——真实 import 语句里的裸包只剩 Node 内置（`stream`/`crypto`/`fs`/`net`/`os`/`tls`/`http2`/`http`/`perf_hooks`，均来自打包进来的 `@hono/node-server`），无第三方裸包、无裸动态 import。
+
+> 排查提示：用 `grep "from 'drizzle-orm/pg-core'"` 这类宽松模式检查自包含性会**误报**——drizzle 源码的 JSDoc 里有 `* import { union } from 'drizzle-orm/pg-core'` 这样的示例文本。必须只匹配行首的真实 `import`/`export` 语句。
+
+## 部署配方（REST 形态必需的四张表）
+
+App 无 DDL 权限，表与 policy 必须在部署期用 `qwenwork_pages_apply_migration` 建。SQL 直接取 `drizzle/pg` 的迁移产物并改成幂等（`IF NOT EXISTS`），另加 REST 版 TTL-KV 用的 `homura_ttlkv`：
+
+| 表               | 用途                                                | 来源                                                |
+| ---------------- | --------------------------------------------------- | --------------------------------------------------- |
+| `todos`          | 业务表（camelCase 列：`ownerSub`/`createdAt`）      | `drizzle/pg/*/migration.sql`                        |
+| `refresh_tokens` | session store（snake_case 列）                      | 同上（由 `@homurajs/auth/tables` spread 进 schema） |
+| `license_state`  | license state store                                 | 同上（由 `@homurajs/license/tables` spread）        |
+| `homura_ttlkv`   | OAuth state 的 TTL-KV（`key`/`value`/`expires_at`） | 无 drizzle schema，SQL 见 `createDbTtlKv` 的 DDL    |
+
+每张表都要 `ENABLE ROW LEVEL SECURITY` + 一条 `FOR ALL TO anon USING (true) WITH CHECK (true)` 的 policy，否则就是前述静默失败（SELECT 200 空数组 / INSERT 401+42501）。这四张表都没有 serial 序列，无需 sequence 授权；`GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是**语法错误**（该位置不接受函数调用），有 serial 表时要在 DO 块里用 `EXECUTE format(...)` 逐条授权。
 
 ## 仍未验证 / 已知缺口
 
-- [ ] **REST 形态的 auth 与 license 未实现**：`@homurajs/auth` 的 session store 与 `@homurajs/license` 的 state store 只有 drizzle 版；Pages 上二者当前**不启用**（app.ts 打 warn）。补齐需 `createRestSessionStore` / `createRestStateStore`，表结构沿用 `refresh_tokens` / `license_state`。→ PRD 场景 2 的"钉扫码登录"在 Pages 上仍不可用。
-- [ ] 多实例是否真会扩容（只观测到单实例）；若会，`createMemoryTtlKv` 存的 OAuth state 必须换 `createRestTtlKv`。
+- [ ] **登录链在 Pages 上仍不可用，但阻塞点已不是 store**：`createRestSessionStore` 已实现，真正卡住的是**配置与密钥投递**——平台没有自定义 env 注入口，`OAUTH_CLIENT_SECRET` 无处安放，而烘进 bundle 等于把密钥发布到公网产物里。可行方案：部署期用受控迁移把配置写入一张 `homura_config` 表，启动时经 PostgREST 读取（anon key 只在服务端 env，不下发浏览器，故该表的 anon SELECT policy 不构成泄露）。**此方案未实现、未实测。**
+- [ ] REST 版 session/license store 只过了单测（桩 RestDb），**未在真实 PostgREST 上跑过**——尤其 `consume` 的原子抢占语义（PATCH + 过滤 + return=representation 是否真等价于 `UPDATE...WHERE...RETURNING`）。受上一条阻塞，端到端验证需要配置投递方案先落地。
+- [ ] 多实例是否真会扩容（只观测到单实例）。
 - [ ] `/storage/v1` 的 upload/download 全链路（因建不出桶而无法测）。
-- [ ] 真实模板产物（`pnpm build:qw-pages` 的 tsdown 全打包路径）在 Pages 上的端到端验证——本轮实验用的是 npm 直装 + 手写入口。
 - [ ] `Accept-Profile: public` 与 `Accept-Profile: tenant_<instance>_schema` 返回相同结果的原因未查（结论：Pages 上不需要设置该头，默认 schema 已含租户 schema）。
 
 ## 复现方法
