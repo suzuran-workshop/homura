@@ -29,11 +29,12 @@ import {
   type LicenseInject,
 } from '@homurajs/app-kit'
 import { detectRuntime, healthzPathFor, type Logger, type RuntimeInfo } from '@homurajs/core'
+import { REST_TTLKV_TABLE } from '@homurajs/db'
 import type { FileStorage } from '@homurajs/storage'
 import { resolveDialect, type AppConfig } from './env.js'
 import { buildDb, migrate, type DbBundle } from './db.js'
 import { buildRestTodoRepo, buildTodoRepo, type TodoRepo } from './todos-repo.js'
-import { todosRest } from './schema/rest.js'
+import { licenseStateRest, refreshTokensRest, restBusinessTables } from './schema/rest.js'
 import { buildApiRoutes } from './routes/api.js'
 import { buildFileRoutes } from './routes/files.js'
 import { buildPlatformRoutes } from './routes/platform.js'
@@ -82,10 +83,26 @@ export async function buildApp(
 
   // ── 层级 1：db（sqlite / pg / rest）──
   const dialect = resolveDialect(config)
+  const oauthOrgId = config.get('oauthOrgId')
+  const genuineServer = config.get('genuineServer')
+
+  /**
+   * 本 App 实际需要的表 = 业务表（schema/rest.ts 的 restBusinessTables）+ 按启用的能力追加。
+   *
+   * REST 形态下缺表 / 缺 policy 是**静默失败**（SELECT 返回 200 空数组、INSERT 返回 401+42501），
+   * 所以这份清单同时用于「部署期探活」与「/_healthz 的 db 检查」。
+   * 新增业务表只需在 restBusinessTables 登记一次，两处自动覆盖——别再往这里塞硬编码表名。
+   */
+  const requiredTables: string[] = [
+    ...restBusinessTables.map((t) => t.table),
+    ...(oauthOrgId ? [refreshTokensRest.table, REST_TTLKV_TABLE] : []),
+    ...(genuineServer ? [licenseStateRest.table] : []),
+  ]
+
   const dbBundle: DbBundle = overrides.db ?? (await buildDb(config, dialect))
   // SQL 形态跑 drizzle 迁移；REST 形态无 DDL 权限 → 探活校验（表与 policy 由平台受控迁移建）
   if (!overrides.skipMigrate) {
-    await migrate(dbBundle, [todosRest.table])
+    await migrate(dbBundle, requiredTables)
   }
   const todoRepo: TodoRepo =
     dbBundle.kind === 'sql'
@@ -94,7 +111,6 @@ export async function buildApp(
 
   // ── 层级 2：auth（OAUTH_DINGTALK_ORG_ID 配置即启用；SQL 与 REST 形态均支持）──
   let auth: AuthInject | false = false
-  const oauthOrgId = config.get('oauthOrgId')
   if (oauthOrgId) {
     auth = await buildAuth(config, dbBundle, oauthOrgId, fetchImpl, secureCookies)
   }
@@ -123,7 +139,6 @@ export async function buildApp(
   // ── 层级 5：license（GENUINE_SERVER 配置即启用；SQL 与 REST 形态均支持）──
   let license: LicenseInject | false = false
   let licenseClient: import('@homurajs/license').LicenseClient | undefined
-  const genuineServer = config.get('genuineServer')
   if (genuineServer) {
     const built = await buildLicense(config, dbBundle, genuineServer, healthzPath, fetchImpl)
     license = built.inject
@@ -136,14 +151,14 @@ export async function buildApp(
   if (storage) routes.route('/', buildFileRoutes(storage))
   if (platformRoutes) routes.route('/api/platform', platformRoutes)
 
-  // ── 健康检查：REST 形态做真探活（能查出「表没建 / policy 没给」这类静默失败）──
+  // ── 健康检查：REST 形态逐表真探活（能查出「表没建 / policy 没给」这类静默失败）──
   const bundle = dbBundle
   const checks: HealthCheck[] = [
     {
       name: 'db',
       check: async () => {
         if (bundle.kind === 'sql') return true // 能建出来即视为健康；生产可替换为 SELECT 1
-        await bundle.rest.ping(todosRest.table)
+        for (const table of requiredTables) await bundle.rest.ping(table)
         return true
       },
     },

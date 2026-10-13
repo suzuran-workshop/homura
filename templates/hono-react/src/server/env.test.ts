@@ -45,30 +45,44 @@ describe('resolveDialect — 显式优先，缺省按形态', () => {
 })
 
 describe('assertSecretsOverridden — 公开缺省密钥不得上生产', () => {
-  it('qw-pages + 缺省 SESSION_SECRET → loadConfig 启动期即拒绝', () => {
-    expect(() => loadConfig({ ...QW_PAGES_ENV }, { configFile: false })).toThrow(/SESSION_SECRET/)
-    expect(() => loadConfig({ ...QW_PAGES_ENV }, { configFile: false })).toThrow(/伪造会话/)
+  // 断言只在「真的会签 session」时生效，故这些用例都要启用 auth
+  const AUTH = { OAUTH_DINGTALK_ORG_ID: 'org' }
+
+  it('qw-pages + 启用 auth + 缺省 SESSION_SECRET → loadConfig 启动期即拒绝', () => {
+    expect(() => loadConfig({ ...QW_PAGES_ENV, ...AUTH }, { configFile: false })).toThrow(
+      /SESSION_SECRET/,
+    )
+    expect(() => loadConfig({ ...QW_PAGES_ENV, ...AUTH }, { configFile: false })).toThrow(
+      /伪造会话/,
+    )
   })
 
   it('单独调用断言函数同样生效（config 由非生产 env 构造，再换 env 判定）', () => {
-    const config = loadConfig({}, { configFile: false })
+    const config = loadConfig({ ...AUTH }, { configFile: false })
     expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).toThrow(/SESSION_SECRET/)
   })
 
-  it('NODE_ENV=production + 缺省密钥 → 拒绝启动', () => {
-    const config = loadConfig({}, { configFile: false })
+  it('NODE_ENV=production + 启用 auth + 缺省密钥 → 拒绝启动', () => {
+    const config = loadConfig({ ...AUTH }, { configFile: false })
     expect(() => assertSecretsOverridden(config, { NODE_ENV: 'production' })).toThrow(
       /SESSION_SECRET/,
     )
   })
 
-  it('qw-pages + 已覆盖密钥 → 通过', () => {
-    const env = { ...QW_PAGES_ENV, SESSION_SECRET: SAFE_SECRET }
+  it('未启用 auth 时放行：不签 JWT 就不该被缺省密钥挡住（回归）', () => {
+    // 冷启动验收发现的 bug：断言曾无条件执行，导致 Pages 上纯匿名 App 也无法启动
+    expect(() => loadConfig({ ...QW_PAGES_ENV }, { configFile: false })).not.toThrow()
+    const config = loadConfig({}, { configFile: false })
+    expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).not.toThrow()
+  })
+
+  it('qw-pages + 启用 auth + 已覆盖密钥 → 通过', () => {
+    const env = { ...QW_PAGES_ENV, ...AUTH, SESSION_SECRET: SAFE_SECRET }
     expect(() => loadConfig(env, { configFile: false })).not.toThrow()
   })
 
   it('standalone 开发态 + 缺省密钥 → 放行（不挡本地开发）', () => {
-    expect(() => loadConfig({}, { configFile: false })).not.toThrow()
+    expect(() => loadConfig({ ...AUTH }, { configFile: false })).not.toThrow()
   })
 
   it('缺省值常量与 configSpecs 里的实际默认一致（防止改了默认却漏改断言）', () => {

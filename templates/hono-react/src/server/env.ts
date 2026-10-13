@@ -224,6 +224,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
  * access/refresh token 冒充任意用户（含绕过 license 停服后的用户态）。
  * 而 Pages 上无法用 env 投递密钥，很容易顺手拿缺省值上线，故在启动期直接拒绝。
  *
+ * ⚠ 只在**真的会签 session** 时拦（即启用了 auth）：不启用登录的 App 根本不用这个密钥，
+ * 无条件拦会误伤——冷启动验收发现过这个 bug（Pages 上纯匿名 App 也无法启动）。
+ *
  * 新增带 default 的 secret 配置项时，请一并加入这里的检查。
  */
 export function assertSecretsOverridden(
@@ -232,11 +235,14 @@ export function assertSecretsOverridden(
 ): void {
   const production = detectRuntime(env).target === 'qw-pages' || env['NODE_ENV'] === 'production'
   if (!production) return
+  // 未启用 auth → 不签 JWT → 缺省密钥无害，放行
+  if (!config.get('oauthOrgId')) return
   if (config.get('sessionSecret') === INSECURE_SESSION_SECRET) {
     throw new Error(
-      'SESSION_SECRET 仍是仓库里公开的缺省值，生产 / qw-pages 形态拒绝启动' +
-        '（HS256 密钥公开等于任何人可伪造会话）。请通过 homura.config.env' +
-        '（随部署产物携带，或放平台的 QWENWORK_WRITABLE_DIR）或真实环境变量提供 >=32B 随机值。',
+      'SESSION_SECRET 仍是仓库里公开的缺省值，而本 App 启用了登录（OAUTH_DINGTALK_ORG_ID 已设）：' +
+        '生产 / qw-pages 形态拒绝启动（HS256 密钥公开等于任何人可伪造会话）。' +
+        '请通过 homura.config.env（随部署产物携带，或放平台的 QWENWORK_WRITABLE_DIR）' +
+        '或真实环境变量提供 >=32B 随机值。',
     )
   }
 }

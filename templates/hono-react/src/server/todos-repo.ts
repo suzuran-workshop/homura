@@ -2,15 +2,16 @@
  * schema 选择器 + todos repository（隔离方言差异）。
  * routes 只依赖 TodoRepo 接口，不感知 sqlite/pg/rest。
  *
- * 为什么有 Queryable 转型：drizzle 的 Database 是 PgDatabase | SqliteDatabase 联合，
- * db.select().from(table) 无法静态匹配「db 方言 × table 方言」的 4 种组合（2 种非法）。
- * 两 driver 的 query builder 方法签名一致，故收敛为一个最小接口，只在此处转型一次。
+ * SQL 形态用 drizzle 的 query builder：`Database` 是 PgDatabase | SqliteDatabase 联合，
+ * `db.select().from(table)` 无法静态匹配「db 方言 × table 方言」的 4 种组合（2 种非法），
+ * 故收敛为 @homurajs/db 导出的 DrizzleQueryable 最小接口，只在此处转型一次
+ * （新写 repo 直接复用它，别再复制一份接口定义）。
  *
  * REST 形态（qw-pages）走 buildRestTodoRepo：它不是 drizzle，没有 query builder，
  * 列名取自 schema/rest.ts 的派生描述符，时间戳是 ISO 字符串需自行转 epoch。
  */
 import { and, desc, eq, isNull } from 'drizzle-orm'
-import { assertRestColumns, type Database, type RestDb } from '@homurajs/db'
+import { assertRestColumns, type Database, type DrizzleQueryable, type RestDb } from '@homurajs/db'
 import { pgSchema } from './schema/pg.js'
 import { sqliteSchema } from './schema/sqlite.js'
 import { todosRest } from './schema/rest.js'
@@ -23,18 +24,8 @@ export interface TodoRepo {
   remove(id: string, ownerSub: string | null): Promise<boolean>
 }
 
-// drizzle 双方言共用的 query builder 子集（select/insert/update/delete + 链式）
-/* eslint-disable @typescript-eslint/no-explicit-any */
-interface SelectFrom {
-  where(c: any): Promise<any[]> & { orderBy(c: any): Promise<any[]> }
-}
-interface Queryable {
-  select(): { from(t: any): SelectFrom }
-  insert(t: any): { values(v: any): { returning(): Promise<any[]> } }
-  update(t: any): { set(v: any): { where(c: any): { returning(): Promise<any[]> } } }
-  delete(t: any): { where(c: any): { returning(): Promise<any[]> } }
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
+/** drizzle 双方言共用的 query builder 子集（定义在 @homurajs/db，各 repo 共用） */
+type Queryable = DrizzleQueryable
 
 type TodosTable = typeof pgSchema.todos | typeof sqliteSchema.todos
 
