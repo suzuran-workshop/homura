@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/core",
-  "version": "26.10.13",
+  "version": "26.10.14",
   "type": "module",
   "description": "homura 基座：运行环境探测、配置装载、日志、TTL-KV",
   "engines": {

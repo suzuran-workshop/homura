@@ -104,10 +104,15 @@
 ## ADR-011：license fail-open + 宽限期
 
 - 日期：2026-10-13
-- 状态：已采纳
+- 状态：**已修订（2026-10-14，homura-genuine 落地并双端联调后）**
 - 背景：守卫不应让 App 因授权服务器故障而宕机；但制作人需要即时停服权
 - 决策：心跳失败走宽限期（server 下发 graceSec），期内继续服务；server 明示 suspended 立即 503（即时停服权保留）；/healthz 与 /auth/* 豁免；strict 模式可选（未注册即停）
-- 何时重新审视：genuine 上线后按运营经验调参
+- **修订（2026-10-14）**：
+  - fail-open 必须覆盖**启动期**：原实现里 `onStart` 的 `register()` 抛错会冒到 `main()` 的 catch → `process.exit(1)`，等于"授权中心在 App 启动那一刻不可达或返回 4xx → 全站宕机"。双端联调时真实触发（残留的旧 genuine 进程导致 `instance_mismatch` 403，App 当场退出）。改为 warn 后继续启动，状态停在 `unknown`，靠心跳循环重试
+  - 豁免清单增加 `/_license`：`enforcement=all` 时它必须仍可读，否则前端连"为什么全站 503"都问不到，强提醒无从展示
+  - 健康检查路径不再硬编码 `/healthz`，改由 core `healthzPathFor` 同源提供（见 ADR-018）
+  - "停服"从单一 503 扩成四档处置（见 ADR-020）；即时停服权保留在 `all` 档
+- 何时重新审视：按运营经验调参（genuine 已上线）
 
 ## ADR-012：qw-pages 适配集中 RuntimeAdapter + 三导出对冲 + 自包含 bundle + manifest
 
@@ -197,3 +202,27 @@
   - **残留风险**：只验证了"经运行中的 App 读不到"，平台产物存储自身的 ACL 未验证；正式承载真实凭据前应向平台确认有无产物下载入口
 - 实测：V10 部署带 canary 配置 → `/auth/login` 返回 302，`Location` 含只可能来自文件的 `canary_org_9f3a` 与 `canary-client-id`；且因 `authorizeUrl` 在返回前 `await stateKv.set()`，该 302 同时证明 `createRestTtlKv` 的 upsert 在部署态跑通。全站扫 canary 零命中
 - 何时重新审视：平台开放自定义 env/secret 注入时（届时文件通道降级为本地开发用途）
+
+## ADR-020：授权载荷 Ed25519 签名，到期与功能范围由中心控制
+
+- 日期：2026-10-14
+- 状态：已采纳
+- 背景：产品要求 ① 中心可设置每个 App 实例的到期时间且**随时可调**，消费侧一旦发现过期就按设置禁用全部/核心功能，并对所有用户**每次使用强提醒**；② 每张许可证携带**签名的**功能范围，从而对不同持有者开放不同能力。原契约只有 active/grace/suspended 三态，无到期、无功能范围、无签名
+- 考虑过的方案：① 响应体加字段但不签名；② HMAC 对称签名；③ Ed25519 非对称签名整个载荷
+- 决策：选 ③。新增 `LicenseEntitlement`（status / expiresAt / enforcement / features / notice / instanceKey / serverTime / 心跳参数）与 `SignedEntitlement`（signature + keyId），register 与 heartbeat 都下发
+- 为什么不选 ①：中心响应可被中间人改写，把 `expired` 改成 `active` 就绕过了全部控制
+- 为什么不选 ②：对称密钥必须随 App 产物分发，而产物会落到别人的部署环境 → 拿到产物即可自签"永不过期 + 全功能"。非对称下 App 只嵌公钥
+- 为什么 Ed25519 而非 RS256：`node:crypto` 原生（契约文件不许引第三方，它会被打进每个派生 App 的 bundle）、签名固定 64B、无填充/哈希算法协商面
+- **签什么**：整个载荷。`instanceKey` 签进去防把授权重放到别的实例；`expiresAt` 防改到期日；`serverTime` 供消费侧校正时钟偏差、防回拨系统时间绕过到期；`enforcement`/`features`/`notice` 防篡改者自选最宽处置、自己加功能、抹掉提醒
+- **消费侧铁律**：验签不通过时，载荷里的任何字段都不得用于决策——enforcement 取最严 `all`、features 全拒、notice 换成安全告警。这条是被自己的测试抓出来的真漏洞（`requireFeature` 原先直接读 `getEntitlement().features`）
+- 处置分两维：`status` 说"发生了什么"，`enforcement` 说"该拦多少"（none/notice/core/all），`notice` 说"怎么告诉用户"。三者都由中心控制、可随时调整；`active` 时 enforcement 恒为 `none`，不给消费侧留误拦余地
+- `core` 档刻意不拦页面与静态资源：用户得能打开界面，才看得到"为什么功能没了"
+- 到期在消费侧**本地判定**（不等心跳），因为需求是"只要发现过期就处置"
+- 后果：
+  - 契约文件新增 `canonicalize` / `normalizePem` / `keyIdOf` / `verifyEntitlement` / `isEntitlementExpired`，全部纳入两侧逐字同步与 parity 测试——它们决定签名字节与 keyId，两侧不一致等于验签**静默**失效
+  - 状态从三态扩成五态（新增 `expired`；`unknown` 仍仅消费侧）
+  - App 侧必须配 `GENUINE_PUBLIC_KEY` 才有安全性；未配时 warn，且 features 一律拒绝
+  - `keyId` 派生方式变更（规范化 PEM 后再哈希）→ 修复前建的中心库需重新生成密钥
+  - 功能范围是**每许可证一份**（= 每个持有者/实例），同一 App 内所有终端用户相同；要做用户级授权是另一个数据模型
+- 实测：与真实 genuine 进程双端联调八阶段（active → 改到期 → core 档 → notice 档 → all 档 → 续期 → 收回功能 → 手动停服 → 恢复），验签全程 verified。四个缺陷由联调与测试抓出并修复：keyId 对 PEM 空白敏感、requireFeature 采信未验签载荷、register 失败 exit(1)、active 时丢弃中心显式文案
+- 何时重新审视：需要按终端用户（而非按许可证）授权时；或平台提供密钥托管/轮换自动化时

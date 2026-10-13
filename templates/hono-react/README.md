@@ -11,18 +11,36 @@ homura 全栈模板：Hono + React + Vite，**AI 开发的起点与活文档**�
 的 `configSpecs`（defineConfig）读出「启用了哪些能力」，逐级注入 `createApp`。
 每能力一组独立 env，缺省则不启用——从零能力到全家桶：
 
-| 层级 | 开关 env                                     | 解锁                                     | 装配文件            |
-| ---- | -------------------------------------------- | ---------------------------------------- | ------------------- |
-| 0    | 无                                           | 纯 routes + 健康检查 + 静态 SPA          | app.ts              |
-| 1    | `DIALECT=sqlite\|pg\|rest`（缺省按形态解析） | db + schema + 迁移/探活                  | db.ts / schema/     |
-| 2    | `OAUTH_DINGTALK_ORG_ID`                      | 钉钉登录（oauth2-dingtalk）+ session     | app.ts buildAuth    |
-| 3    | `DINGTALK_APP_KEY`+`_SECRET`                 | 平台消息/审批/通讯录（3p 能力协商）      | routes/platform.ts  |
-| 4    | `STORAGE_BACKEND=local\|s3\|supabase`        | 图床/文件（⚠ qw-pages 上三后端均不可用） | routes/files.ts     |
-| 5    | `GENUINE_SERVER`                             | 激活心跳 + 停服守卫                      | app.ts buildLicense |
+| 层级 | 开关 env                                     | 解锁                                                       | 装配文件            |
+| ---- | -------------------------------------------- | ---------------------------------------------------------- | ------------------- |
+| 0    | 无                                           | 纯 routes + 健康检查 + 静态 SPA                            | app.ts              |
+| 1    | `DIALECT=sqlite\|pg\|rest`（缺省按形态解析） | db + schema + 迁移/探活                                    | db.ts / schema/     |
+| 2    | `OAUTH_DINGTALK_ORG_ID`                      | 钉钉登录（oauth2-dingtalk）+ session                       | app.ts buildAuth    |
+| 3    | `DINGTALK_APP_KEY`+`_SECRET`                 | 平台消息/审批/通讯录（3p 能力协商）                        | routes/platform.ts  |
+| 4    | `STORAGE_BACKEND=local\|s3\|supabase`        | 图床/文件（⚠ qw-pages 上三后端均不可用）                   | routes/files.ts     |
+| 5    | `GENUINE_SERVER`（+ `GENUINE_PUBLIC_KEY`）   | 激活心跳 + Ed25519 验签 + 到期/停服四档处置 + 功能范围闸门 | app.ts buildLicense |
 
 `DIALECT` 通常**不用填**：`resolveDialect()` 会按运行形态取缺省（standalone → `sqlite`，
 qw-pages → `rest`）。在 qw-pages 上显式填 `sqlite` 或 `pg` 会启动即抛可行动错误——那是故意的，
 因为这两条路在该形态必然失败（应用根只读 / 无 PG 凭据且 5432 出网被封）。
+
+### 授权（层级 5）要点
+
+配了 `GENUINE_SERVER` 即启用，但**还必须配 `GENUINE_PUBLIC_KEY`**（中心 Ed25519 公钥 PEM），
+否则不验签——中心响应可被中间人改成 `active`（App 会 warn，且 features 一律拒绝）。
+PEM 是多行，写进 `config/homura.config.env` 时用双引号包裹、换行写成 `\n`。
+
+- `GENUINE_CORE_PATHS`（缺省 `/api`）：中心把处置强度设为 `core` 时，命中这些前缀的路径 503，
+  其余放行但仍带提醒头（页面要能打开，用户才看得到提醒）
+- `GET /_license` → `{status, enforcement, notice, expiresAt, features, signature}`。
+  它在守卫豁免清单里，所以全站 503 时仍可读——**前端要靠它渲染强提醒**
+  （React banner 尚未实现，见 `docs/specs/module-license.md` 验收项）
+- 每个非 active 响应都带 `X-Homura-License-Status` 与 `X-Homura-License-Notice`
+  （后者是 `encodeURI` 过的中文，前端 `decodeURI` 还原）
+- 功能范围用 `requireFeature(client, 'export')` 挂在具体路由上（**默认拒绝**）；
+  模板目前还没给示范路由，派生 App 时照 `@homurajs/license` README 接
+- `register()` 失败**不会**让 App 退出（fail-open 覆盖启动期）：状态停在 `unknown`，
+  心跳循环继续重试。别在 `onStart` 里让它抛到顶层
 
 配置样例有两份，都由 `pnpm gen:env` 从 `configSpecs` 生成（配置即文档，不会漂）：
 

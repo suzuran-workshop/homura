@@ -31,7 +31,7 @@
 | @homurajs/storage    | FileStorage 六方法契约（ns 前缀隔离/代理 URL/presign 降级）+ local / s3(动态 import) / supabase(手写 REST) 三实现 + /files 代理路由                                                                                                                                                                        |
 | @homurajs/auth       | OAuth2Client（code flow，state TTL-KV 一次性消费）+ SessionManager（HS256 短 JWT + opaque refresh rotate + familyId 复用检测族吊销）+ hono 路由/中间件                                                                                                                                                     |
 | @homurajs/3p         | Capability 分片（oauth/message/approval/contacts）+ supports 守卫协商 + dingtalk 实现（CorpTokenManager 缓存+single-flight、三组 v1.0 API、OAuth 预设）                                                                                                                                                    |
-| @homurajs/license    | genuine 契约（contract.ts 单一事实源）+ LicenseClient（register/心跳±抖动/宽限状态机）+ licenseGuard（503/警告头/fail-open）                                                                                                                                                                               |
+| @homurajs/license    | genuine 契约（contract.ts 与 ../homura-genuine 逐字同步，parity 测试守）+ LicenseClient（register/心跳±抖动/宽限状态机/**Ed25519 验签**/本地到期判定）+ licenseGuard（四档 enforcement/提醒头/fail-open）+ requireFeature（功能范围闸门）+ state store 双实现（drizzle / PostgREST）                       |
 | @homurajs/app-kit    | createApp 固定中间件链装配（健康检查路径按形态取）+ RuntimeAdapter（两形态均为端口监听，差异只剩缺省值：standalone 3000/dist/client，qw-pages 8081+HOST/client）                                                                                                                                           |
 | templates/hono-react | 渐进式装配示范（env.ts 定义每能力独立 env 开关 + resolveDialect 按形态定数据方言 + app.ts buildApp 逐级注入）+ 双形态 build（standalone dist / qw-pages 自包含产物目录：tsdown 代码分割成多 chunk，约 30 文件，非单文件 + manifest）                                                                       |
 
@@ -44,13 +44,13 @@
 - 登录：浏览器 → /auth/login（state 入 TtlKv）→ oauth2-dingtalk /:orgId/authorize → 钉钉 → callback → code+state → token 端点 → userinfo → mapUser → SessionManager 签发双 cookie（HttpOnly）
 - 刷新：sessionMiddleware 检出 access 过期 → refresh cookie → store.consume（一次性）→ rotate 签新；复用检出 → revokeFamily
 - 上传：App → storage.uploadFile(ns,...) → 后端落对象（key=ns/files/ts_name）→ 返回代理 URL `/files/<key>`；下载走 createFileProxyRoutes
-- 激活：App 启动 → license.register（instanceKey 持久化）→ startHeartbeat（server 下发间隔±10%）→ genuine 下发 suspended → guard 503
+- 激活：App 启动 → license.register（instanceKey 持久化；**失败不退出**，warn 后置 unknown 靠心跳重试）→ startHeartbeat（server 下发间隔±10%）→ 每次响应携带 **Ed25519 签名的授权载荷**（status/expiresAt/enforcement/features/notice）→ App 验签后才采信 → guard 按 enforcement 分档处置（none/notice/core/all）+ requireFeature 逐点校验功能范围
 - 部署：`pnpm build`（standalone：vite + tsdown index.ts）/ `pnpm build:qw-pages`（entry=qw-pages.ts，全打包成自包含**产物目录**：tsdown 会代码分割，实测约 30 文件 / 2.1MB，不是单文件；+ homura.manifest.json + 拷入 config/homura.config.env）
 
 ## 外部系统
 
 - ../oauth2-dingtalk（已上线 dingtalk.auth.xrl.im）：/:orgId/authorize|token|userinfo；仅 code flow 无 refresh（故 session 自管）
-- ../homura-genuine（待建）：/v1/register、/v1/heartbeat；契约 = license/src/contract.ts
+- ../homura-genuine（**已实现**，Hono + node:sqlite + Ed25519）：`/v1/register`、`/v1/heartbeat`、`/v1/keys` + 管理端点（bearer token，签发/调期限/改处置强度/改功能范围/停服/轮换密钥）；契约 = license/src/contract.ts（两侧逐字一致，genuine 侧有 parity 测试）；2026-10-14 已双端真进程联调八阶段
 - qw-pages（2026-10-13 实测，定论见 specs/module-qw-pages）：平台拉起 `node <entrypoint>` 常驻进程并反代到 PORT/HOST（**无** serverless 导出约定）；Node v22.23.1；应用根目录只读，唯一可写区跨发布清空；出网**仅 443**（5432 timeout）→ PG 直连不可行，数据层只能走 PostgREST；只注入 12 个 env（含 SUPABASE_URL/ANON_KEY/INSTANCE_ID 与 QWENWORK_WRITABLE_DIR），无自定义注入口；`/healthz` 归网关；storage 桶建不出来（anon 与迁移角色均无权）
 - 钉钉开放平台：oapi gettoken（企业 token 7200s）+ v1.0 API（x-acs-dingtalk-access-token 头）
 
