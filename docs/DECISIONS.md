@@ -1,6 +1,7 @@
 # DECISIONS
 
 ## ADR-001：Suzuran 原地重生为 homura，旧资产归档
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：Suzuran Cloud（Go 多租户 PaaS）方向验证失败；新方向为 AI 开发的独立轻应用 SDK
@@ -11,6 +12,7 @@
 - 何时重新审视：无需
 
 ## ADR-002：Drizzle ORM 1.0.0-rc.4 精确锁版，双 driver
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：需要 pg + node:sqlite 双方言；stable 0.45.4 无 node-sqlite driver（仅 sqlite-proxy）
@@ -18,9 +20,11 @@
 - 决策：drizzle-orm@1.0.0-rc.4 + drizzle-kit@1.0.0-rc.4 精确锁（根 pnpm.overrides 强制统一）；postgres-js 罩 pgsql+supabase，node-sqlite 罩单机
 - 为什么选这个：官方 migrator 全套（已验证 rc.4 含 node-sqlite/migrator）；自研适配层维护成本长期更高
 - 后果：rc 期间 API 动荡风险 → 升级只走独立 PR，必跑 parity + 迁移往返测试；drizzle import 收敛 @homurajs/db 缩小波及面
+- **修订（2026-10-13）**：「postgres-js 罩 supabase」只适用于**自托管 supabase**。qw-pages 上 PG 直连双重不可用（平台不下发 PROJECT_REF/DB_PASSWORD/DATABASE_URL 且无注入口；5432 出网实测 timeout），该形态改走 PostgREST（见 ADR-017）
 - 何时重新审视：drizzle 1.0 正式发布时
 
 ## ADR-003：双方言双文件 + 配方 + parity 测试，而非运行时包装器
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：drizzle pg-core/sqlite-core 必须分别声明 schema
@@ -31,14 +35,19 @@
 - 何时重新审视：drizzle 1.0 若提供单 schema 双方言生成
 
 ## ADR-004：内部包源码直出 + 派生式消费（v1 不发 npm）
+
 - 日期：2026-10-13
-- 状态：已采纳
+- 状态：**已被事实推翻（2026-10-13 起 npm 直发）**
 - 背景：App 全部 AI 开发、上传的是 dist bundle，无需公共分发
 - 决策：exports 直指 src/index.ts（不预编译）；App 消费方式 = 派生本仓库（workspace 引用），模板 build 时整体打包
 - 后果：省去 7 包 × 双格式构建维护；未来发 npm 需补 build 链
-- 何时重新审视：出现外部消费者或 App 数量爆炸时
+- **修订（2026-10-13）**：`@homurajs/*` 已按 CalVer 发版（首个版本 26.10.13，tag 触发 CI），`publishConfig.exports` 切到 `dist/*.js` + `dist/*.d.ts`。两条消费路径并存且互不干扰：
+  - workspace 派生：仍走源码直出 → 教训 7 的 `noExternal: [/^@homurajs\//]` 只对这条路径成立
+  - npm 消费：拿构建产物 → **无需 bundle**。实测在 qw-pages 上以 `npm install --omit=dev --no-bin-links` 预装的 `node_modules` 直接 `import '@homurajs/app-kit'` 跑通（运行时解析到 `/opt/qwenwork-page/app/node_modules/...`）
+- 何时重新审视：无需（已落地）
 
 ## ADR-005：渐进式耦合为全项目最高设计原则
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：App 形态多样（纯展示→全家桶），强制依赖造成负担
@@ -47,6 +56,7 @@
 - 何时重新审视：无需（结构性原则）
 
 ## ADR-006：@homurajs/3p 第三方平台能力分片抽象
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：钉钉只是平台之一（未来企微/飞书）；平台只实现部分能力
@@ -57,6 +67,7 @@
 - 何时重新审视：第二个平台（企微/飞书）落地时验证抽象
 
 ## ADR-007：auth = 通用 OAuth2 客户端，OAuth 预设来自 3p
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：登录服务端已由 ../oauth2-dingtalk 承担（已上线）；homura 只做客户端
@@ -65,6 +76,7 @@
 - 何时重新审视：出现非 code-flow 需求（设备码等）
 
 ## ADR-008：session = HS256 短 JWT + opaque refresh rotate + 族吊销 + 静默重授权兜底
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：oauth2-dingtalk 不支持 refresh token；旧 SDK 最大债务是 token 15 分钟无刷新
@@ -74,6 +86,7 @@
 - 何时重新审视：出现多服务共享验签时升 RS256
 
 ## ADR-009：舍弃多租户/org 模型（单租户轻应用）
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：Suzuran 的 org 选择/角色体系是 PaaS 语境；homura 的 App 是独立单租户应用
@@ -81,6 +94,7 @@
 - 何时重新审视：无需
 
 ## ADR-010：TTL-KV 内存为缺省、DB 实现兜底，不引 Redis
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 决策：createMemoryTtlKv 缺省（单实例足够）；多实例部署用 createDbTtlKv（双方言 DELETE RETURNING）；不引入 Redis 依赖
@@ -88,6 +102,7 @@
 - 何时重新审视：真实多实例场景出现性能问题
 
 ## ADR-011：license fail-open + 宽限期
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：守卫不应让 App 因授权服务器故障而宕机；但制作人需要即时停服权
@@ -95,14 +110,21 @@
 - 何时重新审视：genuine 上线后按运营经验调参
 
 ## ADR-012：qw-pages 适配集中 RuntimeAdapter + 三导出对冲 + 自包含 bundle + manifest
+
 - 日期：2026-10-13
-- 状态：已采纳
+- 状态：**已修订（2026-10-13 实测后）**——保留 RuntimeAdapter 单点收口，退役三导出对冲
 - 背景：qw-pages 入口约定未知（Node 版本/导出形态/是否装依赖/静态服务方）
-- 决策：跨形态差异全走 RuntimeAdapter；qw-pages.ts 同时导出 default/fetch/app 三形态；构建为自包含单文件（不赌 qw-pages 侧 npm install）；产物附 homura.manifest.json（name/version/runtime/entrypoint/assets）；specs/module-qw-pages 维护待确认清单
+- 决策：跨形态差异全走 RuntimeAdapter；qw-pages.ts 同时导出 default/fetch/app 三形态；构建为自包含单文件（不赌 qw-pages 侧 npm install）；产物附 homura.manifest.json；specs/module-qw-pages 维护待确认清单
 - 后果：约定确认后只改 qw-pages.ts + build.mjs 两个文件
-- 何时重新审视：每确认一项 qw-pages 约定
+- **修订依据（线上探针实测，详见 specs/module-qw-pages）**：
+  - 「三导出对冲」**证伪并删除**：平台从不调用导出函数（探针双路计数 `serve` 47 次 / `handler` 0 次），动态页是常驻进程 + 反代 PORT/HOST。`createQwPagesAdapter().start()` 原本抛错拒绝监听，恰好禁掉了唯一正确的做法；现改为与 standalone 共用 `listenWithNodeServer`
+  - 「不赌平台 npm install」**依据替换**：平台确实不装依赖，但发布目录里现成的 `node_modules` 会被原样打包且运行时可解析。自包含单文件从"保命手段"降级为"体积/简单性选择"，予以保留
+  - 「manifest」**降级为文档**：发布的 entrypoint/port 由受控发布工具参数决定，平台不读该文件（推断，非实测）
+  - 四重对冲中三重退役，印证遗产教训 2「抽象层设计好但不接线等于没有」：RuntimeAdapter 保留，但只承载**真实**差异（端口/HOST/静态目录缺省值），且 `trustProxy()` 已接线到 auth 的 cookie `secure`
+- 何时重新审视：平台运行时契约变更时（探针可复跑）
 
 ## ADR-013：钉钉 webhook 回调本轮不做
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：Suzuran 从未实现；需公网入口 + AES 加解密 + 事件去重；无真实企业凭据联调
@@ -110,12 +132,14 @@
 - 何时重新审视：有凭据 + 公网入口的联调条件时
 
 ## ADR-014：jose 选型（JWT 库）
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 决策：session JWT 用 jose（维护活跃、零依赖、Web Crypto 兼容）
 - 何时重新审视：无需
 
 ## ADR-015：推翻旧 SDK 零依赖决策
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：Suzuran packages/sdk 的零依赖决策导致无中间件/无文件上传（DECISIONS 2026-08-04）
@@ -123,8 +147,36 @@
 - 何时重新审视：无需
 
 ## ADR-016：全文档 UTF-8 简体中文
+
 - 日期：2026-10-13
 - 状态：已采纳
 - 背景：Suzuran DECISIONS.md 曾出现 GBK 混编码段
 - 决策：所有文档统一 UTF-8 简体中文；commit 遵循 Conventional Commits（描述简体中文）
 - 何时重新审视：无需
+
+## ADR-017：qw-pages 数据层走 PostgREST，表描述符从 pg schema 派生
+
+- 日期：2026-10-13
+- 状态：已采纳
+- 背景：实测排除了 Pages 上另外两条路——`node:sqlite`（应用根目录只读，`mkdir ./data` → EACCES；唯一可写区跨发布清空）与 PG 直连（无凭据 + 5432 出网 timeout）。剩下 PostgREST：`SUPABASE_URL` + `SUPABASE_ANON_KEY` 是平台唯一注入的可用凭据，实测全套算子可用且数据跨发布持久
+- 考虑过的方案：① 引 `@supabase/supabase-js`；② 在 @homurajs/db 内手写零依赖 REST 客户端；③ 只在模板里写 repo，不进能力包
+- 决策：选 ②。新增 `@homurajs/db` 主入口导出 `createRestDb`（select/insert/update/remove + upsert）、`createRestTtlKv`、`restSchemaFromPg`。表结构**不手写第三份**，由 `restSchemaFromPg(pgSchema)` 从 drizzle pg 表元数据派生
+- 为什么不选 ①：与 storage 的既有风格不一致（那里已是手写 REST 零 SDK），且 SDK 会进 bundle；ADR-015 允许合理依赖，但此处零依赖即可完成
+- 为什么派生而非按 ADR-003 再 colocated 一份 `schema/rest.ts`：PostgREST 用的就是 PG 真实列名，手写必然漂移（教训 6 的同类坑）。`pgCol` 配方不传 name 时列名是 JS 属性名 → `ownerSub`/`createdAt` 是 camelCase，手写极易错成 snake_case；派生让单一事实源留在 `schema/pg.ts`。camelCase 列名在 PostgREST 上已实测可用（`is.null` 过滤 / `order=<col>.desc` / PATCH 全通过），故**不需要**为 Pages 改列名策略
+- 后果：
+  - 迁移从双轨变三轨——Pages 形态的建表与 RLS policy 只能在部署期用平台受控迁移执行 `drizzle/pg` 的 SQL（App 无 DDL 权限）
+  - 两类静默失败必须在代码里显式化：RLS 缺 policy 时 SELECT 返回 `200 []`、INSERT 返回 **401**（PG code 42501，不是 403）；upsert 在唯一列非主键时必须给 `?on_conflict=`，否则 409/23505。`RestError` 对这几类附中文 hint
+  - 被 RLS 拒掉的写入仍消耗序列值 → 不能用 id 连续性判断写入成功
+  - **能力缺口**：`@homurajs/auth` 的 session store 与 `@homurajs/license` 的 state store 只有 drizzle 实现，REST 形态下这两层不启用（app.ts 打 warn）。PRD 场景 2 的"钉扫码登录"在 Pages 上待补 `createRestSessionStore` / `createRestStateStore`
+  - 对象存储在 Pages 上不可用：anon 建桶被 RLS 拒，受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来
+- 何时重新审视：平台开放 service-role 凭据或 storage 建桶能力时
+
+## ADR-018：形态相关的路径常量单点定义（健康检查）
+
+- 日期：2026-10-13
+- 状态：已采纳
+- 背景：实测 `/healthz` 被 qw-pages 的 Page Gateway 保留——网关自答 `ok`（text/plain），请求**不下发到 App 进程**（探针 serve 计数不增）。原实现把 `/healthz` 硬编码在三处：app-kit 注册路由、license guard 豁免清单、static SPA fallback 的保留前缀
+- 决策：core 新增 `HEALTHZ_PATH` + `healthzPathFor(target)`（standalone `/healthz`，qw-pages `/_healthz`）；app-kit 的 `healthz.path` 缺省取它并把实际路径回传（`HomuraApp.healthzPath`）；license guard 的默认豁免清单改为 `createDefaultBypass({ healthzPath })`；模板把 `built.healthzPath` 同时喂给两侧
+- 为什么：只改 app-kit 会让停服时健康检查一起被 503，正好毁掉 ADR-011 的语义；三处各写一份必然漂移（教训 2）
+- 后果：`/healthz` 在 Pages 上不能用作应用健康判据（网关的 `ok` 与 App 无关）；健康检查改看 `/_healthz`
+- 何时重新审视：平台放开 `/healthz` 时
