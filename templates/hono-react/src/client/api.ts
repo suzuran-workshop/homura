@@ -28,4 +28,14 @@ export const api = {
   capabilities: () =>
     request<{ name: string; capabilities: string[] }>('/api/platform/capabilities').catch(() => null),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),
+  passwordLogin: (username: string, password: string) =>
+    request<{ ok: true }>('/auth/password/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+  passwordRegister: (username: string, password: string, nickname?: string) =>
+    request<{ ok: true }>('/auth/password/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, nickname }),
+    }),
 }

@@ -94,7 +94,8 @@ export default function App() {
           </p>
         ) : (
           <p>
-            未登录 <a href="/auth/login">钉钉登录</a>（匿名可操作公共 todos）
+            未登录 <a href="/auth/oauth2/authorize">钉钉登录</a> ·{' '}
+            <a href="/auth/login">密码登录</a>（匿名可操作公共 todos）
           </p>
         )}
       </section>

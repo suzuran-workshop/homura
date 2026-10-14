@@ -272,3 +272,64 @@
   ≥1MB 网关 413；分块 3MB（8×384KB）全 200 → 流式下载 3145728B 逐字节一致；超总上限 init 被拒。
 - 何时重新审视：平台放开 body 上限或提供原生对象存储时；或 OSS 从 Pages 出网实测可达后，
   大文件应优先走预签名直传而非分块 DB。
+
+## ADR-022：auth 多凭证身份模型——users 锚点 + 三类凭证 + JIT
+
+- 日期：2026-10-14
+- 状态：已采纳
+- 背景：原 `@homurajs/auth` 只支持 OAuth2（Authorization Code Flow），不接钉钉就没有认证能力。
+  这与"轻应用基础能力 SDK"定位不符——AI 生成的应用最常见诉求是"加个登录"，TextPassword 是
+  唯一零外部依赖的认证选项。WebAuthn 作为面向未来的无密码认证是第二层需求。需要统一三类
+  凭证（TextPassword 1:1 / WebAuthn 1:N / OAuth2 identity links 1:N）到一个本地身份锚点。
+- 考虑过的方案：
+  - **各凭证独立签发 session**：无统一 sub，跨凭证合并账户不可能 → 否
+  - **IdP subject 当主键，凭证表指向它**：OAuth2-only 可行，但 TextPassword/WebAuthn 没有上游
+    subject，强塞一个本地伪造的 sub 语义混乱 → 否
+  - **users 表作锚点 + 三类凭证表各自引用 user_id**：统一、清晰、可扩展 → 选
+  - **SDK 渲染登录页**：越权——homura 是 SDK 不是全栈框架，UI 是 App 的事 → 否（Spring Security
+    那种内嵌登录页是框架的做法）
+- 决策：
+  1. 引入 `users` 表作为本地身份锚点，所有凭证通过 `user_id` 关联
+  2. `session.sub` 从 IdP subject 改为 local user ID（**Breaking**：现有 refresh token 全部失效）
+  3. 三类凭证各自一张表：`passwords`（PK = user_id，1:1）、`oauth2_identity_links`
+     （UNIQUE provider+provider_sub，1:N）、`webauthn_credentials`（PK = credentialId，1:N）
+  4. `createDefaultIdentityResolver(userStore, linkStore, { jit })` 在 OAuth2 callback 时
+     桥接 IdP sub → local user；JIT 默认开启（首次登录自动建户），可配置关闭（403 拒绝未知身份）
+  5. SDK 只提供 JSON API，不渲染任何 HTML 登录页；OAuth2 路径统一到 `/auth/oauth2/*`
+     （Breaking：旧 `/auth/login` + `/auth/callback`）
+  6. WebAuthn 走 `@simplewebauthn/server` optional peer dep + `./webauthn` 子路径，不用则零依赖
+  7. `AuthInject` 接口不变，`createAuthRoutes` 按配置的能力（oauth2/password）自动组合路由
+- 为什么选这个：
+  - users 锚点是唯一能统一三类凭证且保持语义清晰的方案
+  - JIT 默认开启是轻应用的标准体验（OAuth2-only App 无需预注册）
+  - SDK 不渲染页面守住了"渐进式耦合"边界——App 自行决定登录 UI
+- 后果：
+  - Breaking change：session sub 语义变更 + OAuth2 路径迁移，所有已部署 App 需更新 redirect_uri
+  - 4 张新表（users/passwords/oauth2_identity_links/webauthn_credentials）需加入部署期受控迁移
+  - `createAuthRoutes` 签名变更（`client` → `oauth2: { client, identityResolver, provider }`）
+
+## ADR-023：密码哈希选型——Node 内置 scrypt，零依赖
+
+- 日期：2026-10-14
+- 状态：已采纳
+- 背景：TextPassword 需要安全的密码哈希算法。候选：bcrypt / argon2 / scrypt / PBKDF2。
+- 考虑过的方案：
+  - **argon2**：OWASP 推荐首选，但需要原生编译（node-gyp），qw-pages 运行时未知 → 否
+  - **bcrypt**：成熟但同样需要原生编译，且 72 字节密码长度限制 → 否
+  - **PBKDF2**：Node 内置，零依赖，但非内存困难（GPU 可并行爆破）→ 备选
+  - **scrypt**：Node 内置 `crypto.scrypt`，零依赖，内存困难（NIST SP 800-132 认可），
+    qw-pages 上 Node 运行时必定可用 → 选
+- 决策：
+  1. 使用 `node:crypto` 的 `scryptSync`（同步版，避免 callback 复杂性）
+  2. 参数 N=16384, r=8, p=1（Node 默认，适合 2024 硬件）
+  3. 哈希格式 `$scrypt$N,r,p$salt$hash`（便于未来升级算法时保留旧格式）
+  4. 16 字节随机 salt，64 字节输出
+  5. 验证用 `timingSafeEqual` 防时序攻击
+- 为什么选这个：
+  - 零原生依赖 = qw-pages 兼容（App 运行时是平台提供的 Node，无法预装 .node 文件）
+  - scrypt 内存困难特性比 PBKDF2 更安全（抗 GPU/ASIC 并行）
+  - `scryptSync` 简化代码（无 Promise 包装），auth 包的密码操作不在热路径
+- 后果：
+  - 密码哈希 CPU 成本约 50-100ms/次（可接受，非高频操作）
+  - 未来如需升级算法（如 argon2id），通过解析格式字符串的前缀 `$scrypt$` 平滑迁移
+  - 不引入 `@node-rs/bcrypt` 等替代方案，保持依赖最小化

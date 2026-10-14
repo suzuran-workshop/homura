@@ -137,6 +137,67 @@ pnpm build:qw-pages   # qw-pages：dist/ 整个目录上传（含 homura.manifes
    GRANT SELECT, INSERT, UPDATE, DELETE ON "homura_ttlkv" TO anon;
    ```
 
+   启用多凭证身份（TextPassword / WebAuthn / OAuth2 JIT）时还需建这四张表（每张都要 RLS policy）：
+
+   ```sql
+   CREATE TABLE IF NOT EXISTS "users" (
+     "id" text PRIMARY KEY,
+     "username" text UNIQUE,
+     "nickname" text,
+     "avatar_url" text,
+     "created_at" bigint NOT NULL,
+     "updated_at" bigint NOT NULL
+   );
+   ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS homura_anon_all ON "users";
+   CREATE POLICY homura_anon_all ON "users" FOR ALL TO anon USING (true) WITH CHECK (true);
+   GRANT SELECT, INSERT, UPDATE, DELETE ON "users" TO anon;
+
+   CREATE TABLE IF NOT EXISTS "passwords" (
+     "user_id" text PRIMARY KEY,
+     "password_hash" text NOT NULL,
+     "created_at" bigint NOT NULL,
+     "updated_at" bigint NOT NULL
+   );
+   ALTER TABLE "passwords" ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS homura_anon_all ON "passwords";
+   CREATE POLICY homura_anon_all ON "passwords" FOR ALL TO anon USING (true) WITH CHECK (true);
+   GRANT SELECT, INSERT, UPDATE, DELETE ON "passwords" TO anon;
+
+   CREATE TABLE IF NOT EXISTS "oauth2_identity_links" (
+     "id" text PRIMARY KEY,
+     "user_id" text NOT NULL,
+     "provider" text NOT NULL,
+     "provider_sub" text NOT NULL,
+     "raw_profile" text,
+     "created_at" bigint NOT NULL
+   );
+   CREATE UNIQUE INDEX IF NOT EXISTS oauth2_links_provider_sub_uidx
+     ON "oauth2_identity_links" ("provider", "provider_sub");
+   ALTER TABLE "oauth2_identity_links" ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS homura_anon_all ON "oauth2_identity_links";
+   CREATE POLICY homura_anon_all ON "oauth2_identity_links"
+     FOR ALL TO anon USING (true) WITH CHECK (true);
+   GRANT SELECT, INSERT, UPDATE, DELETE ON "oauth2_identity_links" TO anon;
+
+   CREATE TABLE IF NOT EXISTS "webauthn_credentials" (
+     "id" text PRIMARY KEY,
+     "user_id" text NOT NULL,
+     "public_key" text NOT NULL,
+     "counter" integer NOT NULL,
+     "device_type" text NOT NULL,
+     "backed_up" integer NOT NULL,
+     "transports" text,
+     "display_name" text,
+     "created_at" bigint NOT NULL
+   );
+   ALTER TABLE "webauthn_credentials" ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS homura_anon_all ON "webauthn_credentials";
+   CREATE POLICY homura_anon_all ON "webauthn_credentials"
+     FOR ALL TO anon USING (true) WITH CHECK (true);
+   GRANT SELECT, INSERT, UPDATE, DELETE ON "webauthn_credentials" TO anon;
+   ```
+
    **每张表都要 RLS policy**，否则是静默失败：`SELECT` 返回 `200 []`（看着像空库），
    `INSERT` 返回 **401** + PG code `42501`（不是 403）。需要建哪些表由 `app.ts` 的 `requiredTables`
    决定：模板缺省是 `todos`，启用 auth 追加 `refresh_tokens` + `homura_ttlkv`，启用 license 追加

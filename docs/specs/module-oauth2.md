@@ -7,6 +7,7 @@
 - authorizeUrl(returnTo?)：state（16B base64url）入 TtlKv（TTL 5min，value=returnTo），拼 authorize URL（client_id/redirect_uri/response_type=code/scope/extraParams）
 - callback({code, state})：kv.take(state) 一次性消费（未命中拒绝；allowNoState=true 显式 dev 放行）→ POST tokenUrl（form: grant_type=authorization_code/code/client_id/client_secret/redirect_uri）→ GET userinfoUrl（Bearer）→ mapUser
 - 错误：token 端点非 2xx → 抛含 body 的错误；userinfo 非 2xx → 抛错
+- **Identity Resolver（2026-10-14 新增）**：callback 路由拿到 IdP 的 AuthUser 后，调用 identityResolver.resolve(provider, idpSub, profile) → local user。默认实现 createDefaultIdentityResolver 在 oauth2_identity_links 查 link → 有则返回已有 user → 无则 JIT 建户+建 link（jit 默认 true，可配 false 拒绝未知身份）。session 的 sub 现在是 local user.id，不再是 IdP subject。路由统一到 /auth/oauth2/*（旧 /auth/login + /auth/callback 已废弃）
 
 ## 上游契约快照（oauth2-dingtalk，3p/dingtalk/oauth.ts 消费）
 > ⚠ 已实读 ../oauth2-dingtalk/src/index.ts 核对（2.2 步），修正了侦察期的字段假设：

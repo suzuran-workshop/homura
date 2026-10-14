@@ -41,7 +41,7 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 | db · `rest`（PostgREST）               | ⚪ 可用但无必要     | ✅ **唯一可行** | 表与 RLS policy 必须部署期用受控迁移建（App 无 DDL 权限）                                                                                      |
 | db · `sqlite`                          | ✅                  | ❌              | Pages 应用根只读（`mkdir ./data` → EACCES），唯一可写区跨发布清空 → 数据必丢                                                                   |
 | db · `pg` 直连                         | ✅                  | ❌              | Pages 不下发 PG 凭据、无注入口，且 5432 出网 timeout（仅 443 放行）                                                                            |
-| auth（登录链）                         | ✅                  | 🟡              | `/auth/login` 已线上验证 302；`/auth/callback` 待真实 IdP 联调                                                                                 |
+| auth（登录链）                         | ✅                  | 🟡              | 多凭证身份模型（ADR-022）：TextPassword（1:1）+ WebAuthn（1:N）+ OAuth2 identity links（1:N）。OAuth2 路径 `/auth/oauth2/*`（旧 `/auth/login`+`/auth/callback` 已废弃）。PasswordProvider 用 Node 内置 scrypt（零依赖，ADR-023）。WebAuthn 走 `@simplewebauthn/server` optional peer + `./webauthn` 子路径。Identity Resolver JIT 默认开启。session sub = local user ID（Breaking）。qw-pages 侧 OAuth2 callback 待真实 IdP 联调 |
 | license（到期 / 停服 / 功能范围）      | ✅ 已双端联调       | ✅ 已实测       | standalone 八阶段生命周期实测通过（真 genuine 进程）；Pages 侧 2026-10-14 用 cloudflared 隧道打通五场景（自注册/心跳/四档 enforcement/到期/停服/rotate keys 造成 invalid sig），`createRestStateStore` 跨发布持久化验证通过。前置：genuine 必须 https 公网可达；隧道 URL 漂了要重发 App |
 | 3p（钉钉消息/审批/通讯录）             | ✅                  | ⚪ 未测         | 凭据可经配置文件投递；出网到钉钉域名未验证                                                                                                     |
 | storage · `local`                      | ✅                  | ❌              | 默认 `./data/files` 在 Pages 不可写（首次上传才 EACCES，健康检查照报 ok）；改指可写区也跨发布清空                                              |
@@ -52,14 +52,14 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 
 图例：✅ 已验证可用 · 🟡 代码就绪但未端到端验证 · ⚪ 未测 · ⚠️ 有前置条件 · ❌ 平台限制导致不可用
 
-**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败（启用 `STORAGE_BACKEND=db` 时还要建 `homura_files` + `homura_file_chunks` 两张，`data` 列是 text）；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
+**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败（启用 `STORAGE_BACKEND=db` 时还要建 `homura_files` + `homura_file_chunks` 两张，`data` 列是 text；启用多凭证 auth 时还要建 `users`/`passwords`/`oauth2_identity_links`/`webauthn_credentials` 四张）；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
 
 ## 目录速查
 
 - `packages/core` — 基座：runtime 探测 / HEALTHZ_PATH / defineConfig / env-file（配置文件投递）/ logger / TtlKv
 - `packages/db` — Drizzle 双 driver 工厂（sqlite 内置、pg 走 `./pg` 子路径注册）、双方言配方与 parity、迁移双轨、supabase Supavisor 直连（**仅自托管**）、**PostgREST 层**（`createRestDb` / `restSchemaFromPg` 派生 / `createRestTtlKv`，qw-pages 唯一数据路径）
 - `packages/storage` — 四后端对象存储（local/s3/supabase/**db**）+ /files 代理路由（`./db`、`./tables` 子路径）；⚠ local/s3/supabase 在 qw-pages 上均不可用，**db 后端是 Pages 唯一可用的 storage**（二进制 base64 存 `homura_files` 表），见支持矩阵
-- `packages/auth` — 通用 OAuth2 客户端 + 自管 session（`./hono`、`./tables` 子路径）；session store 有 drizzle 与 PostgREST 两版
+- `packages/auth` — 多凭证身份：OAuth2 客户端 + TextPassword（scrypt）+ WebAuthn（optional peer）+ 自管 session（`./hono`、`./tables`、`./webauthn` 子路径）；Identity Resolver 桥接 IdP → local user；所有 store 有 drizzle 与 PostgREST 两版。见 ADR-022/023
 - `packages/3p` — 第三方平台能力分片抽象 + 钉钉实现（`./dingtalk` 子路径）
 - `packages/license` — 激活心跳客户端（Ed25519 验签 + 本地到期判定）+ 四档处置守卫 + `requireFeature` 功能范围闸门（`./contract` 契约、`./hono` 守卫）；state store 有 drizzle 与 PostgREST 两版
 - `packages/app-kit` — createApp 渐进式装配 + RuntimeAdapter（`./serve`、`./qw-pages`；两形态都自监听端口，差异只在缺省值）
