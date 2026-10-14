@@ -137,17 +137,22 @@ pnpm build:qw-pages   # qw-pages：dist/ 整个目录上传（含 homura.manifes
    GRANT SELECT, INSERT, UPDATE, DELETE ON "homura_ttlkv" TO anon;
    ```
 
-   启用多凭证身份（TextPassword / WebAuthn / OAuth2 JIT）时还需建这四张表（每张都要 RLS policy）：
+   启用多凭证身份（TextPassword / WebAuthn / OAuth2 JIT）时还需这四张表。⚠ 它们的 `CREATE TABLE`
+   **已由 `pnpm db:generate` 产出的迁移包含**（`drizzle/pg/` 里按时间序应用即建出，见上）——下面这段
+   是「幂等兜底 + 补 RLS policy」：drizzle 迁移**不生成 policy**，故每张表仍须单独 `CREATE POLICY` +
+   `GRANT`。列类型与迁移严格对齐（`users.id` / `oauth2_identity_links.id` 是 `uuid DEFAULT
+   gen_random_uuid()`，username 唯一性走唯一索引而非 inline UNIQUE——与 sqlite 侧对称，见 module-password.md）：
 
    ```sql
    CREATE TABLE IF NOT EXISTS "users" (
-     "id" text PRIMARY KEY,
-     "username" text UNIQUE,
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     "username" text,
      "nickname" text,
      "avatar_url" text,
      "created_at" bigint NOT NULL,
      "updated_at" bigint NOT NULL
    );
+   CREATE UNIQUE INDEX IF NOT EXISTS users_username_uidx ON "users" ("username");
    ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;
    DROP POLICY IF EXISTS homura_anon_all ON "users";
    CREATE POLICY homura_anon_all ON "users" FOR ALL TO anon USING (true) WITH CHECK (true);
@@ -165,7 +170,7 @@ pnpm build:qw-pages   # qw-pages：dist/ 整个目录上传（含 homura.manifes
    GRANT SELECT, INSERT, UPDATE, DELETE ON "passwords" TO anon;
 
    CREATE TABLE IF NOT EXISTS "oauth2_identity_links" (
-     "id" text PRIMARY KEY,
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
      "user_id" text NOT NULL,
      "provider" text NOT NULL,
      "provider_sub" text NOT NULL,

@@ -23,14 +23,17 @@
 
 1. `POST /auth/webauthn/auth/options`
    - 可选传入 userId（缩小 allowCredentials 范围）
-   - 调用 `generateAuthenticationOptions`
-   - challenge 存入 TtlKv（key = `${userId}:auth` 或 `anon:${random}`）
-   - 返回 options JSON（客户端传给 `startAuthentication`）
+   - 调用 `generateAuthenticationOptions`，返回 `{ options, challengeKey }`
+   - challenge 存入 TtlKv：已知 userId 时 key = `${userId}:auth`；匿名（discoverable credential）时 key = `anon:${random}`
+   - 响应 = options JSON **附带 `challengeKey`**（客户端传给 `startAuthentication`，并需在 verify 时回传 challengeKey）
 2. `POST /auth/webauthn/auth/verify`
-   - 按 credentialId 查凭证 → 找 user → 消费 challenge
-   - 调用 `verifyAuthenticationResponse` 验证 assertion
-   - 更新 counter（防重放）
-   - 创建 session → cookies + 200 JSON
+   - body 含 `response` + 可选 `challengeKey`
+   - 按 credentialId（response.id）查凭证 → 找 user
+   - 消费 challenge：key = 回传的 `challengeKey`，缺省回退 `${cred.userId}:auth`
+   - 调用 `verifyAuthenticationResponse` 验证 assertion → 更新 counter（防重放）→ 创建 session → cookies + 200 JSON
+
+> ⚠ **challengeKey 必须回传（匿名流程）**：匿名 options 阶段还不知道是哪个用户/凭证，challenge 只能存在 `anon:${random}` 下；而 verify 阶段是按 `response.id` 反查凭证的，两条腿对不上同一个固定 key。故 `generateAuthenticationOptions` 把 `challengeKey` 一并返回，客户端在 verify 时回传。已知 userId 的流程 key 固定为 `${userId}:auth`，回传与否都能命中（向后兼容）。
+> 历史 bug：旧实现匿名 challenge 存 `anon:xxx` 但 verify 只按 `${cred.userId}:auth` 取、且 API 不接受 key 回传 → discoverable credential 登录永远失败（provider.test.ts 已锁这条契约）。
 
 ### 凭证管理
 
@@ -48,7 +51,9 @@
 - `AUTH_WEBAUTHN_ENABLED`（默认 false）
 - `AUTH_WEBAUTHN_RP_ID`（域名，如 app.example.com）
 - `AUTH_WEBAUTHN_RP_NAME`（显示名，如 "My App"）
-- `AUTH_WEBAUTHN_ORIGIN`（允许的 origin，如 https://app.example.com）
+- `AUTH_WEBAUTHN_ORIGIN`（允许的 origin，如 https://app.example.com；多 origin 逗号分隔）
+
+> 模板接线（templates/hono-react `buildAuth`）：`AUTH_WEBAUTHN_ENABLED=true` 且配齐 `RP_ID`/`ORIGIN` 时，构造 `WebAuthProvider`（challenge 复用 OAuth2 state 的 TtlKv）并把 `createWebAuthnRoutes` 挂进 authRoutes；缺 RP_ID/ORIGIN 则告警且不挂载。此前该开关只决定建不建表、路由从不挂载（死配置），现已接通服务端。客户端 passkey UI 仍由 App 自绘（SDK 只给 JSON 路由）。
 
 ## 依赖策略
 
@@ -59,11 +64,11 @@
 
 ## 验收标准
 
-- [ ] 注册 ceremony 全流程：options → 客户端 attestation → verify → 凭证入库
-- [ ] 认证 ceremony 全流程：options → 客户端 assertion → verify → session
-- [ ] counter 更新：每次认证成功 counter 递增
-- [ ] 多凭证：同一用户可注册多个 passkey
-- [ ] 凭证隔离：用户只能删除自己的凭证
-- [ ] challenge 过期（5min 后 take 返回 null）→ 验证失败
+- [ ] 注册 ceremony 全流程：options → 客户端 attestation → verify → 凭证入库（需真实 authenticator，未单测）
+- [x] 认证 challengeKey 契约：匿名 options 返回 `anon:` key、verify 回传命中；不回传则失败；已知 userId 可省略（provider.test.ts，mock @simplewebauthn/server）
+- [x] counter 更新：认证成功后 counter 写入 mock 返回的 newCounter（provider.test.ts）
+- [x] challenge 一次性消费：同 key 二次 verify 失败（provider.test.ts）
+- [ ] 多凭证：同一用户可注册多个 passkey（store 支持，未单测）
+- [ ] 凭证隔离：用户只能删除自己的凭证（routes 有校验，未单测）
 - [ ] 双 store 接口一致（Drizzle SQL 双方言 + PostgREST）
 - [ ] 不装 @simplewebauthn/server 时 `./webauthn` 子路径动态 import 报错，不影响主包

@@ -41,7 +41,7 @@
 
 ## 数据流
 
-- 登录：浏览器 → /auth/login（state 入 TtlKv）→ oauth2-dingtalk /:orgId/authorize → 钉钉 → callback → code+state → token 端点 → userinfo → mapUser → SessionManager 签发双 cookie（HttpOnly）
+- 登录（OAuth2）：浏览器 → /auth/oauth2/authorize（state 入 TtlKv）→ oauth2-dingtalk /:orgId/authorize → 钉钉 → /auth/oauth2/callback → code+state → token 端点 → userinfo → mapUser → identityResolver.resolve（IdP sub → local user，JIT 建户或拒绝）→ SessionManager 签发双 cookie（HttpOnly，sub = local user.id）。密码登录走 /auth/password/*，WebAuthn 走 /auth/webauthn/*（见对应 spec）
 - 刷新：sessionMiddleware 检出 access 过期 → refresh cookie → store.consume（一次性）→ rotate 签新；复用检出 → revokeFamily
 - 上传：App → storage.uploadFile(ns,...) → 后端落对象（key=ns/files/ts_name）→ 返回代理 URL `/files/<key>`；下载走 createFileProxyRoutes
 - 激活：App 启动 → license.register（instanceKey 持久化；**失败不退出**，warn 后置 unknown 靠心跳重试）→ startHeartbeat（server 下发间隔±10%）→ 每次响应携带 **Ed25519 签名的授权载荷**（status/expiresAt/enforcement/features/notice）→ App 验签后才采信 → guard 按 enforcement 分档处置（none/notice/core/all）+ requireFeature 逐点校验功能范围

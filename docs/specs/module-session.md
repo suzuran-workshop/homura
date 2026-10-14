@@ -31,13 +31,13 @@
 
 ### 兜底
 
-- refresh 链终态（过期/吊销/复用检出）：页面请求 302 /auth/login（钉钉免登一跳无感）；API 401
+- refresh 链终态（过期/吊销/复用检出）：页面请求 302 登录入口（缺省 `/auth/oauth2/authorize`，钉钉免登一跳无感）；API 401
 
 ### Hono 集成
 
 - sessionMiddleware：cookie 优先、Bearer 兼容；access 过期且 refresh 有效 → 透明 rotate
-- requireAuth：无身份 → /api 或 Accept:json 401 JSON；页面 302
-- createAuthRoutes：GET /auth/login、GET /auth/callback、POST /auth/refresh、POST /auth/logout（路径可配）
+- requireAuth：无身份 → /api 或 Accept:json 401 JSON；页面 302 到 `loginPath`（缺省 `/auth/oauth2/authorize`，旧 `/auth/login` 已废弃见 ADR-022）。⚠ SDK 不渲染登录页，纯密码认证或自带登录 UI 的 App 必须显式传 `loginPath` 指向自己的登录页，否则页面请求会 302 到不存在的路径（被 SPA fallback 判 404 JSON）
+- createAuthRoutes：GET /auth/oauth2/authorize、GET /auth/oauth2/callback、POST /auth/refresh、POST /auth/logout（路径可配）；密码路由见 module-password.md，WebAuthn 路由见 module-webauthn.md
 - cookie：HttpOnly + SameSite=Lax；qw-pages（trust proxy）下 Secure
 
 ## 存储
