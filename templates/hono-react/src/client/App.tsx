@@ -17,6 +17,10 @@ export default function App() {
   const [notice, setNotice] = useState<string>('')
   const [license, setLicense] = useState<LicenseState | null>(null)
   const [demoMsg, setDemoMsg] = useState<string>('')
+  // 密码登录/注册表单（层级 2：TextPassword，演示 api.passwordLogin/passwordRegister）
+  const [pwUser, setPwUser] = useState('')
+  const [pwPass, setPwPass] = useState('')
+  const [pwMsg, setPwMsg] = useState('')
 
   const refresh = useCallback(async () => {
     const [{ user }, { todos: list }] = await Promise.all([api.me(), api.listTodos()])
@@ -75,6 +79,24 @@ export default function App() {
     setNotice(r.ok ? '已发送' : `失败 ${r.status}`)
   }
 
+  // 密码认证（活文档）：SDK 只给 JSON 路由（/auth/password/*），登录 UI 由 App 自绘。
+  // 登录/注册成功后后端已 Set-Cookie，刷新即可拿到 /api/me 身份。
+  const passwordAuth = async (mode: 'login' | 'register') => {
+    setPwMsg('')
+    if (!pwUser || !pwPass) {
+      setPwMsg('需要用户名和密码')
+      return
+    }
+    try {
+      if (mode === 'register') await api.passwordRegister(pwUser, pwPass)
+      else await api.passwordLogin(pwUser, pwPass)
+      setPwPass('')
+      await refresh()
+    } catch (e) {
+      setPwMsg(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: 24, fontFamily: 'system-ui' }}>
       <h1>homura 模板</h1>
@@ -93,10 +115,32 @@ export default function App() {
             <button onClick={() => void api.logout().then(refresh)}>退出</button>
           </p>
         ) : (
-          <p>
-            未登录 <a href="/auth/oauth2/authorize">钉钉登录</a> ·{' '}
-            <a href="/auth/login">密码登录</a>（匿名可操作公共 todos）
-          </p>
+          <div>
+            <p>
+              未登录 <a href="/auth/oauth2/authorize">钉钉登录</a>（匿名可操作公共 todos）
+            </p>
+            {/* 密码登录/注册：演示 TextPassword 能力（AUTH_PASSWORD_ENABLED，缺省开）。
+                SDK 不渲染页面，故表单由 App 自绘，调 /auth/password/* JSON 路由。 */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
+              <input
+                value={pwUser}
+                onChange={(e) => setPwUser(e.target.value)}
+                placeholder="用户名"
+                style={{ padding: 6, width: 120 }}
+              />
+              <input
+                type="password"
+                value={pwPass}
+                onChange={(e) => setPwPass(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void passwordAuth('login')}
+                placeholder="密码（≥8 位）"
+                style={{ padding: 6, width: 140 }}
+              />
+              <button onClick={() => void passwordAuth('login')}>密码登录</button>
+              <button onClick={() => void passwordAuth('register')}>注册</button>
+              {pwMsg && <span style={{ color: '#c00' }}>{pwMsg}</span>}
+            </div>
+          </div>
         )}
       </section>
 

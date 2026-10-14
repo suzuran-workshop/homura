@@ -56,31 +56,39 @@ const sqliteRefreshTokens = sqliteTable(
 )
 
 // ── users（身份锚点）──────────────────────────────────
+//
+// ⚠ username 唯一性走**显式唯一索引**，不用 inline `.unique()`：
+//   drizzle-kit rc.4 的 sqlite 生成器不落列级 inline UNIQUE（pg 落），
+//   实测 `sqliteCol.text('username').unique()` 产出的迁移里 username 只是普通 `text`，
+//   唯一约束静默丢失 → standalone（缺省 sqlite）部署可注册重复用户名，
+//   密码注册的「username 重复 → 409」路径永远不触发。
+//   双方言统一用唯一索引表达才对称、才都能产出约束（唯一索引同时服务 findByUsername 等值查询）。
+//   注：sqlite **运行时**认 inline UNIQUE（测试手建 DDL 无碍），丢约束只发生在 kit 生成迁移这一环。
 
 const pgUsers = pgTable(
   USERS_TABLE,
   {
     id: pgCol.id('id'),
-    username: pgCol.text('username').unique(),
+    username: pgCol.text('username'),
     nickname: pgCol.text('nickname'),
     avatarUrl: pgCol.text('avatar_url'),
     createdAt: pgCol.epochMs('created_at').notNull(),
     updatedAt: pgCol.epochMs('updated_at').notNull(),
   },
-  (t) => [index('users_username_idx').on(t.username)],
+  (t) => [uniqueIndex('users_username_uidx').on(t.username)],
 )
 
 const sqliteUsers = sqliteTable(
   USERS_TABLE,
   {
     id: sqliteCol.id('id'),
-    username: sqliteCol.text('username').unique(),
+    username: sqliteCol.text('username'),
     nickname: sqliteCol.text('nickname'),
     avatarUrl: sqliteCol.text('avatar_url'),
     createdAt: sqliteCol.epochMs('created_at').notNull(),
     updatedAt: sqliteCol.epochMs('updated_at').notNull(),
   },
-  (t) => [sqliteIndex('users_username_idx').on(t.username)],
+  (t) => [sqliteUniqueIndex('users_username_uidx').on(t.username)],
 )
 
 // ── passwords（1:1 user_id 即 PK）────────────────────

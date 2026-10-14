@@ -9,9 +9,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sql } from 'drizzle-orm'
-import { createSqliteDb } from '@homurajs/db'
-import { runMigrations } from '@homurajs/db'
+import { createSqliteDb, runMigrations } from '@homurajs/db'
 import { createLocalStorage } from '@homurajs/storage/local'
 import { loadConfig } from '../src/server/env.js'
 import { buildApp, type BuiltApp } from '../src/server/app.js'
@@ -20,40 +18,17 @@ import { fileURLToPath } from 'node:url'
 const here = fileURLToPath(new URL('.', import.meta.url))
 const MIGRATIONS = join(here, '../drizzle/sqlite')
 
-/** 建 sqlite :memory: + 跑真实迁移 + 补建 auth 新表（迁移尚未重新生成） */
+/**
+ * 建 sqlite :memory: + 跑真实迁移。
+ *
+ * ⚠ 不再手建 auth 表：users/passwords/oauth2_identity_links/webauthn_credentials 已由
+ *   drizzle 迁移（drizzle/sqlite/）产出，runMigrations 会建出来。此前 e2e 用 skipMigrate +
+ *   手写 raw DDL 绕开真实迁移路径，恰好盖住了「迁移没生成」这个洞（standalone 部署会
+ *   撞 no such table: users）。现在 e2e 走真实迁移——迁移缺表即测试失败，是回归护栏。
+ */
 async function makeDb() {
   const db = createSqliteDb({ dialect: 'sqlite', path: ':memory:' })
   await runMigrations(db, MIGRATIONS)
-  // auth 多凭证身份表（迁移将在 db:generate 后自动包含）
-  await db.run(sql.raw(
-    `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY, username TEXT UNIQUE, nickname TEXT, avatar_url TEXT,
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    )`,
-  ))
-  await db.run(sql.raw(
-    `CREATE TABLE IF NOT EXISTS passwords (
-      user_id TEXT PRIMARY KEY, password_hash TEXT NOT NULL,
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    )`,
-  ))
-  await db.run(sql.raw(
-    `CREATE TABLE IF NOT EXISTS oauth2_identity_links (
-      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
-      provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
-    )`,
-  ))
-  await db.run(sql.raw(
-    `CREATE UNIQUE INDEX IF NOT EXISTS oauth2_links_provider_sub_uidx
-     ON oauth2_identity_links (provider, provider_sub)`,
-  ))
-  await db.run(sql.raw(
-    `CREATE TABLE IF NOT EXISTS webauthn_credentials (
-      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, public_key TEXT NOT NULL,
-      counter INTEGER NOT NULL, device_type TEXT NOT NULL, backed_up INTEGER NOT NULL,
-      transports TEXT, display_name TEXT, created_at INTEGER NOT NULL
-    )`,
-  ))
   return db
 }
 
@@ -350,5 +325,99 @@ describe('模板 e2e — license 停服守卫', () => {
     await built.onStart?.()
     expect((await built.app.request('/api/todos')).status).toBe(200)
     await built.onStop?.()
+  })
+})
+
+describe('模板 e2e — 密码认证（TextPassword，纯密码形态）', () => {
+  // 不配 OAUTH，只开密码认证：验证「无钉钉也能登录」这条 SDK 卖点，
+  // 且表由真实迁移建出（makeDb 不再手建 auth 表）。
+  let built: BuiltApp
+
+  beforeAll(async () => {
+    const db = await makeDb()
+    const config = loadConfig({
+      DIALECT: 'sqlite',
+      SESSION_SECRET: 'e2e-secret-key-that-is-long-enough-32b',
+      AUTH_PASSWORD_ENABLED: 'true',
+    })
+    built = await buildApp(config, {
+      db: { kind: 'sql', db, dialect: 'sqlite' },
+      skipMigrate: true, // makeDb 已跑真实迁移
+    })
+  })
+
+  async function post(path: string, body: unknown, cookie?: string) {
+    return built.app.request(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it('注册 → 200 + cookie，/api/me 的 sub 是 local user ID（非 username）', async () => {
+    const jar = new CookieJar()
+    const reg = await post('/auth/password/register', { username: 'alice', password: 'password123', nickname: 'Alice' })
+    expect(reg.status).toBe(200)
+    jar.absorb(reg)
+    expect(jar.get('homura_at')).toBeTruthy()
+
+    const me = await built.app.request('/api/me', { headers: { cookie: jar.header() } })
+    const body = (await me.json()) as { user: { sub: string; nickname?: string } | null }
+    expect(body.user).toBeTruthy()
+    expect(body.user!.sub).toBeTruthy()
+    expect(body.user!.sub).not.toBe('alice') // local user ID（UUID），不是用户名
+    expect(body.user!.nickname).toBe('Alice')
+  })
+
+  it('重复用户名注册 → 409（迁移建出的唯一索引 + 预检生效）', async () => {
+    const dup = await post('/auth/password/register', { username: 'alice', password: 'otherpass123' })
+    expect(dup.status).toBe(409)
+    await expect(dup.json()).resolves.toMatchObject({ error: 'username_taken' })
+  })
+
+  it('登录：正确密码 200，错误密码 401', async () => {
+    const ok = await post('/auth/password/login', { username: 'alice', password: 'password123' })
+    expect(ok.status).toBe(200)
+    const bad = await post('/auth/password/login', { username: 'alice', password: 'wrong-password' })
+    expect(bad.status).toBe(401)
+  })
+
+  it('改密 → reloginRequired，旧 refresh 失效，新密码可登录（#9）', async () => {
+    const jar = new CookieJar()
+    jar.absorb(await post('/auth/password/login', { username: 'alice', password: 'password123' }))
+    const oldRt = jar.get('homura_rt')!
+
+    const change = await post(
+      '/auth/password/change',
+      { oldPassword: 'password123', newPassword: 'new-password' },
+      jar.header(),
+    )
+    expect(change.status).toBe(200)
+    await expect(change.json()).resolves.toMatchObject({ ok: true, reloginRequired: true })
+
+    // 旧 refresh 已被吊销
+    const replay = await built.app.request('/auth/refresh', {
+      method: 'POST',
+      headers: { cookie: `homura_rt=${oldRt}` },
+    })
+    expect(replay.status).toBe(401)
+
+    // 新密码可登录，旧密码不行
+    expect((await post('/auth/password/login', { username: 'alice', password: 'new-password' })).status).toBe(200)
+    expect((await post('/auth/password/login', { username: 'alice', password: 'password123' })).status).toBe(401)
+  })
+
+  it('密码用户的 todos 与匿名隔离（ownerSub = local user ID）', async () => {
+    const jar = new CookieJar()
+    jar.absorb(await post('/auth/password/login', { username: 'alice', password: 'new-password' }))
+    await built.app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: jar.header() },
+      body: JSON.stringify({ title: '密码用户的待办' }),
+    })
+    const mine = await built.app.request('/api/todos', { headers: { cookie: jar.header() } })
+    const { todos } = (await mine.json()) as { todos: Array<{ title: string; ownerSub: string | null }> }
+    expect(todos.some((t) => t.title === '密码用户的待办')).toBe(true)
+    expect(todos.every((t) => t.ownerSub !== null)).toBe(true)
   })
 })

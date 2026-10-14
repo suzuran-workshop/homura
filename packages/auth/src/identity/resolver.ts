@@ -71,13 +71,32 @@ export function createDefaultIdentityResolver(
         nickname: profile.nickname ?? null,
         avatarUrl: profile.avatarUrl ?? null,
       })
-      await linkStore.create({
-        userId: user.id,
-        provider,
-        providerSub,
-        rawProfile: JSON.stringify(profile),
-      })
-      return user
+      try {
+        await linkStore.create({
+          userId: user.id,
+          provider,
+          providerSub,
+          rawProfile: JSON.stringify(profile),
+        })
+        return user
+      } catch (e) {
+        // 并发首次登录：同一 (provider, providerSub) 的两个回调都查到无 link、都建了 user，
+        // linkStore.create 撞 UNIQUE(provider, provider_sub) 约束——一个赢一个输。
+        // 输家若不清理就会留下孤儿 user，且把唯一冲突冒成 500/401。
+        const winner = await linkStore.findByProvider(provider, providerSub)
+        if (winner && winner.userId === user.id) {
+          // 罕见：我们的 link 其实已落库（create 抛错但写入成功）→ 保留本次 user
+          return user
+        }
+        // 别人赢了（或 link 根本没建成）→ best-effort 清理本次刚建的孤儿 user
+        await userStore.delete(user.id).catch(() => {})
+        if (winner) {
+          const winnerUser = await userStore.findById(winner.userId)
+          if (winnerUser) return winnerUser
+        }
+        // 不是唯一冲突，或赢家 user 也查不到 → 透传原始错误
+        throw e
+      }
     },
   }
 }

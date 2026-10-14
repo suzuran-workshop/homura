@@ -84,5 +84,9 @@ export function createRestUserStore(rest: RestDb, opts: RestUserStoreOptions = {
       if (!row) throw new Error('user 不存在: ' + id)
       return toUser(row)
     },
+
+    async delete(id) {
+      await t.remove({ id })
+    },
   }
 }

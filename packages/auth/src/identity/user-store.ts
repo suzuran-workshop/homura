@@ -95,5 +95,9 @@ VALUES (${id}, ${input.username ?? null}, ${input.nickname ?? null}, ${input.ava
       if (!rows[0]) throw new Error('user 不存在: ' + id)
       return toUser(rows[0])
     },
+
+    async delete(id) {
+      await exec(db, sql`DELETE FROM users WHERE id = ${id}`)
+    },
   }
 }

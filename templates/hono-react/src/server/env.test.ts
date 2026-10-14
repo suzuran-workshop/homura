@@ -45,7 +45,7 @@ describe('resolveDialect — 显式优先，缺省按形态', () => {
 })
 
 describe('assertSecretsOverridden — 公开缺省密钥不得上生产', () => {
-  // 断言只在「真的会签 session」时生效，故这些用例都要启用 auth
+  // 断言只在「真的会签 session」时生效，故这些用例都要启用某种认证
   const AUTH = { OAUTH_DINGTALK_ORG_ID: 'org' }
 
   it('qw-pages + 启用 auth + 缺省 SESSION_SECRET → loadConfig 启动期即拒绝', () => {
@@ -69,10 +69,28 @@ describe('assertSecretsOverridden — 公开缺省密钥不得上生产', () => 
     )
   })
 
-  it('未启用 auth 时放行：不签 JWT 就不该被缺省密钥挡住（回归）', () => {
-    // 冷启动验收发现的 bug：断言曾无条件执行，导致 Pages 上纯匿名 App 也无法启动
-    expect(() => loadConfig({ ...QW_PAGES_ENV }, { configFile: false })).not.toThrow()
-    const config = loadConfig({}, { configFile: false })
+  // 回归：闸门曾只看 oauthOrgId，纯密码认证（缺省即开）带公开缺省密钥可静默上生产 → 会话可伪造。
+  it('纯密码认证（无 OAuth2）+ 缺省密钥 + 生产 → 同样拒绝启动（回归 #3）', () => {
+    const config = loadConfig({ AUTH_PASSWORD_ENABLED: 'true' }, { configFile: false })
+    expect(config.get('oauthOrgId')).toBeUndefined()
+    expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).toThrow(/SESSION_SECRET/)
+    expect(() => assertSecretsOverridden(config, { NODE_ENV: 'production' })).toThrow(/伪造会话/)
+  })
+
+  it('WebAuthn 启用（无 OAuth2 / 无密码）+ 缺省密钥 + 生产 → 拒绝启动', () => {
+    const config = loadConfig(
+      { AUTH_PASSWORD_ENABLED: 'false', AUTH_WEBAUTHN_ENABLED: 'true' },
+      { configFile: false },
+    )
+    expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).toThrow(/SESSION_SECRET/)
+  })
+
+  it('三类认证全关时放行：不签 JWT 就不该被缺省密钥挡住（回归）', () => {
+    // 冷启动验收发现的 bug：断言曾无条件执行，导致 Pages 上纯匿名 App 也无法启动。
+    // 密码认证缺省即开，故「纯匿名」需显式关掉 AUTH_PASSWORD_ENABLED。
+    const anon = { ...QW_PAGES_ENV, AUTH_PASSWORD_ENABLED: 'false' }
+    expect(() => loadConfig(anon, { configFile: false })).not.toThrow()
+    const config = loadConfig({ AUTH_PASSWORD_ENABLED: 'false' }, { configFile: false })
     expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).not.toThrow()
   })
 

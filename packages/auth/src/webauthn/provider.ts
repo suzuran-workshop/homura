@@ -183,9 +183,15 @@ export class WebAuthProvider {
 
   /**
    * 生成认证 options（未登录用户发起）。
-   * challenge 存入 TtlKv（key = challengeId），关联 allowCredentials。
+   * challenge 存入 TtlKv，返回 { options, challengeKey }——challengeKey 必须由调用方
+   * 在 verifyAuthentication 时回传，否则匿名（discoverable credential）流程无法定位 challenge：
+   * 匿名场景下 options 阶段还不知道是哪个用户/凭证，key 只能是 `anon:${random}`，
+   * 而 verify 阶段是按 response.id 反查凭证的，两条腿对不上同一个 key。
+   * 已知 userId 时 key 固定为 `${userId}:auth`，回传与否都能命中（向后兼容）。
    */
-  async generateAuthenticationOptions(userId?: string): Promise<AuthenticationOptions> {
+  async generateAuthenticationOptions(
+    userId?: string,
+  ): Promise<{ options: AuthenticationOptions; challengeKey: string }> {
     const { generateAuthenticationOptions } = await import('@simplewebauthn/server')
     let allowCredentials: Array<{ id: string; transports?: AuthenticatorTransportFuture[] }> = []
     let challengeKey: string
@@ -197,7 +203,7 @@ export class WebAuthProvider {
       }))
       challengeKey = `${userId}:auth`
     } else {
-      // 无 userId：允许所有凭证（客户端自选）
+      // 无 userId：允许所有凭证（客户端自选 discoverable credential）
       challengeKey = `anon:${randomToken(16)}`
     }
     const options = await generateAuthenticationOptions({
@@ -206,22 +212,25 @@ export class WebAuthProvider {
       userVerification: 'preferred',
     })
     await this.config.challengeKv.set(challengeKey, options.challenge, this.challengeTtl)
-    return options as unknown as AuthenticationOptions
+    return { options: options as unknown as AuthenticationOptions, challengeKey }
   }
 
   /**
    * 验证认证响应，返回已验证的用户（供 session 创建）。
    * challenge 一次性消费。
+   *
+   * @param challengeKey generateAuthenticationOptions 返回的 key。匿名流程**必须**回传；
+   *   已知 userId 的流程可省略（缺省按 `${cred.userId}:auth` 取）。
    */
-  async verifyAuthentication(response: AuthenticationResponse): Promise<LocalUser> {
+  async verifyAuthentication(response: AuthenticationResponse, challengeKey?: string): Promise<LocalUser> {
     const { verifyAuthenticationResponse } = await import('@simplewebauthn/server')
     // 按 credentialId 找凭证 → 找 user → 验 challenge
     const cred = await this.config.credentialStore.findById(response.id)
     if (!cred) throw new Error('凭证不存在: ' + response.id)
-    // challenge 可能在 userId:auth 或 anon:xxx 下，都试
-    let challenge = await this.config.challengeKv.take(`${cred.userId}:auth`)
+    // challengeKey 缺省 = 已知 userId 的 `${cred.userId}:auth`；匿名流程由调用方回传 options 阶段的 key
+    const key = challengeKey ?? `${cred.userId}:auth`
+    const challenge = await this.config.challengeKv.take(key)
     if (!challenge) {
-      // 匿名 challenge 无法定位 key → 要求调用方传 challengeKey
       throw new Error('challenge 无效或已过期')
     }
     const verification = await verifyAuthenticationResponse({

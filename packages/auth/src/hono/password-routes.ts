@@ -10,7 +10,31 @@ import { Hono } from 'hono'
 import { setCookie } from 'hono/cookie'
 import type { SessionManager } from '../session/manager.js'
 import type { PasswordProvider } from '../password/provider.js'
+import { UsernameTakenError } from '../password/provider.js'
 import type { AuthUser } from '../types.js'
+
+/**
+ * 跨方言唯一约束冲突判定（username 并发注册的兜底）。
+ *
+ * ⚠ 必须走 cause 链：drizzle 把底层驱动错误包成 DrizzleQueryError，其顶层 message 是
+ *   "Failed query: INSERT ..."，**不含** UNIQUE 字样——只看顶层 message 会漏判（曾导致
+ *   重复用户名注册回落 400 而非 409）。真正的信号在 cause：
+ *   - sqlite：cause.errcode === 2067（SQLITE_CONSTRAINT_UNIQUE），cause.message 含 "UNIQUE constraint failed"
+ *   - pg：cause.code === '23505'（unique_violation），message 含 "duplicate key"
+ *   逐层向下最多走 5 层，命中任一信号即判定为唯一冲突。
+ */
+function isUniqueViolation(e: unknown): boolean {
+  let cur = e as { cause?: unknown; message?: unknown; code?: unknown; errcode?: unknown } | null
+  for (let depth = 0; cur && depth < 5; depth++) {
+    if (cur.errcode === 2067) return true // SQLITE_CONSTRAINT_UNIQUE
+    if (cur.code === '23505') return true // pg unique_violation
+    if (typeof cur.message === 'string' && /unique constraint|duplicate key|unique violation/i.test(cur.message)) {
+      return true
+    }
+    cur = cur.cause as typeof cur
+  }
+  return false
+}
 
 export interface PasswordPaths {
   register?: string
@@ -88,11 +112,11 @@ export function createPasswordRoutes(opts: PasswordRoutesOptions): Hono {
       })
       return c.json({ ok: true, user: { id: user.id, username: user.username, nickname: user.nickname } })
     } catch (e) {
-      const msg = (e as Error).message
-      if (msg.includes('UNIQUE') || msg.includes('unique') || msg.includes('duplicate')) {
+      // username 占用：预检抛的类型化错误，或并发撞唯一索引（走 cause 链识别）→ 409
+      if (e instanceof UsernameTakenError || isUniqueViolation(e)) {
         return c.json({ error: 'username_taken', message: '用户名已被注册' }, 409)
       }
-      return c.json({ error: 'register_failed', message: msg }, 400)
+      return c.json({ error: 'register_failed', message: (e as Error).message }, 400)
     }
   })
 
@@ -154,7 +178,14 @@ export function createPasswordRoutes(opts: PasswordRoutesOptions): Hono {
     }
     try {
       await password.changePassword(claims.sub, body.oldPassword, body.newPassword)
-      return c.json({ ok: true })
+      // 安全：改密后吊销该用户**所有** session 的 refresh token（含当前会话）。
+      // 否则此前被盗的 refresh token 在改密后依然能 rotate 续命——改密本应是止损点。
+      // access token 是无状态 JWT，会在自身 TTL 内自然过期；refresh 链已断，无法再续。
+      // 代价是当前会话也需重新登录（reloginRequired），这是密码修改的标准安全语义。
+      await sessions.revokeUser(claims.sub)
+      setCookie(c, names.access, '', { httpOnly: true, secure, path: '/', maxAge: 0 })
+      setCookie(c, names.refresh, '', { httpOnly: true, secure, path: '/', maxAge: 0 })
+      return c.json({ ok: true, reloginRequired: true })
     } catch (e) {
       return c.json({ error: 'change_failed', message: (e as Error).message }, 400)
     }

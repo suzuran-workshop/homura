@@ -193,7 +193,8 @@ describe('authRoutes + middleware 集成', () => {
     const res = await ctx.app.request('/page')
     expect(res.status).toBe(302)
     const loc = res.headers.get('location')!
-    expect(loc).toContain('/auth/login')
+    // 缺省 loginPath = OAuth2 授权入口（旧 /auth/login 已废弃，ADR-022）
+    expect(loc).toContain('/auth/oauth2/authorize')
     expect(loc).toContain('returnTo=')
   })
 

@@ -121,7 +121,7 @@ export async function buildApp(
   const authWebauthnEnabled = config.get('authWebauthnEnabled')
   let auth: AuthInject | false = false
   if (oauthOrgId || authPasswordEnabled || authWebauthnEnabled) {
-    auth = await buildAuth(config, dbBundle, fetchImpl, secureCookies)
+    auth = await buildAuth(config, dbBundle, fetchImpl, secureCookies, logger)
   }
 
   // ── 层级 3：3p 平台（DINGTALK_APP_KEY 配置即启用）──
@@ -251,6 +251,7 @@ async function buildAuth(
   bundle: DbBundle,
   fetchImpl?: typeof fetch,
   secureCookies = false,
+  logger?: Logger,
 ) {
   const {
     OAuth2Client,
@@ -327,15 +328,64 @@ async function buildAuth(
     })
   }
 
+  // WebAuthn provider（如果启用且配齐 rpId/origin）。
+  // ⚠ 此前 AUTH_WEBAUTHN_ENABLED 只决定建不建表，路由从不挂载（死配置）。现补上服务端接线：
+  //   challenge 复用 stateKv（SQL 形态内存版 / REST 形态 DB 版，与 OAuth2 state 同机制）；
+  //   @simplewebauthn/server 是 optional peer，provider 内部动态 import，未装也不影响挂载，
+  //   只有真正调用 WebAuthn 端点时才需要该依赖。客户端 passkey UI 由 App 自绘（SDK 只给 JSON 路由）。
+  const webauthnEnabled = config.get('authWebauthnEnabled')
+  const webauthnRpId = config.get('authWebauthnRpId')
+  const webauthnOrigin = config.get('authWebauthnOrigin')
+  let webauthnRoutes: Hono | undefined
+  if (webauthnEnabled) {
+    if (!webauthnRpId || !webauthnOrigin) {
+      logger?.warn(
+        'AUTH_WEBAUTHN_ENABLED=true 但缺 AUTH_WEBAUTHN_RP_ID / AUTH_WEBAUTHN_ORIGIN，WebAuthn 路由未挂载',
+        { impact: 'Passkey 注册/登录不可用；补齐两项配置后重启' },
+      )
+    } else {
+      const {
+        WebAuthProvider,
+        createWebAuthnRoutes,
+        createDrizzleWebauthnCredentialStore,
+        createRestWebauthnCredentialStore,
+      } = await import('@homurajs/auth/webauthn')
+      const credentialStore =
+        bundle.kind === 'sql'
+          ? createDrizzleWebauthnCredentialStore(bundle.db)
+          : createRestWebauthnCredentialStore(bundle.rest)
+      const webauthn = new WebAuthProvider({
+        rpId: webauthnRpId,
+        rpName: config.get('authWebauthnRpName') ?? webauthnRpId,
+        // 多 origin 用逗号分隔（env.ts 约定）
+        origin: webauthnOrigin
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s !== ''),
+        credentialStore,
+        userStore,
+        challengeKv: stateKv,
+      })
+      webauthnRoutes = createWebAuthnRoutes({ webauthn, sessions, secure: secureCookies })
+    }
+  }
+
+  // 组合 auth 路由：createAuthRoutes 装 OAuth2 + Password + refresh/logout，
+  // WebAuthn 路由是独立子路径，route() 进同一个 authRoutes（AuthInject 契约不变）。
+  const authRoutes = createAuthRoutes({
+    sessions,
+    oauth2: client && identityResolver ? { client, identityResolver, provider: 'dingtalk' } : undefined,
+    password,
+    // 自助注册开关（此前定义了却没传，恒取缺省 true → "仅管理员建户"模式不可达）
+    allowRegister: config.get('authPasswordAllowSelfRegister'),
+    secure: secureCookies,
+  })
+  if (webauthnRoutes) authRoutes.route('/', webauthnRoutes)
+
   return {
     sessions: sessions as unknown as AuthInject['sessions'],
     sessionMiddleware: sessionMiddleware(sessions, { secure: secureCookies }),
-    authRoutes: createAuthRoutes({
-      sessions,
-      oauth2: client && identityResolver ? { client, identityResolver, provider: 'dingtalk' } : undefined,
-      password,
-      secure: secureCookies,
-    }),
+    authRoutes,
   } satisfies AuthInject
 }
 

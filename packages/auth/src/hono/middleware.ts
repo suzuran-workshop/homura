@@ -61,9 +61,16 @@ export function sessionMiddleware(
   }
 }
 
-/** 无身份：/api 或 Accept:json → 401 JSON；页面请求 → 302 login */
+/**
+ * 无身份：/api 或 Accept:json → 401 JSON；页面请求 → 302 login。
+ *
+ * ⚠ loginPath 缺省 = OAuth2 授权入口 `/auth/oauth2/authorize`（旧 `/auth/login` 已废弃，
+ *   见 ADR-022）。SDK 不渲染登录页，故缺省指向唯一内置的 GET 登录入口；
+ *   纯密码认证或自带登录 UI 的 App 必须显式传 `loginPath` 指向自己的登录页，
+ *   否则页面请求会 302 到一个不存在的路径（被 SPA fallback 判成 404 JSON）。
+ */
 export function requireAuth(opts?: { loginPath?: string }): MiddlewareHandler {
-  const loginPath = opts?.loginPath ?? '/auth/login'
+  const loginPath = opts?.loginPath ?? '/auth/oauth2/authorize'
   return async (c, next) => {
     if (c.get('auth')) {
       await next()

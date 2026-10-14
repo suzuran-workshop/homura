@@ -36,7 +36,7 @@ export type {
 } from './identity/resolver.js'
 
 // ── Password ─────────────────────────────────────────
-export { PasswordProvider } from './password/provider.js'
+export { PasswordProvider, UsernameTakenError } from './password/provider.js'
 export type { PasswordProviderOptions } from './password/provider.js'
 export type { PasswordRecord, PasswordStore } from './password/store.js'
 export { createDrizzlePasswordStore } from './password/drizzle-store.js'

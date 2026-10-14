@@ -94,15 +94,18 @@ export function createWebAuthnRoutes(opts: WebAuthnRoutesOptions): Hono {
       // 空 body 也可以
     }
     try {
-      const options = await webauthn.generateAuthenticationOptions(body.userId)
-      return c.json(options)
+      const { options, challengeKey } = await webauthn.generateAuthenticationOptions(body.userId)
+      // challengeKey 一并下发：匿名（discoverable credential）流程必须回传给 auth/verify，
+      // 否则服务端无法把 assertion 与 options 阶段的 challenge 对上（见 provider 注释）。
+      // 已知 userId 的流程可忽略它（verify 缺省按 `${userId}:auth` 取）。
+      return c.json({ ...options, challengeKey })
     } catch (e) {
       return c.json({ error: 'options_failed', message: (e as Error).message }, 400)
     }
   })
 
   app.post(paths.authVerify, async (c) => {
-    let body: { response?: unknown }
+    let body: { response?: unknown; challengeKey?: string }
     try {
       body = await c.req.json()
     } catch {
@@ -112,7 +115,7 @@ export function createWebAuthnRoutes(opts: WebAuthnRoutesOptions): Hono {
       return c.json({ error: 'missing_response' }, 400)
     }
     try {
-      const user = await webauthn.verifyAuthentication(body.response as never)
+      const user = await webauthn.verifyAuthentication(body.response as never, body.challengeKey)
       const authUser: AuthUser = {
         sub: user.id,
         nickname: user.nickname ?? undefined,

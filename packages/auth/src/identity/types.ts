@@ -60,6 +60,12 @@ export interface UserStore {
   create(input: { username?: string | null; nickname?: string | null; avatarUrl?: string | null }): Promise<LocalUser>
   /** 更新 nickname/avatarUrl（部分更新，不传字段不动） */
   update(id: string, patch: { nickname?: string; avatarUrl?: string }): Promise<LocalUser>
+  /**
+   * 删除用户（按 id）。用于注册失败时清理孤儿 user（见 PasswordProvider.register）。
+   * ⚠ 不级联删除凭证记录（passwords/oauth2_identity_links/webauthn_credentials）——
+   *   调用方自行保证只在「刚建、尚无凭证」的 user 上调用，或先清凭证再删 user。
+   */
+  delete(id: string): Promise<void>
 }
 
 /**
