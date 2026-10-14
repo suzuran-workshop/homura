@@ -52,7 +52,7 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 
 图例：✅ 已验证可用 · 🟡 代码就绪但未端到端验证 · ⚪ 未测 · ⚠️ 有前置条件 · ❌ 平台限制导致不可用
 
-**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败（启用 `STORAGE_BACKEND=db` 时还要建 `homura_files` + `homura_file_chunks` 两张，`data` 列是 text；启用多凭证 auth 时还要建 `users`/`passwords`/`oauth2_identity_links`/`webauthn_credentials` 四张）；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
+**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建，且**按实际启用的能力逐张建**（`app.ts` 的 `requiredTables` 是权威映射；缺表/缺 anon policy 是静默失败）：业务表（`todos` + 你新增的，登记进 `restBusinessTables`）总是要；**任何**认证形态加 `refresh_tokens` + `users`（本地身份锚点）；OAuth2 加 `oauth2_identity_links`、WebAuthn 加 `webauthn_credentials`、二者任一还需 `homura_ttlkv`（OAuth2 state / WebAuthn challenge）；密码认证加 `passwords`；启用 license 加 `license_state`；`STORAGE_BACKEND=db` 加 `homura_files` + `homura_file_chunks`（`data` 列是 text）。⚠ 三类认证均 **opt-in**（密码 `AUTH_PASSWORD_ENABLED` / WebAuthn `AUTH_WEBAUTHN_ENABLED` 缺省关，OAuth2 靠 `OAUTH_DINGTALK_ORG_ID`）——配了啥才启用啥、才需要建对应表；旧实现把 `refresh_tokens` 只挂 OAuth2、四张身份表只挂密码/WebAuthn，会让纯密码部署漏 `refresh_tokens`、纯 OAuth2 部署漏 `users`/`oauth2_identity_links`；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
 
 ## 目录速查
 

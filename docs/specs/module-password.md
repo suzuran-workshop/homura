@@ -4,6 +4,10 @@
 
 - 目标：基于用户名密码的本地认证，零外部依赖，作为 OAuth2 的补充/替代
 - 依赖：`node:crypto` 内置 `scrypt`（零原生依赖，qw-pages 兼容）
+- 模板配置：`AUTH_PASSWORD_ENABLED`（**默认 false，opt-in**）+ `AUTH_PASSWORD_ALLOW_SELF_REGISTER`（默认 true）。
+  与 OAuth2（靠 `OAUTH_DINGTALK_ORG_ID`）、WebAuthn（`AUTH_WEBAUTHN_ENABLED` 默认 false）一致——三类认证
+  均「配了啥才启用啥」，各能力独立开关，不配则不挂载对应路由（SDK 层 `createAuthRoutes` 也是按传入的
+  capability 组合路由，不传 password 就不挂 `/auth/password/*`）
 
 ## 行为
 

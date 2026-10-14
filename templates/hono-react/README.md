@@ -137,11 +137,14 @@ pnpm build:qw-pages   # qw-pages：dist/ 整个目录上传（含 homura.manifes
    GRANT SELECT, INSERT, UPDATE, DELETE ON "homura_ttlkv" TO anon;
    ```
 
-   启用多凭证身份（TextPassword / WebAuthn / OAuth2 JIT）时还需这四张表。⚠ 它们的 `CREATE TABLE`
-   **已由 `pnpm db:generate` 产出的迁移包含**（`drizzle/pg/` 里按时间序应用即建出，见上）——下面这段
-   是「幂等兜底 + 补 RLS policy」：drizzle 迁移**不生成 policy**，故每张表仍须单独 `CREATE POLICY` +
-   `GRANT`。列类型与迁移严格对齐（`users.id` / `oauth2_identity_links.id` 是 `uuid DEFAULT
-   gen_random_uuid()`，username 唯一性走唯一索引而非 inline UNIQUE——与 sqlite 侧对称，见 module-password.md）：
+   启用多凭证身份时还需这四张表——但**按你实际开的能力取用**（三类认证均 opt-in，配了啥才启用啥）：
+   任何认证形态都要 `users`（本地身份锚点）+ `refresh_tokens`（session，已在上面的迁移里）；OAuth2 用
+   `oauth2_identity_links`、WebAuthn 用 `webauthn_credentials`、二者任一还需 `homura_ttlkv`（state/challenge）；
+   密码认证用 `passwords`。`app.ts` 的 `requiredTables` 是权威映射（部署期探活与 `/_healthz` 按它逐张 ping）。
+   ⚠ 这四张的 `CREATE TABLE` **已由 `pnpm db:generate` 产出的迁移包含**（`drizzle/pg/` 里按时间序应用即
+   全部建出，见上）——下面这段是「幂等兜底 + 补 RLS policy」：drizzle 迁移**不生成 policy**，故你**用到的**
+   每张表仍须单独 `CREATE POLICY` + `GRANT`。列类型与迁移严格对齐（`users.id` / `oauth2_identity_links.id`
+   是 `uuid DEFAULT gen_random_uuid()`，username 唯一性走唯一索引而非 inline UNIQUE——与 sqlite 侧对称，见 module-password.md）：
 
    ```sql
    CREATE TABLE IF NOT EXISTS "users" (
