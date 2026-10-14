@@ -15,19 +15,21 @@
     "db:generate": "drizzle-kit generate --config=drizzle.pg.config.ts && drizzle-kit generate --config=drizzle.sqlite.config.ts"
   },
   "dependencies": {
+    "@homurajs/3p": "workspace:*",
     "@homurajs/app-kit": "workspace:*",
     "@homurajs/auth": "workspace:*",
     "@homurajs/core": "workspace:*",
     "@homurajs/db": "workspace:*",
     "@homurajs/license": "workspace:*",
     "@homurajs/storage": "workspace:*",
-    "@homurajs/3p": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.10.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "drizzle-orm": "1.0.0-rc.4"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1149.0",
+    "@aws-sdk/s3-request-presigner": "^3.1149.0",
     "@hono/node-server": "^1.19.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
