@@ -49,6 +49,44 @@ function safeResolve(root: string, reqPath: string): string | null {
   return abs
 }
 
+/** 支持的压缩编码，按优先级排列（br 压缩率优于 gzip） */
+const COMPRESSED_EXTS = [
+  { encoding: 'br', ext: '.br' },
+  { encoding: 'gzip', ext: '.gz' },
+] as const
+
+/**
+ * 解析 Accept-Encoding 头，返回客户端支持的编码集合。
+ * 不解析 q 值——只要声明了该编码就视为支持（实际场景足够）。
+ */
+function parseAcceptEncoding(header: string | undefined): Set<string> {
+  if (!header) return new Set()
+  const encodings = new Set<string>()
+  for (const part of header.split(',')) {
+    const name = part.trim().split(';')[0]?.trim().toLowerCase()
+    if (name) encodings.add(name)
+  }
+  return encodings
+}
+
+/**
+ * 尝试找到预压缩侧车文件（.br / .gz）。
+ * 返回命中的压缩文件绝对路径与编码名；未命中返回 null。
+ */
+function findCompressedSidecar(
+  abs: string,
+  accepted: Set<string>,
+): { path: string; encoding: string } | null {
+  for (const { encoding, ext } of COMPRESSED_EXTS) {
+    if (!accepted.has(encoding)) continue
+    const compressed = abs + ext
+    if (existsSync(compressed) && statSync(compressed).isFile()) {
+      return { path: compressed, encoding }
+    }
+  }
+  return null
+}
+
 /** 静态文件中间件：命中则回文件，未命中 next()（交给 SPA fallback） */
 export function createStaticMiddleware(root: string): MiddlewareHandler {
   return async (c, next) => {
@@ -63,9 +101,20 @@ export function createStaticMiddleware(root: string): MiddlewareHandler {
       return
     }
     const isAsset = urlPath.startsWith('/assets/') || urlPath.includes('.')
-    c.header('content-type', mimeOf(abs))
+    const mime = mimeOf(abs)
+    c.header('content-type', mime)
     // 带 hash 的构建产物长缓存；其余 no-cache（SPA 入口需即时更新）
     c.header('cache-control', isAsset ? 'public, max-age=31536000, immutable' : 'no-cache')
+    // 优先使用预压缩侧车文件（br > gzip），不做实时压缩
+    const accepted = parseAcceptEncoding(c.req.header('accept-encoding'))
+    const sidecar = findCompressedSidecar(abs, accepted)
+    if (sidecar) {
+      c.header('content-encoding', sidecar.encoding)
+      c.header('vary', 'Accept-Encoding')
+      if (c.req.method === 'HEAD') return c.body(null)
+      const stream = Readable.toWeb(createReadStream(sidecar.path)) as ReadableStream
+      return c.body(stream)
+    }
     if (c.req.method === 'HEAD') return c.body(null)
     const stream = Readable.toWeb(createReadStream(abs)) as ReadableStream
     return c.body(stream)

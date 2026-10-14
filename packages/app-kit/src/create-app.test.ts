@@ -231,6 +231,117 @@ describe('createApp — 静态资源 + SPA fallback', () => {
   })
 })
 
+describe('createApp — 预压缩侧车文件（br / gzip）', () => {
+  let dir: string
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'homura-compress-'))
+    mkdirSync(join(dir, 'assets'), { recursive: true })
+    // 原始文件 + br 侧车 + gz 侧车
+    writeFileSync(join(dir, 'assets', 'app.abc.js'), 'original-js-body')
+    writeFileSync(join(dir, 'assets', 'app.abc.js.br'), 'br-compressed-body')
+    writeFileSync(join(dir, 'assets', 'app.abc.js.gz'), 'gz-compressed-body')
+    // 只有 gz 没有 br 的文件
+    writeFileSync(join(dir, 'assets', 'style.xyz.css'), 'original-css-body')
+    writeFileSync(join(dir, 'assets', 'style.xyz.css.gz'), 'gz-css-body')
+    // 没有任何侧车的文件
+    writeFileSync(join(dir, 'assets', 'plain.txt'), 'plain-text-body')
+  })
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('Accept-Encoding: br → 优先返回 .br 侧车', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js', {
+      headers: { 'accept-encoding': 'br, gzip' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBe('br')
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(res.headers.get('vary')).toBe('Accept-Encoding')
+    expect(await res.text()).toBe('br-compressed-body')
+  })
+
+  it('Accept-Encoding: gzip → 返回 .gz 侧车', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js', {
+      headers: { 'accept-encoding': 'gzip' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBe('gzip')
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(await res.text()).toBe('gz-compressed-body')
+  })
+
+  it('Accept-Encoding 同时含 br+gzip → br 优先于 gzip', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js', {
+      headers: { 'accept-encoding': 'gzip, br' },
+    })
+    expect(res.headers.get('content-encoding')).toBe('br')
+    expect(await res.text()).toBe('br-compressed-body')
+  })
+
+  it('无 Accept-Encoding → 返回原始文件', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBeNull()
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(await res.text()).toBe('original-js-body')
+  })
+
+  it('Accept-Encoding: br 但只有 .gz 侧车 → 回落 .gz', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/style.xyz.css', {
+      headers: { 'accept-encoding': 'br, gzip' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBe('gzip')
+    expect(res.headers.get('content-type')).toContain('text/css')
+    expect(await res.text()).toBe('gz-css-body')
+  })
+
+  it('Accept-Encoding 不匹配任何侧车 → 返回原始文件', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/style.xyz.css', {
+      headers: { 'accept-encoding': 'br' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBeNull()
+    expect(await res.text()).toBe('original-css-body')
+  })
+
+  it('无侧车文件 → 始终返回原始文件', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/plain.txt', {
+      headers: { 'accept-encoding': 'br, gzip' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBeNull()
+    expect(res.headers.get('content-type')).toContain('text/plain')
+    expect(await res.text()).toBe('plain-text-body')
+  })
+
+  it('压缩侧车仍保留 cache-control（immutable 长缓存）', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js', {
+      headers: { 'accept-encoding': 'br' },
+    })
+    expect(res.headers.get('cache-control')).toContain('immutable')
+  })
+
+  it('HEAD 请求 + 压缩侧车 → 无 body 但有正确头', async () => {
+    const { app } = createApp({ staticDir: dir })
+    const res = await app.request('/assets/app.abc.js', {
+      method: 'HEAD',
+      headers: { 'accept-encoding': 'gzip' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBe('gzip')
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(await res.text()).toBe('')
+  })
+})
+
 describe('runtime 探测透传', () => {
   it('显式 runtime=qw-pages → runtime.target', () => {
     const { runtime } = createApp({ runtime: 'qw-pages' })
