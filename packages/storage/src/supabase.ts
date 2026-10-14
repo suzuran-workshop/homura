@@ -41,7 +41,9 @@ export function createSupabaseStorage(options: SupabaseStorageOptions): FileStor
         'content-type': contentType,
         'x-upsert': 'true',
       },
-      body: data,
+      // Uint8Array → RequestInit['body'] 双重 cast：规避 DOM lib（BodyInit 不匹配
+      // Uint8Array<ArrayBufferLike> 泛型变体）与 Node lib（无 BodyInit 名）的差异（同 chunk-client.ts）
+      body: data as unknown as RequestInit['body'],
     })
     if (!res.ok) throw new Error(`supabase upload failed: ${res.status} ${await res.text()}`)
     const uploadedAt = new Date()
