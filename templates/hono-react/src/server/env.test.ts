@@ -87,10 +87,12 @@ describe('assertSecretsOverridden — 公开缺省密钥不得上生产', () => 
 
   it('三类认证全关时放行：不签 JWT 就不该被缺省密钥挡住（回归）', () => {
     // 冷启动验收发现的 bug：断言曾无条件执行，导致 Pages 上纯匿名 App 也无法启动。
-    // 密码认证缺省即开，故「纯匿名」需显式关掉 AUTH_PASSWORD_ENABLED。
-    const anon = { ...QW_PAGES_ENV, AUTH_PASSWORD_ENABLED: 'false' }
-    expect(() => loadConfig(anon, { configFile: false })).not.toThrow()
-    const config = loadConfig({ AUTH_PASSWORD_ENABLED: 'false' }, { configFile: false })
+    // 三类认证均 opt-in（密码/WebAuthn 缺省关，OAuth2 靠 oauthOrgId）→ 空配置即纯匿名。
+    expect(() => loadConfig({ ...QW_PAGES_ENV }, { configFile: false })).not.toThrow()
+    const config = loadConfig({}, { configFile: false })
+    // 锁定 opt-in 缺省：密码/WebAuthn 缺省关（"配了啥才启用啥"）
+    expect(config.get('authPasswordEnabled')).toBe(false)
+    expect(config.get('authWebauthnEnabled')).toBe(false)
     expect(() => assertSecretsOverridden(config, QW_PAGES_ENV)).not.toThrow()
   })
 

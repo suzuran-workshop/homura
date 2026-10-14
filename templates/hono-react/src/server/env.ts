@@ -114,9 +114,12 @@ export const configSpecs = {
   },
   authPasswordEnabled: {
     env: 'AUTH_PASSWORD_ENABLED',
-    default: true,
+    // 缺省 false：渐进式能力包「配了啥才启用啥」——密码认证与 OAuth2（靠 oauthOrgId）/
+    // WebAuthn（靠 AUTH_WEBAUTHN_ENABLED）一样是 opt-in。此前缺省 true 会让「只配了 OAuth2」
+    // 的部署连带开放密码自助注册，违反能力独立开关的契约。
+    default: false,
     parse: parses.boolean,
-    description: '是否启用用户名密码认证（TextPassword）',
+    description: '是否启用用户名密码认证（TextPassword）；缺省 false（opt-in，配了才启用）',
   },
   authPasswordAllowSelfRegister: {
     env: 'AUTH_PASSWORD_ALLOW_SELF_REGISTER',

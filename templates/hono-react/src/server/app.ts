@@ -87,23 +87,35 @@ export async function buildApp(
   const oauthOrgId = config.get('oauthOrgId')
   const genuineServer = config.get('genuineServer')
   const storageBackend = config.get('storageBackend')
+  // 认证能力开关（渐进式：配了啥才启用啥，各能力独立 opt-in；密码/WebAuthn 缺省关，OAuth2 靠 oauthOrgId）
+  const authPasswordEnabled = config.get('authPasswordEnabled')
+  const authWebauthnEnabled = config.get('authWebauthnEnabled')
+  const anyAuth = Boolean(oauthOrgId) || authPasswordEnabled || authWebauthnEnabled
 
   /**
-   * 本 App 实际需要的表 = 业务表（schema/rest.ts 的 restBusinessTables）+ 按启用的能力追加。
+   * 本 App 实际需要的表 = 业务表（schema/rest.ts 的 restBusinessTables）+ 按**实际启用的能力**逐张追加。
    *
    * REST 形态下缺表 / 缺 policy 是**静默失败**（SELECT 返回 200 空数组、INSERT 返回 401+42501），
    * 所以这份清单同时用于「部署期探活」与「/_healthz 的 db 检查」。
    * 新增业务表只需在 restBusinessTables 登记一次，两处自动覆盖——别再往这里塞硬编码表名。
+   *
+   * ⚠ 每张 auth 表精确映射到「真正需要它的能力」，别一刀切（配了啥才建啥）：
+   *   - refresh_tokens（session）+ users（本地身份锚点）：任何认证形态都要
+   *   - homura_ttlkv：OAuth2 state 与 WebAuthn challenge 用（纯密码认证不碰它）
+   *   - oauth2_identity_links：仅 OAuth2；passwords：仅密码；webauthn_credentials：仅 WebAuthn
+   *   旧实现把 refresh_tokens/ttlkv 只挂在 oauthOrgId、四张身份表只挂在 password||webauthn，
+   *   导致「纯密码部署」漏 refresh_tokens（登录写 session 静默失败）、「纯 OAuth2 部署」漏
+   *   users/oauth2_identity_links（JIT 建户静默失败）——都是 qw-pages 上的静默失败。
    */
   const requiredTables: string[] = [
     ...restBusinessTables.map((t) => t.table),
-    ...(oauthOrgId ? [refreshTokensRest.table, REST_TTLKV_TABLE] : []),
+    ...(anyAuth ? [refreshTokensRest.table, usersRest.table] : []),
+    ...(oauthOrgId || authWebauthnEnabled ? [REST_TTLKV_TABLE] : []),
+    ...(oauthOrgId ? [oauth2IdentityLinksRest.table] : []),
+    ...(authPasswordEnabled ? [passwordsRest.table] : []),
+    ...(authWebauthnEnabled ? [webauthnCredentialsRest.table] : []),
     ...(genuineServer ? [licenseStateRest.table] : []),
     ...(storageBackend === 'db' ? [homuraFilesRest.table, homuraFileChunksRest.table] : []),
-    // auth 多凭证身份表（password/webauthn 启用时需要）
-    ...(config.get('authPasswordEnabled') || config.get('authWebauthnEnabled')
-      ? [usersRest.table, passwordsRest.table, oauth2IdentityLinksRest.table, webauthnCredentialsRest.table]
-      : []),
   ]
 
   const dbBundle: DbBundle = overrides.db ?? (await buildDb(config, dialect))
@@ -117,10 +129,8 @@ export async function buildApp(
       : buildRestTodoRepo(dbBundle.rest)
 
   // ── 层级 2：auth（OAuth2 / Password / WebAuthn 任一启用即挂载；SQL 与 REST 形态均支持）──
-  const authPasswordEnabled = config.get('authPasswordEnabled')
-  const authWebauthnEnabled = config.get('authWebauthnEnabled')
   let auth: AuthInject | false = false
-  if (oauthOrgId || authPasswordEnabled || authWebauthnEnabled) {
+  if (anyAuth) {
     auth = await buildAuth(config, dbBundle, fetchImpl, secureCookies, logger)
   }
 
