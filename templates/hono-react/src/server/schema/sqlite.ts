@@ -24,5 +24,20 @@ export const licenseState = sqliteLicenseTables.licenseState
 // DB-backed storage 的 homura_files（清单）+ homura_file_chunks（数据分块），与 pg.ts 严格对应
 export const homuraFiles = sqliteStorageTables.homuraFiles
 export const homuraFileChunks = sqliteStorageTables.homuraFileChunks
+// auth 多凭证身份表，与 pg.ts 严格对应
+export const users = sqliteAuthTables.users
+export const passwords = sqliteAuthTables.passwords
+export const oauth2IdentityLinks = sqliteAuthTables.oauth2IdentityLinks
+export const webauthnCredentials = sqliteAuthTables.webauthnCredentials
 
-export const sqliteSchema = { todos, refreshTokens, licenseState, homuraFiles, homuraFileChunks }
+export const sqliteSchema = {
+  todos,
+  refreshTokens,
+  licenseState,
+  homuraFiles,
+  homuraFileChunks,
+  users,
+  passwords,
+  oauth2IdentityLinks,
+  webauthnCredentials,
+}

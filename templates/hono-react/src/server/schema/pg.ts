@@ -1,6 +1,7 @@
 /**
  * PG 方言 schema（pgsql 独立部署 + supabase 共用）。
- * 业务表 todos + spread 进 auth/license 的第三方表（refresh_tokens / license_state）。
+ * 业务表 todos + spread 进 auth/license 的第三方表（refresh_tokens / license_state）
+ * + auth 新表（users / passwords / oauth2_identity_links / webauthn_credentials）。
  * 与 sqlite.ts 严格对应，parity 测试锁一致。
  */
 import { pgCol, pgTable, pgJson } from '@homurajs/db/schema-helpers'
@@ -25,5 +26,20 @@ export const licenseState = pgLicenseTables.licenseState
 // （STORAGE_BACKEND=db 时用；表恒迁移，requiredTables 按后端条件纳入）
 export const homuraFiles = pgStorageTables.homuraFiles
 export const homuraFileChunks = pgStorageTables.homuraFileChunks
+// auth 多凭证身份表（TextPassword + WebAuthn + OAuth2 identity links）
+export const users = pgAuthTables.users
+export const passwords = pgAuthTables.passwords
+export const oauth2IdentityLinks = pgAuthTables.oauth2IdentityLinks
+export const webauthnCredentials = pgAuthTables.webauthnCredentials
 
-export const pgSchema = { todos, refreshTokens, licenseState, homuraFiles, homuraFileChunks }
+export const pgSchema = {
+  todos,
+  refreshTokens,
+  licenseState,
+  homuraFiles,
+  homuraFileChunks,
+  users,
+  passwords,
+  oauth2IdentityLinks,
+  webauthnCredentials,
+}

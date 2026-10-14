@@ -42,6 +42,11 @@ export const licenseStateRest = must('licenseState')
  */
 export const homuraFilesRest = must('homuraFiles')
 export const homuraFileChunksRest = must('homuraFileChunks')
+/** auth 多凭证身份表（users/passwords/oauth2_identity_links/webauthn_credentials） */
+export const usersRest = must('users')
+export const passwordsRest = must('passwords')
+export const oauth2IdentityLinksRest = must('oauth2IdentityLinks')
+export const webauthnCredentialsRest = must('webauthnCredentials')
 
 /**
  * 业务表清单：新增业务表时在此登记。

@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     hono: 'src/hono/index.ts',
     tables: 'src/tables.ts',
+    webauthn: 'src/webauthn/index.ts',
   },
   dts: true,
   format: 'esm',

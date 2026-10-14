@@ -34,7 +34,7 @@ import type { FileStorage } from '@homurajs/storage'
 import { resolveDialect, type AppConfig } from './env.js'
 import { buildDb, migrate, type DbBundle } from './db.js'
 import { buildRestTodoRepo, buildTodoRepo, type TodoRepo } from './todos-repo.js'
-import { licenseStateRest, refreshTokensRest, homuraFilesRest, homuraFileChunksRest, restBusinessTables } from './schema/rest.js'
+import { licenseStateRest, refreshTokensRest, homuraFilesRest, homuraFileChunksRest, usersRest, passwordsRest, oauth2IdentityLinksRest, webauthnCredentialsRest, restBusinessTables } from './schema/rest.js'
 import { buildApiRoutes } from './routes/api.js'
 import { buildFileRoutes } from './routes/files.js'
 import { buildPlatformRoutes } from './routes/platform.js'
@@ -100,6 +100,10 @@ export async function buildApp(
     ...(oauthOrgId ? [refreshTokensRest.table, REST_TTLKV_TABLE] : []),
     ...(genuineServer ? [licenseStateRest.table] : []),
     ...(storageBackend === 'db' ? [homuraFilesRest.table, homuraFileChunksRest.table] : []),
+    // auth 多凭证身份表（password/webauthn 启用时需要）
+    ...(config.get('authPasswordEnabled') || config.get('authWebauthnEnabled')
+      ? [usersRest.table, passwordsRest.table, oauth2IdentityLinksRest.table, webauthnCredentialsRest.table]
+      : []),
   ]
 
   const dbBundle: DbBundle = overrides.db ?? (await buildDb(config, dialect))
@@ -112,10 +116,12 @@ export async function buildApp(
       ? buildTodoRepo(dbBundle.db, dbBundle.dialect)
       : buildRestTodoRepo(dbBundle.rest)
 
-  // ── 层级 2：auth（OAUTH_DINGTALK_ORG_ID 配置即启用；SQL 与 REST 形态均支持）──
+  // ── 层级 2：auth（OAuth2 / Password / WebAuthn 任一启用即挂载；SQL 与 REST 形态均支持）──
+  const authPasswordEnabled = config.get('authPasswordEnabled')
+  const authWebauthnEnabled = config.get('authWebauthnEnabled')
   let auth: AuthInject | false = false
-  if (oauthOrgId) {
-    auth = await buildAuth(config, dbBundle, oauthOrgId, fetchImpl, secureCookies)
+  if (oauthOrgId || authPasswordEnabled || authWebauthnEnabled) {
+    auth = await buildAuth(config, dbBundle, fetchImpl, secureCookies)
   }
 
   // ── 层级 3：3p 平台（DINGTALK_APP_KEY 配置即启用）──
@@ -243,14 +249,24 @@ export async function buildApp(
 async function buildAuth(
   config: AppConfig,
   bundle: DbBundle,
-  oauthOrgId: string,
   fetchImpl?: typeof fetch,
   secureCookies = false,
 ) {
-  const { OAuth2Client, SessionManager, createDrizzleSessionStore, createRestSessionStore } =
-    await import('@homurajs/auth')
+  const {
+    OAuth2Client,
+    SessionManager,
+    createDrizzleSessionStore,
+    createRestSessionStore,
+    createDrizzleUserStore,
+    createRestUserStore,
+    createDrizzleOAuth2LinkStore,
+    createRestOAuth2LinkStore,
+    createDefaultIdentityResolver,
+    PasswordProvider,
+    createDrizzlePasswordStore,
+    createRestPasswordStore,
+  } = await import('@homurajs/auth')
   const { sessionMiddleware, createAuthRoutes } = await import('@homurajs/auth/hono')
-  const { dingtalkOAuth } = await import('@homurajs/3p/dingtalk')
 
   // OAuth state KV：REST 形态用 DB 版（内存 KV 在 Pages 上进程重启即清空，
   // 登录会断在「跳转 → 回调」两条腿之间）；SQL 形态沿用内存版（ADR-010：单实例足够，
@@ -260,26 +276,66 @@ async function buildAuth(
       ? (await import('@homurajs/db')).createRestTtlKv(bundle.rest)
       : (await import('@homurajs/core')).createMemoryTtlKv()
 
-  const preset = dingtalkOAuth({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
-  const client = new OAuth2Client({
-    clientId: config.get('oauthClientId') ?? '',
-    clientSecret: config.get('oauthClientSecret') ?? '',
-    redirectUri: config.get('oauthRedirectUri') ?? '',
-    scopes: ['openid'],
-    stateKv,
-    fetchImpl,
-    ...preset,
-  })
   // session store 按形态选实现：两套接口语义严格对齐（含 consume 的原子抢占与复用检出）
   const store =
     bundle.kind === 'sql'
       ? createDrizzleSessionStore(bundle.db)
       : createRestSessionStore(bundle.rest)
   const sessions = new SessionManager({ secret: config.get('sessionSecret') }, store)
+
+  // 多凭证身份：user store + oauth2 link store + password store（共享）
+  const userStore =
+    bundle.kind === 'sql'
+      ? createDrizzleUserStore(bundle.db)
+      : createRestUserStore(bundle.rest)
+  const linkStore =
+    bundle.kind === 'sql'
+      ? createDrizzleOAuth2LinkStore(bundle.db)
+      : createRestOAuth2LinkStore(bundle.rest)
+
+  // Password provider（如果启用）：通过 PasswordStore 接口操作，不直接依赖数据库实例
+  const passwordEnabled = config.get('authPasswordEnabled')
+  const password = passwordEnabled
+    ? new PasswordProvider({
+        userStore,
+        passwordStore:
+          bundle.kind === 'sql'
+            ? createDrizzlePasswordStore(bundle.db)
+            : createRestPasswordStore(bundle.rest),
+      })
+    : undefined
+
+  // OAuth2 client（如果配置了钉钉）
+  const oauthOrgId = config.get('oauthOrgId')
+  let client: InstanceType<typeof OAuth2Client> | undefined
+  let identityResolver: ReturnType<typeof createDefaultIdentityResolver> | undefined
+  if (oauthOrgId) {
+    const { dingtalkOAuth } = await import('@homurajs/3p/dingtalk')
+    const preset = dingtalkOAuth({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
+    client = new OAuth2Client({
+      clientId: config.get('oauthClientId') ?? '',
+      clientSecret: config.get('oauthClientSecret') ?? '',
+      redirectUri: config.get('oauthRedirectUri') ?? '',
+      scopes: ['openid'],
+      stateKv,
+      fetchImpl,
+      ...preset,
+    })
+    // Identity resolver：JIT 默认开启，OAuth2 首次登录自动建户
+    identityResolver = createDefaultIdentityResolver(userStore, linkStore, {
+      jit: config.get('authOauth2Jit'),
+    })
+  }
+
   return {
     sessions: sessions as unknown as AuthInject['sessions'],
     sessionMiddleware: sessionMiddleware(sessions, { secure: secureCookies }),
-    authRoutes: createAuthRoutes({ client, sessions, secure: secureCookies }),
+    authRoutes: createAuthRoutes({
+      sessions,
+      oauth2: client && identityResolver ? { client, identityResolver, provider: 'dingtalk' } : undefined,
+      password,
+      secure: secureCookies,
+    }),
   } satisfies AuthInject
 }
 

@@ -6,6 +6,9 @@ import { createSqliteDb } from '@homurajs/db'
 import { OAuth2Client } from '../oauth2/client.js'
 import { SessionManager } from '../session/manager.js'
 import { createDrizzleSessionStore } from '../session/store.js'
+import { createDrizzleUserStore } from '../identity/user-store.js'
+import { createDrizzleOAuth2LinkStore } from '../identity/oauth2-link-store.js'
+import { createDefaultIdentityResolver } from '../identity/resolver.js'
 import { createAuthRoutes } from './routes.js'
 import { sessionMiddleware, requireAuth } from './middleware.js'
 
@@ -31,8 +34,24 @@ async function buildApp(opts?: { accessTtl?: number; now?: () => Date }) {
       sub TEXT NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER, profile TEXT
     )`,
   ))
+  await db.run(sql.raw(
+    `CREATE TABLE users (
+      id TEXT PRIMARY KEY, username TEXT UNIQUE, nickname TEXT, avatar_url TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    )`,
+  ))
+  await db.run(sql.raw(
+    `CREATE TABLE oauth2_identity_links (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
+      provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
+    )`,
+  ))
+  await db.run(sql.raw(
+    `CREATE UNIQUE INDEX oauth2_links_provider_sub_uidx ON oauth2_identity_links (provider, provider_sub)`,
+  ))
   const kv = createMemoryTtlKv()
-  const store = createDrizzleSessionStore(db, opts?.now ? { now: () => opts.now!().getTime() } : undefined)
+  const nowMs = opts?.now ? () => opts.now!().getTime() : undefined
+  const store = createDrizzleSessionStore(db, nowMs ? { now: nowMs } : undefined)
   const sessions = new SessionManager(
     {
       secret: SECRET,
@@ -41,10 +60,14 @@ async function buildApp(opts?: { accessTtl?: number; now?: () => Date }) {
     },
     store,
   )
+  const userStore = createDrizzleUserStore(db, nowMs ? { now: nowMs } : undefined)
+  const linkStore = createDrizzleOAuth2LinkStore(db, nowMs ? { now: nowMs } : undefined)
+  const identityResolver = createDefaultIdentityResolver(userStore, linkStore)
+
   const client = new OAuth2Client({
     clientId: 'cid',
     clientSecret: 'csec',
-    redirectUri: 'https://app.example/auth/callback',
+    redirectUri: 'https://app.example/auth/oauth2/callback',
     scopes: ['openid'],
     endpoints: {
       authorizeUrl: 'https://idp.example/authorize',
@@ -61,10 +84,13 @@ async function buildApp(opts?: { accessTtl?: number; now?: () => Date }) {
 
   const app = new Hono()
   app.use('*', sessionMiddleware(sessions))
-  app.route('/', createAuthRoutes({ client, sessions }))
+  app.route('/', createAuthRoutes({
+    sessions,
+    oauth2: { client, identityResolver, provider: 'test-idp' },
+  }))
   app.get('/api/me', requireAuth(), (c) => c.json(c.get('auth')))
   app.get('/page', requireAuth(), (c) => c.text('secret-page'))
-  return { app, client, sessions, kv }
+  return { app, client, sessions, kv, userStore }
 }
 
 /** 极简 cookie jar：吸收 Set-Cookie，回吐 Cookie 头 */
@@ -97,13 +123,13 @@ beforeEach(async () => {
   ctx = await buildApp()
 })
 
-/** 走完整登录：login → 取 state → callback，返回带 cookie 的 jar */
+/** 走完整登录：authorize → 取 state → callback，返回带 cookie 的 jar */
 async function loginFlow(returnTo = '/home'): Promise<CookieJar> {
   const jar = new CookieJar()
-  const login = await ctx.app.request(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`)
+  const login = await ctx.app.request(`/auth/oauth2/authorize?returnTo=${encodeURIComponent(returnTo)}`)
   expect(login.status).toBe(302)
   const state = new URL(login.headers.get('location')!).searchParams.get('state')!
-  const cb = await ctx.app.request(`/auth/callback?code=abc&state=${state}`)
+  const cb = await ctx.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
   jar.absorb(cb)
   expect(cb.status).toBe(302)
   expect(cb.headers.get('location')).toBe(returnTo)
@@ -111,8 +137,8 @@ async function loginFlow(returnTo = '/home'): Promise<CookieJar> {
 }
 
 describe('authRoutes + middleware 集成', () => {
-  it('GET /auth/login → 302 到 IdP authorize（带 state）', async () => {
-    const res = await ctx.app.request('/auth/login')
+  it('GET /auth/oauth2/authorize → 302 到 IdP authorize（带 state）', async () => {
+    const res = await ctx.app.request('/auth/oauth2/authorize')
     expect(res.status).toBe(302)
     const loc = new URL(res.headers.get('location')!)
     expect(loc.origin + loc.pathname).toBe('https://idp.example/authorize')
@@ -124,27 +150,30 @@ describe('authRoutes + middleware 集成', () => {
     const jar = await loginFlow('/dash')
     expect(jar.get('homura_at')).toBeTruthy()
     expect(jar.get('homura_rt')).toBeTruthy()
-    // 再验一次 loginFlow 的 returnTo 传递（此处 /dash）
-    const res = await ctx.app.request('/auth/login?returnTo=%2Fdash')
+    const res = await ctx.app.request('/auth/oauth2/authorize?returnTo=%2Fdash')
     expect(res.status).toBe(302)
   })
 
   it('callback 缺 code → 400', async () => {
-    const res = await ctx.app.request('/auth/callback?state=x')
+    const res = await ctx.app.request('/auth/oauth2/callback?state=x')
     expect(res.status).toBe(400)
     await expect(res.json()).resolves.toMatchObject({ error: 'missing_code' })
   })
 
   it('callback 伪造 state → 401', async () => {
-    const res = await ctx.app.request('/auth/callback?code=abc&state=forged')
+    const res = await ctx.app.request('/auth/oauth2/callback?code=abc&state=forged')
     expect(res.status).toBe(401)
   })
 
-  it('受保护 API：带 cookie → 200 claims', async () => {
+  it('受保护 API：带 cookie → 200 claims（sub 是 local user ID）', async () => {
     const jar = await loginFlow()
     const res = await ctx.app.request('/api/me', { headers: { cookie: jar.header() } })
     expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toMatchObject({ sub: 'u1', nickname: '张三' })
+    const body = await res.json() as { sub: string; nickname?: string }
+    // sub 现在是 local user ID（UUID），不是 IdP 的 'u1'
+    expect(body.sub).toBeTruthy()
+    expect(body.sub).not.toBe('u1')
+    expect(body.nickname).toBe('张三')
   })
 
   it('受保护 API：无 cookie → 401 JSON', async () => {
@@ -192,28 +221,35 @@ describe('authRoutes + middleware 集成', () => {
     jar.absorb(res)
     expect(jar.get('homura_at')).toBeUndefined()
     expect(jar.get('homura_rt')).toBeUndefined()
-    // 旧 refresh token 已被 revokeSession 吊销
     expect(await ctx.sessions.refresh(oldRt)).toBeNull()
+  })
+
+  it('OAuth2 JIT：首次登录自动建户，再次登录找到同一 user', async () => {
+    const jar1 = await loginFlow()
+    const res1 = await ctx.app.request('/api/me', { headers: { cookie: jar1.header() } })
+    const body1 = await res1.json() as { sub: string }
+    // 第二次登录
+    const jar2 = await loginFlow()
+    const res2 = await ctx.app.request('/api/me', { headers: { cookie: jar2.header() } })
+    const body2 = await res2.json() as { sub: string }
+    expect(body1.sub).toBe(body2.sub) // 同一个 local user
   })
 })
 
 describe('sessionMiddleware 透明 rotate', () => {
   it('access 过期 + refresh cookie 有效 → 自动续期', async () => {
     let ms = 1_700_000_000_000
-    // access TTL 短（10s），refresh 默认 30d；签发后推进时间使 access 过期但 refresh 仍有效
     const c = await buildApp({ accessTtl: 10, now: () => new Date(ms) })
     const jar = new CookieJar()
-    const login = await c.app.request('/auth/login?returnTo=/home')
+    const login = await c.app.request('/auth/oauth2/authorize?returnTo=/home')
     const state = new URL(login.headers.get('location')!).searchParams.get('state')!
-    const cb = await c.app.request(`/auth/callback?code=abc&state=${state}`)
+    const cb = await c.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
     jar.absorb(cb)
 
     ms += 20_000 // access 过期（10s TTL），refresh 未过期
-    // middleware 用 refresh cookie 透明 rotate，新 access 在推进后的时钟下有效
     const res = await c.app.request('/api/me', { headers: { cookie: jar.header() } })
     expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toMatchObject({ sub: 'u1' })
-    // middleware 应已下发新 cookie
+    await expect(res.json()).resolves.toMatchObject({ nickname: '张三' })
     jar.absorb(res)
     expect(jar.get('homura_at')).toBeTruthy()
   })

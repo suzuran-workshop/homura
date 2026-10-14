@@ -104,7 +104,46 @@ export const configSpecs = {
   oauthRedirectUri: {
     env: 'OAUTH_REDIRECT_URI',
     parse: parses.string,
-    description: '回调地址（如 https://app.example/auth/callback）',
+    description: '回调地址（如 https://app.example/auth/oauth2/callback）',
+  },
+  authOauth2Jit: {
+    env: 'AUTH_OAUTH2_JIT',
+    default: true,
+    parse: parses.boolean,
+    description: 'OAuth2 首次登录是否自动建户（JIT provisioning）；false 则要求预先注册并关联',
+  },
+  authPasswordEnabled: {
+    env: 'AUTH_PASSWORD_ENABLED',
+    default: true,
+    parse: parses.boolean,
+    description: '是否启用用户名密码认证（TextPassword）',
+  },
+  authPasswordAllowSelfRegister: {
+    env: 'AUTH_PASSWORD_ALLOW_SELF_REGISTER',
+    default: true,
+    parse: parses.boolean,
+    description: '是否允许自助注册（false 则只能由管理员创建账户）',
+  },
+  authWebauthnEnabled: {
+    env: 'AUTH_WEBAUTHN_ENABLED',
+    default: false,
+    parse: parses.boolean,
+    description: '是否启用 WebAuthn（Passkey）认证',
+  },
+  authWebauthnRpId: {
+    env: 'AUTH_WEBAUTHN_RP_ID',
+    parse: parses.string,
+    description: 'WebAuthn RP ID（通常是域名，如 app.example.com）',
+  },
+  authWebauthnRpName: {
+    env: 'AUTH_WEBAUTHN_RP_NAME',
+    parse: parses.string,
+    description: 'WebAuthn RP 显示名称（如 "My App"）',
+  },
+  authWebauthnOrigin: {
+    env: 'AUTH_WEBAUTHN_ORIGIN',
+    parse: parses.string,
+    description: 'WebAuthn 允许的 origin（如 https://app.example.com；多 origin 用逗号分隔）',
   },
 
   // ── 3p: dingtalk 平台能力 ──

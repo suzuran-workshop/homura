@@ -20,10 +20,40 @@ import { fileURLToPath } from 'node:url'
 const here = fileURLToPath(new URL('.', import.meta.url))
 const MIGRATIONS = join(here, '../drizzle/sqlite')
 
-/** 建 sqlite :memory: + 跑真实迁移 */
+/** 建 sqlite :memory: + 跑真实迁移 + 补建 auth 新表（迁移尚未重新生成） */
 async function makeDb() {
   const db = createSqliteDb({ dialect: 'sqlite', path: ':memory:' })
   await runMigrations(db, MIGRATIONS)
+  // auth 多凭证身份表（迁移将在 db:generate 后自动包含）
+  await db.run(sql.raw(
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY, username TEXT UNIQUE, nickname TEXT, avatar_url TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    )`,
+  ))
+  await db.run(sql.raw(
+    `CREATE TABLE IF NOT EXISTS passwords (
+      user_id TEXT PRIMARY KEY, password_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    )`,
+  ))
+  await db.run(sql.raw(
+    `CREATE TABLE IF NOT EXISTS oauth2_identity_links (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
+      provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
+    )`,
+  ))
+  await db.run(sql.raw(
+    `CREATE UNIQUE INDEX IF NOT EXISTS oauth2_links_provider_sub_uidx
+     ON oauth2_identity_links (provider, provider_sub)`,
+  ))
+  await db.run(sql.raw(
+    `CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, public_key TEXT NOT NULL,
+      counter INTEGER NOT NULL, device_type TEXT NOT NULL, backed_up INTEGER NOT NULL,
+      transports TEXT, display_name TEXT, created_at INTEGER NOT NULL
+    )`,
+  ))
   return db
 }
 
@@ -150,28 +180,31 @@ describe('模板 e2e — 渐进式全链路', () => {
     await expect(res.json()).resolves.toMatchObject({ user: null })
   })
 
-  it('OAuth 登录全链路：login→callback→session→/api/me', async () => {
+  it('OAuth 登录全链路：authorize→callback→session→/api/me', async () => {
     const jar = new CookieJar()
-    // login → 302 到 IdP authorize（带 state）
-    const login = await built.app.request('/auth/login?returnTo=%2Fdashboard')
+    // authorize → 302 到 IdP authorize（带 state）
+    const login = await built.app.request('/auth/oauth2/authorize?returnTo=%2Fdashboard')
     expect(login.status).toBe(302)
     const loc = new URL(login.headers.get('location')!)
     expect(loc.pathname).toBe('/test_org/authorize')
     const state = loc.searchParams.get('state')!
 
     // callback → 建 session + 双 cookie + 302 returnTo
-    const cb = await built.app.request(`/auth/callback?code=abc&state=${state}`)
+    const cb = await built.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
     expect(cb.status).toBe(302)
     expect(cb.headers.get('location')).toBe('/dashboard')
     jar.absorb(cb)
     expect(jar.get('homura_at')).toBeTruthy()
     expect(jar.get('homura_rt')).toBeTruthy()
 
-    // /api/me 带 cookie → 登录身份
+    // /api/me 带 cookie → 登录身份（sub 现在是 local user ID，不再是 IdP 的 'user-1'）
     const me = await built.app.request('/api/me', { headers: { cookie: jar.header() } })
-    await expect(me.json()).resolves.toMatchObject({
-      user: { sub: 'user-1', nickname: '张三', avatarUrl: 'http://a/p.png' },
-    })
+    const meBody = await me.json() as { user: { sub: string; nickname?: string; avatarUrl?: string } }
+    expect(meBody.user).toBeTruthy()
+    expect(meBody.user.sub).toBeTruthy()
+    expect(meBody.user.sub).not.toBe('user-1') // local user ID, not IdP sub
+    expect(meBody.user.nickname).toBe('张三')
+    const localSub = meBody.user.sub
 
     // 登录用户的 todos 与匿名隔离：登录后 list 看不到匿名 todos
     await built.app.request('/api/todos', {
@@ -183,15 +216,15 @@ describe('模板 e2e — 渐进式全链路', () => {
     const { todos } = (await mine.json()) as {
       todos: Array<{ title: string; ownerSub: string | null }>
     }
-    expect(todos.every((t) => t.ownerSub === 'user-1')).toBe(true)
+    expect(todos.every((t) => t.ownerSub === localSub)).toBe(true)
     expect(todos.some((t) => t.title === '登录用户的待办')).toBe(true)
   })
 
   it('refresh rotate：POST /auth/refresh 换新 cookie', async () => {
     const jar = new CookieJar()
-    const login = await built.app.request('/auth/login')
+    const login = await built.app.request('/auth/oauth2/authorize')
     const state = new URL(login.headers.get('location')!).searchParams.get('state')!
-    const cb = await built.app.request(`/auth/callback?code=abc&state=${state}`)
+    const cb = await built.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
     jar.absorb(cb)
     const oldRt = jar.get('homura_rt')!
 

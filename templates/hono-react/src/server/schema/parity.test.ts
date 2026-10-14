@@ -14,9 +14,13 @@ describe('schema parity（pg ↔ sqlite）', () => {
     expect(() => assertSchemaParity(pgSchema, sqliteSchema)).not.toThrow()
   })
 
-  it('覆盖业务表 + 第三方表（todos/refresh_tokens/license_state/homura_files/homura_file_chunks）', () => {
-    expect(Object.keys(pgSchema).sort()).toEqual(['homuraFileChunks', 'homuraFiles', 'licenseState', 'refreshTokens', 'todos'])
-    expect(Object.keys(sqliteSchema).sort()).toEqual(['homuraFileChunks', 'homuraFiles', 'licenseState', 'refreshTokens', 'todos'])
+  it('覆盖业务表 + 第三方表（todos/refresh_tokens/license_state/homura_files/homura_file_chunks + auth 新表）', () => {
+    const expected = [
+      'homuraFileChunks', 'homuraFiles', 'licenseState', 'oauth2IdentityLinks',
+      'passwords', 'refreshTokens', 'todos', 'users', 'webauthnCredentials',
+    ]
+    expect(Object.keys(pgSchema).sort()).toEqual(expected)
+    expect(Object.keys(sqliteSchema).sort()).toEqual(expected)
   })
 })
 
