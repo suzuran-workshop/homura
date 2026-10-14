@@ -38,6 +38,7 @@ import { licenseStateRest, refreshTokensRest, restBusinessTables } from './schem
 import { buildApiRoutes } from './routes/api.js'
 import { buildFileRoutes } from './routes/files.js'
 import { buildPlatformRoutes } from './routes/platform.js'
+import { buildLicenseDemoRoutes } from './routes/license-demo.js'
 
 export interface BuildAppOverrides {
   /** 注入已建好的 db（e2e 用 :memory:）；不传则按 config 建 */
@@ -155,6 +156,8 @@ export async function buildApp(
   routes.route('/api', buildApiRoutes(todoRepo))
   if (storage) routes.route('/', buildFileRoutes(storage))
   if (platformRoutes) routes.route('/api/platform', platformRoutes)
+  // 中央激活用例：requireFeature 功能范围闸门示范（层级 5，配了 GENUINE_SERVER 才挂）
+  if (licenseClient) routes.route('/api/license-demo', buildLicenseDemoRoutes(licenseClient, todoRepo))
 
   // 授权状态端点：在 guard 的豁免清单里，故 enforcement=all 时仍可读——
   // 否则前端连"为什么全站 503"都问不到，"每次使用强提醒"就无从展示。

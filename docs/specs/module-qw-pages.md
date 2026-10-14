@@ -149,11 +149,34 @@ RETURNING family_id, sid, sub, profile
 
 实测验证（V10，真实产物 + canary 配置）：`/auth/login` → **302**，`Location: https://dingtalk.auth.xrl.im/canary_org_9f3a/authorize?client_id=canary-client-id&redirect_uri=…&state=…`。orgId 与 clientId 只可能来自配置文件 → 文件确实在启动期被读取；`SESSION_SECRET` 也通过了断言（否则进程启动即退出）。又因 `OAuth2Client.authorizeUrl` 在返回 URL 前 `await stateKv.set(...)`，这个 302 同时证明 **`createRestTtlKv` 的 upsert 已在部署态对真实 PostgREST 跑通**（`homura_ttlkv` 表 + policy 生效）。
 
+## license 端到端联调（2026-10-14 已实测）
+
+前置：本地起真 `../homura-genuine`（Hono + `node:sqlite` + Ed25519），用 `cloudflared tunnel --url http://127.0.0.1:8787` 拿到 `https://<random>.trycloudflare.com` 作为 Pages 出网目标。App 侧 `config/homura.config.env` 里配 `GENUINE_SERVER` / `GENUINE_PRODUCT_ID` / `GENUINE_APP_ID` / `GENUINE_PUBLIC_KEY`（PEM 用双引号包裹、换行写 `\n`），`GENUINE_LICENSE_KEY` 留空走 `allowSelfRegister`。发布 `dist/` 到 Pages（V1）后逐项验证：
+
+| 场景 | 操作 | App 侧观察 |
+| ---- | ---- | ---------- |
+| 自注册 + 心跳 | 冷启动 | `/_license` 返回 `status:active`、`signature.kind:verified`、`features:[export,beta]`；`license_state` 表落一行 `id/license_id/instance_key` |
+| enforcement=notice | PATCH `{status:suspended,enforcement:notice,notice:"..."}` | 全站 200 + `X-Homura-License-Status:suspended` + `X-Homura-License-Notice` 携 URL 编码中文（`decodeURI` 还原正确） |
+| enforcement=core | PATCH 同上换 core | `/api/*` **503** body `{error:"service_suspended",enforcement:"core"}`；`/` 仍 200 |
+| enforcement=all | PATCH 同上换 all | `/api/*` 与 `/` **均 503**；`/_license` 仍 200（bypass 清单生效，前端才能读到"为什么全站停"） |
+| 本地到期判定 | PATCH `{status:active,expiresAt:"2020-01-01",enforcement:core}` | 中心 `manualStatus:active` 但 `effectiveStatus:expired`；App 侧 `status:expired`、`/api` 503 body `{error:"license_expired"}` |
+| rotate keys → invalid sig | `POST /admin/keys/rotate`，App 侧仍持旧 pubkey | 下一次心跳 `signature.kind:invalid`、reason 精确报 `keyId 不匹配（响应 X，本地公钥 Y）：中心可能已轮换密钥`；`enforcement` 自动最严 `all`；`hasFeature()` 一律 false；`notice` 换固定安全告警；全站 503 |
+| 跨发布持久化 | 更新 `GENUINE_PUBLIC_KEY` 到新 pubkey，republish V2 | V2 冷启动从 PostgREST 读回同一 `licenseId+instanceKey`，直接 heartbeat 而**不重新 register**，未触发 `instance_mismatch`；`/_license` 恢复 `active+verified` |
+
+**踩坑清单**（写代码前先看）：
+
+- `getEnforcement()` 在 `status===active` 时**恒返回 `none`**，不管中心下发的 `enforcement` 是什么。要让 enforcement 生效必须同时把 `status` 打到 `suspended`（或让 `expiresAt` 到过去使本地判 `expired`）。仅 PATCH `enforcement` 而不动 `status` 会看不到任何变化，容易误判成 bug
+- genuine 默认 `heartbeatIntervalSec=300`。e2e 演练必须 PATCH 到 10s 级别，否则每次翻状态要等 5 分钟才生效
+- `cloudflared` quick tunnel URL 每次重启都会漂。漂了必须重新 `pnpm build:qw-pages` + republish（`GENUINE_SERVER` 是烧进 `dist/homura.config.env` 的）；生产联调应该用 named tunnel 或直接把 genuine 部署到公网
+- Windows Git Bash 的 `curl -d "中文"` 会按 shell codepage 编码，genuine 端 JSON 解析成 U+FFFD 替换字符。用 `--data-binary @file.json`（文件 UTF-8）就没问题
+- 平台健康检查路径是 `/_healthz`（`/healthz` 归网关），本次实测再次确认；`/_license` 也在 guard 的 bypass 清单里，`enforcement=all` 时仍可读
+
 ## 仍未验证 / 已知缺口
 
 - [x] **配置与密钥投递**（见上节）：登录链的机制性阻塞已解除，`/auth/login` 在 Pages 上实测可用。
 - [x] `consume` 依赖的 PostgREST 原子抢占语义已实测（见上节）。
-- [ ] `createRestSessionStore` / `createRestStateStore` 的**函数体仍未在部署态执行过**：前者要等真实 IdP 走完 `/auth/callback`，后者要等 ../homura-genuine 上线。已验证的是它们依赖的 PostgREST 语义与请求形状（单测逐条断言）。
+- [x] `createRestStateStore` **已在部署态执行**（见上节 license 端到端联调，2026-10-14）：跨发布持久化 + `on_conflict=id` upsert + heartbeat 循环全部验证通过。
+- [ ] `createRestSessionStore` 的**函数体仍未在部署态执行过**：要等真实 IdP 走完 `/auth/callback`。已验证的是它依赖的 PostgREST 语义与请求形状（单测逐条断言）。
 - [ ] **平台产物存储自身的 ACL 未验证**：本文只证明了"经运行中的 App 读不到"。若平台另有产物下载入口，"随产物携带密钥"的前提就不成立——正式承载真实凭据前值得向平台确认一次。
 - [ ] 多实例是否真会扩容（只观测到单实例）。
 - [ ] `/storage/v1` 的 upload/download 全链路（因建不出桶而无法测）。

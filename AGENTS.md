@@ -42,7 +42,7 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 | db · `sqlite`                          | ✅                  | ❌              | Pages 应用根只读（`mkdir ./data` → EACCES），唯一可写区跨发布清空 → 数据必丢                                                                   |
 | db · `pg` 直连                         | ✅                  | ❌              | Pages 不下发 PG 凭据、无注入口，且 5432 出网 timeout（仅 443 放行）                                                                            |
 | auth（登录链）                         | ✅                  | 🟡              | `/auth/login` 已线上验证 302；`/auth/callback` 待真实 IdP 联调                                                                                 |
-| license（到期 / 停服 / 功能范围）      | ✅ 已双端联调       | 🟡              | standalone 八阶段生命周期实测通过（真 genuine 进程）；Pages 侧未验证——需 genuine 以 https 公网可达，且 `createRestStateStore` 未在部署态执行过 |
+| license（到期 / 停服 / 功能范围）      | ✅ 已双端联调       | ✅ 已实测       | standalone 八阶段生命周期实测通过（真 genuine 进程）；Pages 侧 2026-10-14 用 cloudflared 隧道打通五场景（自注册/心跳/四档 enforcement/到期/停服/rotate keys 造成 invalid sig），`createRestStateStore` 跨发布持久化验证通过。前置：genuine 必须 https 公网可达；隧道 URL 漂了要重发 App |
 | 3p（钉钉消息/审批/通讯录）             | ✅                  | ⚪ 未测         | 凭据可经配置文件投递；出网到钉钉域名未验证                                                                                                     |
 | storage · `local`                      | ✅                  | ❌              | 默认 `./data/files` 在 Pages 不可写（首次上传才 EACCES，健康检查照报 ok）；改指可写区也跨发布清空                                              |
 | storage · `supabase`                   | ✅（自建 supabase） | ❌              | Pages 上 anon 无建桶权（RLS 403），受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来                                                 |

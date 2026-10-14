@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
+import { LicenseBanner, type LicenseState } from './LicenseBanner'
 import type { Todo } from '../shared/types'
 
 type Me = { sub: string; nickname?: string; avatarUrl?: string } | null
@@ -11,6 +12,8 @@ export default function App() {
   const [caps, setCaps] = useState<string[] | null>(null)
   const [uploadUrl, setUploadUrl] = useState<string | null>(null)
   const [notice, setNotice] = useState<string>('')
+  const [license, setLicense] = useState<LicenseState | null>(null)
+  const [demoMsg, setDemoMsg] = useState<string>('')
 
   const refresh = useCallback(async () => {
     const [{ user }, { todos: list }] = await Promise.all([api.me(), api.listTodos()])
@@ -18,6 +21,9 @@ export default function App() {
     setTodos(list)
     const cap = await api.capabilities()
     setCaps(cap?.capabilities ?? null)
+    // 读授权状态（未启用 license 时 /_license 404，静默跳过）
+    const lic = await fetch('/_license').then((r) => (r.ok ? (r.json() as Promise<LicenseState>) : null)).catch(() => null)
+    setLicense(lic)
   }, [])
 
   useEffect(() => {
@@ -52,6 +58,11 @@ export default function App() {
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: 24, fontFamily: 'system-ui' }}>
       <h1>homura 模板</h1>
+
+      {/* ── 中央激活强提醒（层级 5：license）──
+          必须放在最顶部且不可关闭：产品硬要求"每次使用强提醒、无差别提示所有用户"。
+          未启用 license（/_license 404）时组件自身返回 null，不打扰。 */}
+      <LicenseBanner />
 
       {/* ── 认证（层级 2）── */}
       <section>
@@ -121,6 +132,48 @@ export default function App() {
           </>
         )}
       </section>
+
+      {/* ── 中央激活（层级 5：license 功能范围闸门）──
+          示范 requireFeature 的逐路由闸门：同一份产物散给多人，按 features 分权。
+          中心给谁签了 export/beta，谁就能访问对应端点；没签就 403 feature_not_licensed。
+          配了 GENUINE_SERVER 才渲染（未启用 license 时 /_license 404，license 为 null）。 */}
+      {license && (
+        <section>
+          <h2>中央激活</h2>
+          <p style={{ fontSize: 13, color: '#666' }}>
+            状态：<code>{license.status}</code> · 处置：<code>{license.enforcement ?? '—'}</code> ·
+            验签：<code>{license.signature?.kind ?? '—'}</code> ·
+            已授权功能：<code>{license.features.length ? license.features.join(', ') : '（无）'}</code>
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() =>
+                void fetch('/api/license-demo/export').then(async (r) => {
+                  setDemoMsg(r.ok ? `导出成功（CSV ${(await r.text()).length} 字节）` : `导出被拒 ${r.status}：${(await r.json()).error}`)
+                })
+              }
+            >
+              导出 CSV（需 export）
+            </button>
+            <button
+              onClick={() =>
+                void fetch('/api/license-demo/beta/ping').then(async (r) => {
+                  setDemoMsg(r.ok ? 'beta 功能可用' : `beta 被拒 ${r.status}：${(await r.json()).error}`)
+                })
+              }
+            >
+              调用 beta（需 beta）
+            </button>
+            <button onClick={() => void refresh()}>刷新状态</button>
+          </div>
+          {demoMsg && <p style={{ marginTop: 8, fontSize: 13 }}>{demoMsg}</p>}
+          <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+            在中心 PATCH 该许可的 <code>features</code> 后点"刷新状态"——下一次心跳（≤ heartbeatIntervalSec 秒）
+            闸门即随之开关。验签失败（如中心 rotate keys 后未更新公钥）时所有闸门一律 403，
+            这是默认拒绝的安全网。
+          </p>
+        </section>
+      )}
     </main>
   )
 }

@@ -39,9 +39,9 @@ cd templates/hono-react && pnpm dev   # 模板开发（轮二完善）
 - 已知限制：
   - drizzle-orm 1.0.0-rc.4 精确锁版（node:sqlite driver 仅 1.0 线存在），升级需独立 PR 过 parity 测试
   - **qw-pages 形态的数据层只有 PostgREST 一条路**（`DIALECT=rest`）：应用根目录只读、唯一可写区跨发布清空 → sqlite 不可用；平台不下发 PG 凭据且 5432 出网被禁 → pg 直连不可用。表与 RLS policy 须在部署期用平台受控迁移建（App 无 DDL 权限），四张表的配方见 spec
-  - **qw-pages 形态的登录链机制已打通，待真实 IdP 联调**：`createRestSessionStore` / `createRestStateStore` 已实现；密钥投递走随产物携带的 `homura.config.env`（实测产物不可公网读取，见 spec）；`/auth/login` 已在线上返回 302。剩余：`/auth/callback` 全链路需真实钉钉 IdP
-  - **license 已双端联调（standalone），qw-pages 侧未验证**：`../homura-genuine` 已实现，八阶段生命周期（到期/续期/四档处置/功能范围/停服）实测通过；Pages 侧需 genuine 以 https 公网可达（出网只放行 443），且 `createRestStateStore` 未在部署态执行过
-  - **前端强提醒 UI 未实现**：到期/停服的提醒目前只到响应头（`X-Homura-License-Notice`）与 `/_license` 端点，React 端 banner 还没做；`requireFeature` 也还没有模板使用示范
+  - **qw-pages 形态的登录链机制已打通，待真实 IdP 联调**：`createRestSessionStore` 已实现；密钥投递走随产物携带的 `homura.config.env`（实测产物不可公网读取，见 spec）；`/auth/login` 已在线上返回 302。剩余：`/auth/callback` 全链路需真实钉钉 IdP。**`createRestStateStore` 已在 2026-10-14 license 端到端联调中与部署态验证通过**（跨发布持久化 + 心跳循环全跑通）
+  - **license 双端均已实测**：standalone 八阶段生命周期（到期/续期/四档处置/功能范围/停服）通过；qw-pages 侧 2026-10-14 用 cloudflared 隧道打通五场景（自注册/心跳/四档 enforcement/到期/停服/rotate keys 造成 invalid sig），`createRestStateStore` 跨发布持久化验证通过。前置：genuine 必须 https 公网可达；隧道 URL 漂了要重发 App
+  - **前端强提醒 UI 已实现**：`templates/hono-react/src/client/LicenseBanner.tsx` 轮询 `/_license`，只要 `notice` 非空就展示且不可关闭（产品硬要求"每次使用强提醒、无差别提示所有用户"）；`requireFeature` 示范路由 `license-demo.ts` 已给三条端点（`/status` 无闸门、`/export` 需 `export`、`/beta/ping` 需 `beta`），含 colocated 测试穷尽分支
   - **`SESSION_SECRET` 缺省值是仓库里的公开字符串**：qw-pages 形态或 `NODE_ENV=production` 下沿用缺省值会**启动即拒绝**（HS256 密钥公开 = 会话可伪造）。部署前必须在 `config/homura.config.env` 里给 >=32B 随机值
   - **qw-pages 形态暂不支持对象存储**：anon 无建桶权（RLS 403），受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来，PRD 的"图床刚需"在该形态待平台侧预置桶
   - 钉钉 webhook 回调本轮不做（未来为 @homurajs/3p 的 webhook capability）

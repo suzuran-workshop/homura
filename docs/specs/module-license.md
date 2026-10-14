@@ -163,9 +163,21 @@ REST（qw-pages）→ `createRestStateStore`。
 - [x] fake genuine 全流程测试 + 签名授权的特性测试（篡改四类字段各自失败、四态签名状态、
       本地到期与时钟回拨、四档处置、中文提醒头编解码、requireFeature 三态）
 - [x] homura-genuine 实现并与消费侧真进程联调（八阶段生命周期）
-- [ ] **qw-pages 形态未验证**：`createRestStateStore` 至今没在部署态执行过。障碍是 Page 里的 App
-      必须能公网访问 genuine，而 Pages 出网只放行 443 → genuine 需以 https 公网可达
-- [ ] **前端强提醒 UI 未实现**：目前只有响应头 + `/_license` 端点，"无差别提示所有用户"
-      还差 React 端 banner
-- [ ] **模板缺 `requireFeature` 使用示范**：中间件已导出并有单测，但模板是"活文档"，
-      没有示范等于派生 App 的 Agent 不知道功能范围该怎么接
+- [x] **qw-pages 形态已实测**（2026-10-14）：本地起真 genuine + cloudflared 快速隧道，
+      模板以 `dist/` 发布到 `puwkg4ac.qwenwork.host`，跑通五场景：
+      ① 自注册 + 10s 心跳 + Ed25519 验签 verified；② 四档 enforcement 逐个翻转
+      （`core` 档 `/api/*` 503、`/` 200；`all` 档全站 503、`/_license` 仍可读）；
+      ③ `expiresAt` 到过去 → 本地判定 `expired` 压过中心 `active`；④ `status:suspended`
+      → 下一次心跳全站 503；⑤ `POST /admin/keys/rotate` → App 侧 `signature.kind:invalid`
+      + `enforcement` 自动最严 `all` + features 全拒 + 安全告警文案；换 pubkey 重发布 V2
+      后跨发布从 PostgREST 读回同一 `licenseId+instanceKey`，未触发 `instance_mismatch`。
+      `X-Homura-License-Notice` 用 UTF-8 URL 编码回中文正确。
+      前置：genuine 必须以 https 公网可达（Pages 出网只放行 443）；隧道 URL 会随
+      cloudflared 重启漂移，漂了必须重发 App。
+- [x] **前端强提醒 UI 已实现**：`templates/hono-react/src/client/LicenseBanner.tsx` 轮询
+      `/_license`，只要 `notice` 非空就展示且不可关闭（产品硬要求"每次使用强提醒、
+      无差别提示所有用户"），未启用 license 时自身返回 null。已接入 `App.tsx` 顶部。
+- [x] **模板已给 `requireFeature` 使用示范**：`templates/hono-react/src/server/routes/license-demo.ts`
+      示范三条端点（`/status` 无闸门、`/export` 需 `export`、`/beta/ping` 需 `beta`），
+      含 colocated 测试穷尽"有/无 feature、验签通过/失败、未注册"各分支；前端 `App.tsx`
+      的「中央激活」区块给按钮直接打这些端点。README 新增「中央激活用例」章节讲接法要点。
