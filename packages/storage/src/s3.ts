@@ -22,6 +22,13 @@ export interface S3StorageOptions {
   autoCreateBucket?: boolean
   /** 预签名走直连 URL（默认 false：走代理路径降级，避免暴露 endpoint） */
   presignDirect?: boolean
+  /**
+   * 寻址风格：true = path-style（`endpoint/bucket/key`），false = virtual-hosted（`bucket.endpoint/key`）。
+   * 缺省 true（minio 需要）。⚠ **阿里云 OSS 必须 false**：OSS 对对象操作强制 virtual-hosted，
+   * path-style 会报 `403 SecondLevelDomainForbidden: Please use virtual hosted style`
+   * （2026-10-14 真 OSS 实测）。预签名 URL 的寻址风格也随此开关，故直传前必须配对。
+   */
+  forcePathStyle?: boolean
 }
 
 /** 动态 import 的结构化形状（send/输出类型在调用点断言） */
@@ -61,7 +68,7 @@ export function createS3Storage(options: S3StorageOptions): FileStorage {
     const client = new deps.S3Client({
       endpoint: options.endpoint,
       region: options.region,
-      forcePathStyle: true,
+      forcePathStyle: options.forcePathStyle ?? true,
       credentials: {
         accessKeyId: options.accessKeyId,
         secretAccessKey: options.secretAccessKey,

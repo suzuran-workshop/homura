@@ -48,7 +48,7 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 | storage · `supabase`                   | ✅（自建 supabase） | ❌              | Pages 上 anon 无建桶权（RLS 403），受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来                                                 |
 | storage · `s3`                         | ✅                  | ⚠️ 理论可行     | 需 App 自行安装两个 optional peer（`@aws-sdk/client-s3`、`s3-request-presigner`）；凭据走配置文件；S3 端点出网未验证                           |
 | storage · `db`（DB-backed 分块）       | ✅                  | ✅ **唯一可用** | 二进制**分块** base64 存进 `homura_files`（清单）+ `homura_file_chunks`（数据）走 PostgREST。强制分块（每块 raw≤384KB→base64 512KB）绕开网关 body 上限（实测 ≥1MB 413）与 PostgREST 单值限（~1MB）；2026-10-14 实测 3MB 分 8 块上传 + 流式下载逐字节一致。可配总上限缺省 50MB（非无限，DB 存 blob 是反模式）。`data` 列是 **text 不是 bytea**（PostgREST bytea 编解码不可靠，实测 308B→618B mojibake）。两表须部署期迁移预建。见 ADR-021 |
-| storage · `s3` 预签名直传              | ✅                  | ⚠️ 大文件正解   | `getSignedUploadUrl`（预签名 PUT）+ `/api/files/presign` + 客户端 `uploadViaPresign`：浏览器直传 OSS/S3，字节不过 App/网关 → 绕开 body 上限且不膨胀 DB。需对象存储配 CORS；OSS 从浏览器侧出网未实测 |
+| storage · `s3` 预签名直传              | ✅                  | ✅ 大文件正解   | `getSignedUploadUrl`（预签名 PUT）+ `/api/files/presign` + 客户端 `uploadViaPresign`：浏览器直传 OSS/S3，字节不过 App/网关 → 绕开 body 上限且不膨胀 DB。2026-10-14 真阿里云 OSS 实测通过（预签名 PUT 3MB→200、downloadFile 回读逐字节一致、预签名 GET 200）。⚠ **OSS 必须 `S3_FORCE_PATH_STYLE=false`**（virtual-hosted，否则 SecondLevelDomainForbidden）；浏览器直传需桶配 CORS |
 
 图例：✅ 已验证可用 · 🟡 代码就绪但未端到端验证 · ⚪ 未测 · ⚠️ 有前置条件 · ❌ 平台限制导致不可用
 

@@ -180,6 +180,13 @@ export const configSpecs = {
     secret: true,
     description: 's3 secret key',
   },
+  s3ForcePathStyle: {
+    env: 'S3_FORCE_PATH_STYLE',
+    default: true,
+    parse: parses.boolean,
+    description:
+      's3 寻址风格：true=path-style（minio 缺省）；阿里云 OSS 必须 false（virtual-hosted，否则对象操作报 SecondLevelDomainForbidden）',
+  },
 
   // ── license: homura-genuine ──
   genuineServer: {

@@ -128,6 +128,7 @@ const storage = createS3Storage({
   bucket: 'my-bucket',
   accessKeyId: process.env.S3_ACCESS_KEY!,     // OSS AccessKey ID
   secretAccessKey: process.env.S3_SECRET_KEY!, // OSS AccessKey Secret
+  forcePathStyle: false, // ⚠ OSS 必须 false（virtual-hosted）；path-style 会报 SecondLevelDomainForbidden
   autoCreateBucket: false, // ⚠ OSS 桶须在控制台预建；S3 的 CreateBucket 对 OSS 不一定生效，关掉更稳
   presignDirect: false,    // 走 /files 代理下载（不暴露 OSS 直连 URL）；要直连下载再开
 })
@@ -142,17 +143,23 @@ S3_REGION=oss-cn-hangzhou
 S3_BUCKET=my-bucket
 S3_ACCESS_KEY=<OSS AccessKey ID>
 S3_SECRET_KEY=<OSS AccessKey Secret>
+S3_FORCE_PATH_STYLE=false
 ```
 
 **OSS 注意点**：
 
-- 后端用 `forcePathStyle: true`（path-style：`endpoint/bucket/key`），OSS 的 S3 兼容层支持；
-  若遇到签名/寻址问题，OSS 也支持 virtual-hosted style（`bucket.endpoint/key`），需按需调整
+- ⚠ **必须 `forcePathStyle: false`（virtual-hosted：`bucket.endpoint/key`）**。OSS 对对象操作强制
+  virtual-hosted，path-style（`endpoint/bucket/key`，minio 缺省）会报
+  `403 SecondLevelDomainForbidden: Please use virtual hosted style`——2026-10-14 真 OSS 实测确认。
+  预签名 URL 的寻址风格也随此开关，故直传前必须配对（模板经 `S3_FORCE_PATH_STYLE=false` 投递）
 - `region` 用 OSS 的写法（`oss-cn-hangzhou`），不是 AWS 的 `cn-hangzhou`
 - 桶必须**预先在 OSS 控制台创建**并配好读写权限；`autoCreateBucket` 对 OSS 不保证生效，建议关
 - 需 App 自行安装两个 optional peer：`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`
-- ⚠ qw-pages 上 OSS 端点出网未验证（Pages 出网仅放行 443，OSS 是 https 应可达，但未实测）；
-  standalone 形态可直连
+- ✅ **预签名直传已对真 OSS 实测通过**（2026-10-14）：建桶 → `getSignedUploadUrl` → PUT 3MB → 200 →
+  `downloadFile` 回读逐字节一致 → 预签名 GET 200。浏览器直传是客户端 → OSS，不经 Pages 网关，
+  故网关 body 上限不适用；服务端 `downloadFile`/代理下载走 Pages→OSS 443 出网，实测可达
+- ⚠ 浏览器直传仍需 OSS 桶配 **CORS**（允许 Pages 域名的 `PUT` + `Content-Type` 头）；curl/node 直传
+  不受 CORS 约束（故上述实测用 node fetch 模拟），但真实浏览器流程必须配 CORS
 
 supabase 后端的 env 解析用**本包**的 loader，不要用 `@homurajs/db/pg` 的那个：
 

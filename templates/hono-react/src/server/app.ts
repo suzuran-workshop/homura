@@ -300,6 +300,8 @@ async function buildStorage(config: AppConfig, bundle: DbBundle): Promise<FileSt
       bucket: config.get('s3Bucket')!,
       accessKeyId: config.get('s3AccessKey')!,
       secretAccessKey: config.get('s3SecretKey')!,
+      // ⚠ 阿里云 OSS 必须 false（virtual-hosted）；minio 用缺省 true（path-style）
+      forcePathStyle: config.get('s3ForcePathStyle'),
     })
   }
   if (backend === 'supabase') {
