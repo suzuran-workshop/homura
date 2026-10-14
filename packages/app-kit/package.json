@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/app-kit",
-  "version": "26.10.14",
+  "version": "26.10.15",
   "type": "module",
   "description": "homura 组装入口：createApp 中间件链装配 + 双形态 RuntimeAdapter（standalone / qw-pages）",
   "engines": {

@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/3p",
-  "version": "26.10.14",
+  "version": "26.10.15",
   "type": "module",
   "description": "homura 第三方平台能力抽象：能力分片接口（capability 声明 + supports 守卫协商），钉钉为第一个实现",
   "engines": {
