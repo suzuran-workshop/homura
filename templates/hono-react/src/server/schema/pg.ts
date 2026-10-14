@@ -6,6 +6,7 @@
 import { pgCol, pgTable, pgJson } from '@homurajs/db/schema-helpers'
 import { pgAuthTables } from '@homurajs/auth/tables'
 import { pgLicenseTables } from '@homurajs/license/tables'
+import { pgStorageTables } from '@homurajs/storage/tables'
 import { boolean } from 'drizzle-orm/pg-core'
 
 export const todos = pgTable('todos', {
@@ -20,5 +21,9 @@ export const todos = pgTable('todos', {
 // spread 第三方表：参与本方言迁移
 export const refreshTokens = pgAuthTables.refreshTokens
 export const licenseState = pgLicenseTables.licenseState
+// DB-backed storage 的 homura_files（清单）+ homura_file_chunks（数据分块）
+// （STORAGE_BACKEND=db 时用；表恒迁移，requiredTables 按后端条件纳入）
+export const homuraFiles = pgStorageTables.homuraFiles
+export const homuraFileChunks = pgStorageTables.homuraFileChunks
 
-export const pgSchema = { todos, refreshTokens, licenseState }
+export const pgSchema = { todos, refreshTokens, licenseState, homuraFiles, homuraFileChunks }

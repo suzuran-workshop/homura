@@ -5,7 +5,7 @@
  */
 import { createReadStream, existsSync } from 'node:fs'
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import {
   assertSafeObjectKey,
   proxyUrl,
@@ -26,7 +26,10 @@ async function* walk(dir: string, base = dir): AsyncGenerator<string> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name)
     if (entry.isDirectory()) yield* walk(full, base)
-    else if (!entry.name.endsWith('.meta.json')) yield full.slice(base.length + 1)
+    // 归一分隔符为 '/'：Windows 上 join 产出反斜杠，否则 objectKey 会变成 `ns/files\x`，
+    // 进而让代理 URL（/files/<key>）与跨后端 key 语义错位
+    else if (!entry.name.endsWith('.meta.json'))
+      yield full.slice(base.length + 1).split(sep).join('/')
   }
 }
 

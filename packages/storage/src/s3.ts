@@ -136,6 +136,26 @@ export function createS3Storage(options: S3StorageOptions): FileStorage {
       )
     },
 
+    /**
+     * 预签名**上传** URL（PUT）：浏览器拿到后直传对象存储，字节不过 App。
+     * 这是大文件的正解——绕开 App 网关的 body 上限（qw-pages 实测 ≥1MB 413），
+     * 也避免 DB-backed 分块的开销。前端用 @homurajs/storage/chunk-client 的 uploadViaPresign 对接。
+     * ⚠ 纯本地 SigV4 计算，不联网；但浏览器直传需对象存储侧配好 CORS（允许 Pages 域名的 PUT）。
+     */
+    async getSignedUploadUrl(objectKey, contentType, expirySeconds) {
+      assertSafeObjectKey(objectKey)
+      const { client, deps } = await ensure()
+      return deps.getSignedUrl(
+        client,
+        new deps.PutObjectCommand({
+          Bucket: options.bucket,
+          Key: objectKey,
+          ContentType: contentType,
+        }),
+        { expiresIn: expirySeconds },
+      )
+    },
+
     async deleteFile(objectKey) {
       const { client, deps } = await ensure()
       await client.send(new deps.DeleteObjectCommand({ Bucket: options.bucket, Key: objectKey }))

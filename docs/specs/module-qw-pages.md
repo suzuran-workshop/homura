@@ -44,7 +44,28 @@
 
 **`/healthz` 归网关**：请求**不下发到 App 进程**（探针 `serve` 计数不增），网关自答 `ok`（text/plain）。→ App 的健康检查路径改为 `/_healthz`，由 core 的 `HEALTHZ_PATH` 单点定义，app-kit 注册与 license guard 豁免清单同源读取。
 
-**对象存储在 Pages 上不可用**：`GET /storage/v1/bucket` 可达（200，返回空数组），但 anon 建桶被 RLS 拒（400 内含 `403 new row violates row-level security policy`），受控迁移角色又对 `storage` schema 无权 → **桶建不出来**，upload/download 一律 `Bucket not found`。PRD 的"图床刚需"在 Pages 形态目前无解，除非平台侧预置桶。
+**对象存储（supabase 桶）在 Pages 上不可用**：`GET /storage/v1/bucket` 可达（200，返回空数组），但 anon 建桶被 RLS 拒（400 内含 `403 new row violates row-level security policy`），受控迁移角色又对 `storage` schema 无权 → **桶建不出来**，upload/download 一律 `Bucket not found`。
+
+**但"图床刚需"有解——DB-backed 分块 storage（2026-10-14 实测）**：`@homurajs/storage/db` 把二进制
+**分块** base64 存进 `homura_files`（清单）+ `homura_file_chunks`（数据），走 PostgREST（Pages 唯一
+可用的数据路径），绕开建不出桶的死结。`STORAGE_BACKEND=db` 即启用，是 **Pages 上唯一可用的 storage 后端**。
+强制分块（每块 raw≤384KB→base64 512KB）绕开网关 body 上限，支持大文件（可配总上限，缺省 50MB）。
+实测：3MB 文件分 8 块上传全 200 → 流式下载 3145728B 逐字节一致；而同文件整文件 `/api/upload` 被网关 413。
+
+关键约束（实测，详见 ADR-021）：
+
+- **`data` 列必须是 text 不是 bytea**：PostgREST 对 bytea 的 JSON 编解码不可靠——308B 二进制进去、
+  618B mojibake 出来（hex/base64/UTF-8 多重误解码）。改存 base64 文本后三方言一致、编解码由 store
+  显式控制，round-trip 保真。代价 +33% 体积
+- **网关 body 上限在 512KB~1MB 之间**：实测整文件 256KB/512KB → 201，768KB → 500（base64 后 ~1MB 撞
+  PostgREST 单值限），≥1MB → **413**（openresty 网关直接拒，请求到不了 App）。**流式上传救不了**
+  （网关缓冲整个 body）——只有**分块**（每块一个小请求）能绕过。故单块必须 ≤~512KB base64
+- **大文件正解是预签名直传**：s3 后端 `getSignedUploadUrl`（预签名 PUT）+ `/api/files/presign` +
+  客户端 `uploadViaPresign`，浏览器直传 OSS/S3，字节不过 App/网关 → 既绕 body 限又不膨胀 DB。
+  需对象存储配 CORS；OSS 从浏览器侧出网未实测。DB 分块是"无对象存储时"的兜底
+- 两张表须部署期受控迁移预建（`homura_files`: object_key text PK / content_type / total_size bigint /
+  chunk_size int / chunk_count int / status text / created_at bigint / updated_at bigint；
+  `homura_file_chunks`: object_key text + chunk_index int 复合 PK / data text）+ 各 anon 的 RLS policy
 
 ## 已落地的适配点
 
@@ -179,7 +200,7 @@ RETURNING family_id, sid, sub, profile
 - [ ] `createRestSessionStore` 的**函数体仍未在部署态执行过**：要等真实 IdP 走完 `/auth/callback`。已验证的是它依赖的 PostgREST 语义与请求形状（单测逐条断言）。
 - [ ] **平台产物存储自身的 ACL 未验证**：本文只证明了"经运行中的 App 读不到"。若平台另有产物下载入口，"随产物携带密钥"的前提就不成立——正式承载真实凭据前值得向平台确认一次。
 - [ ] 多实例是否真会扩容（只观测到单实例）。
-- [ ] `/storage/v1` 的 upload/download 全链路（因建不出桶而无法测）。
+- [ ] `/storage/v1`（supabase 桶）的 upload/download 全链路——因建不出桶而无法测；**图床需求改走 DB-backed storage**（`@homurajs/storage/db`，见上「对象存储」节，2026-10-14 实测可用）。
 - [ ] `Accept-Profile: public` 与 `Accept-Profile: tenant_<instance>_schema` 返回相同结果的原因未查（结论：Pages 上不需要设置该头，默认 schema 已含租户 schema）。
 
 ## 复现方法

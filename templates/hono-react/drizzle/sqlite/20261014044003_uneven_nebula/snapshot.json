@@ -1,0 +1,385 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "9c80f13f-0440-400f-941b-0e05959bd0e4",
+  "prevIds": [
+    "b15624c3-6170-44f5-93af-14b3a0000483"
+  ],
+  "ddl": [
+    {
+      "name": "homura_file_chunks",
+      "entityType": "tables"
+    },
+    {
+      "name": "homura_files",
+      "entityType": "tables"
+    },
+    {
+      "name": "license_state",
+      "entityType": "tables"
+    },
+    {
+      "name": "refresh_tokens",
+      "entityType": "tables"
+    },
+    {
+      "name": "todos",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "object_key",
+      "entityType": "columns",
+      "table": "homura_file_chunks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "chunk_index",
+      "entityType": "columns",
+      "table": "homura_file_chunks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "data",
+      "entityType": "columns",
+      "table": "homura_file_chunks"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "object_key",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content_type",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "total_size",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "chunk_size",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "chunk_count",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "homura_files"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "license_state"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "license_id",
+      "entityType": "columns",
+      "table": "license_state"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "instance_key",
+      "entityType": "columns",
+      "table": "license_state"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "license_state"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "token_hash",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "family_id",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "sid",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "sub",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "used_at",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "profile",
+      "entityType": "columns",
+      "table": "refresh_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "name": "done",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ownerSub",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "(unixepoch() * 1000)",
+      "generated": null,
+      "name": "createdAt",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "meta",
+      "entityType": "columns",
+      "table": "todos"
+    },
+    {
+      "columns": [
+        "object_key",
+        "chunk_index"
+      ],
+      "nameExplicit": false,
+      "name": "homura_file_chunks_pk",
+      "entityType": "pks",
+      "table": "homura_file_chunks"
+    },
+    {
+      "columns": [
+        "object_key"
+      ],
+      "nameExplicit": false,
+      "name": "homura_files_pk",
+      "table": "homura_files",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "license_state_pk",
+      "table": "license_state",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "token_hash"
+      ],
+      "nameExplicit": false,
+      "name": "refresh_tokens_pk",
+      "table": "refresh_tokens",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "todos_pk",
+      "table": "todos",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "family_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "refresh_tokens_family_idx",
+      "entityType": "indexes",
+      "table": "refresh_tokens"
+    },
+    {
+      "columns": [
+        {
+          "value": "sub",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "refresh_tokens_sub_idx",
+      "entityType": "indexes",
+      "table": "refresh_tokens"
+    }
+  ],
+  "renames": []
+}

@@ -128,15 +128,37 @@ export const configSpecs = {
   // ── storage ──
   storageBackend: {
     env: 'STORAGE_BACKEND',
-    default: 'none' as 'none' | 'local' | 's3' | 'supabase',
-    parse: (raw: string) => raw as 'none' | 'local' | 's3' | 'supabase',
-    description: '存储后端：none（不启用）| local | s3 | supabase',
+    default: 'none' as 'none' | 'local' | 's3' | 'supabase' | 'db',
+    parse: (raw: string) => raw as 'none' | 'local' | 's3' | 'supabase' | 'db',
+    description:
+      '存储后端：none（不启用）| local | s3 | supabase | db（二进制写进数据库，qw-pages 唯一可用，有大小上限）',
   },
   localStorageDir: {
     env: 'STORAGE_LOCAL_DIR',
     default: './data/files',
     parse: parses.string,
     description: 'local 存储根目录',
+  },
+  storageDbMaxBytes: {
+    env: 'STORAGE_DB_MAX_BYTES',
+    default: 50 * 1024 * 1024,
+    parse: (raw: string) => {
+      const n = Number(raw)
+      if (!Number.isFinite(n) || n <= 0) throw new Error('STORAGE_DB_MAX_BYTES 必须是正整数（字节）')
+      return n
+    },
+    description: 'db 后端单文件总上限（字节），超限即拒；缺省 50MB。大文件请改用 s3 预签名直传',
+  },
+  storageDbChunkSize: {
+    env: 'STORAGE_DB_CHUNK_SIZE',
+    default: 384 * 1024,
+    parse: (raw: string) => {
+      const n = Number(raw)
+      if (!Number.isFinite(n) || n <= 0) throw new Error('STORAGE_DB_CHUNK_SIZE 必须是正整数（字节）')
+      return n
+    },
+    description:
+      'db 后端每块原始字节数；缺省 384KB（base64 入库后 512KB，安全避开 qw-pages 网关与 PostgREST 的 ~1MB 限制）',
   },
   s3Endpoint: { env: 'S3_ENDPOINT', parse: parses.string, description: 's3 兼容端点' },
   s3Region: {

@@ -226,3 +226,49 @@
   - 功能范围是**每许可证一份**（= 每个持有者/实例），同一 App 内所有终端用户相同；要做用户级授权是另一个数据模型
 - 实测：与真实 genuine 进程双端联调八阶段（active → 改到期 → core 档 → notice 档 → all 档 → 续期 → 收回功能 → 手动停服 → 恢复），验签全程 verified。四个缺陷由联调与测试抓出并修复：keyId 对 PEM 空白敏感、requireFeature 采信未验签载荷、register 失败 exit(1)、active 时丢弃中心显式文案
 - 何时重新审视：需要按终端用户（而非按许可证）授权时；或平台提供密钥托管/轮换自动化时
+
+## ADR-021：大文件存储——分块 DB 兜底 + 预签名直传正解，data 列用 base64 文本
+
+- 日期：2026-10-14
+- 状态：已采纳
+- 背景：qw-pages 上 local/s3/supabase 三后端全不可用（见 module-qw-pages.md），图床/文件能力在 Pages
+  形态一度无解。DB-backed storage（二进制写进 PostgREST）是唯一可用数据路径，但撞上两道平台限制：
+  网关（openresty）对单请求 body 有上限（实测 ≥1MB 直接 413，请求到不了 App），PostgREST 单值也
+  ~1MB（768KB raw→base64 ~1MB 报 500）。且 PostgREST 对 `bytea` 的 JSON 编解码不可靠（实测 308B
+  进去、618B mojibake 出来）。
+- 考虑过的方案：
+  - **单请求整文件 + bytea 列**：撞网关 body 限（≥1MB 413），且 bytea 过 PostgREST 往返损坏 → 否
+  - **单请求整文件 + base64 text 列**：解决 bytea 损坏，但仍撞网关 body 限（>~512KB 就悬）→ 只够小文件
+  - **强制分块 + base64 text 列**：每块 ≤384KB raw（base64 后 512KB），两道限制都避开 → 支持大文件
+  - **预签名直传对象存储（浏览器直接 PUT 到 OSS/S3）**：字节不过 App、不过网关 → 大文件正解，但需对象存储 + CORS
+  - **流式上传绕网关**：无效——网关会缓冲整个请求 body 再转发，流式上传照样撞 413
+- 决策：**双轨**。
+  1. **分块 DB storage 作兜底**（`@homurajs/storage/db`）：强制分块（即使小文件也 1 块），
+     `homura_files`（清单）+ `homura_file_chunks`（数据，复合主键 object_key+chunk_index）两表；
+     `data` 列是 **base64 文本不是 bytea**（PostgREST bytea 编解码不可靠，text 三方言一致、编解码自控）；
+     init/putChunk/complete 协议 + 浏览器 SDK（`@homurajs/storage/chunk-client` 的 `uploadChunked`，
+     每块发**原始字节** body 不 base64，把请求体压到 raw 块大小）；下载走服务端 `downloadStream`
+     逐块流式重组（避免整文件进内存）；残块 GC（status=uploading 超 24h 顺带清扫）；
+     **可配总上限**（缺省 50MB，非"无限"）。
+  2. **预签名直传作大文件正解**（s3 后端 `getSignedUploadUrl` + 模板 `/api/files/presign` +
+     客户端 `uploadViaPresign`）：浏览器拿预签名 PUT URL 直传 OSS/S3，绕开网关与 DB。
+- 为什么选这个：
+  - 分块是唯一能绕开"网关缓冲整个 body"的上传方式（流式无效）；base64-text 是唯一在 PostgREST 上
+    往返保真的二进制编码（bytea 实测损坏）
+  - 但 DB 存 blob 是反模式（撑大库、无 CDN、慢、贵），故只作**兜底**且设总上限；"无限大"是陷阱
+  - 大文件的正解始终是对象存储——预签名直传让字节不过 App，既绕网关又不膨胀 DB。分块 DB 是
+    "Pages 上连对象存储都不可达时"的退路
+- 为什么不选其他：单请求方案撞网关限；bytea 往返损坏；流式上传绕不过网关缓冲；真"无限大"会诱导
+  把 GB 级视频塞进 Postgres。
+- 后果：
+  - 块大小缺省 384KB raw（base64 后 512KB），实测 3MB 文件分 8 块上传成功、流式下载逐字节一致，
+    而同文件整文件上传被网关 413——分块确实绕过了限制
+  - base64 使 DB 体积 +33%；分块使 N 块 = N 行（下载大文件要 N 次 PostgREST 查询，流式逐块）
+  - 预签名直传需对象存储侧配 CORS（允许 Pages 域名 PUT + Content-Type），且 content-type 必须与
+    签发时一致（签名覆盖了它）；OSS 从 Pages/浏览器侧的出网可达性尚未实测
+  - 依赖方向：storage → `@homurajs/db` schema-helpers（照 auth/license 先例，已进 AGENTS.md 白名单）；
+    drizzle-orm 是 optional peer，`./db` 子路径动态 import
+- 实测（2026-10-14，Pages 部署态）：512KB 整文件上传 201、768KB 报 500（base64 ~1MB 撞 PostgREST 值限）、
+  ≥1MB 网关 413；分块 3MB（8×384KB）全 200 → 流式下载 3145728B 逐字节一致；超总上限 init 被拒。
+- 何时重新审视：平台放开 body 上限或提供原生对象存储时；或 OSS 从 Pages 出网实测可达后，
+  大文件应优先走预签名直传而非分块 DB。

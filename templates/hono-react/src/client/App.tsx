@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import { LicenseBanner, type LicenseState } from './LicenseBanner'
+import { uploadChunked } from '@homurajs/storage/chunk-client'
 import type { Todo } from '../shared/types'
 
 type Me = { sub: string; nickname?: string; avatarUrl?: string } | null
@@ -11,6 +12,8 @@ export default function App() {
   const [title, setTitle] = useState('')
   const [caps, setCaps] = useState<string[] | null>(null)
   const [uploadUrl, setUploadUrl] = useState<string | null>(null)
+  const [chunkUrl, setChunkUrl] = useState<string | null>(null)
+  const [chunkProgress, setChunkProgress] = useState<string>('')
   const [notice, setNotice] = useState<string>('')
   const [license, setLicense] = useState<LicenseState | null>(null)
   const [demoMsg, setDemoMsg] = useState<string>('')
@@ -43,6 +46,23 @@ export default function App() {
     const res = await fetch('/api/upload', { method: 'POST', body: fd })
     const data = (await res.json()) as { url: string }
     setUploadUrl(data.url)
+  }
+
+  // 分块上传（活文档）：大文件走 @homurajs/storage/chunk-client 的 uploadChunked，
+  // 每块一个小请求绕开 qw-pages 网关 body 上限（整文件上传 >~1MB 会被 413）。
+  const onChunkedUpload = async (file: File) => {
+    setChunkUrl(null)
+    try {
+      const r = await uploadChunked(file, {
+        chunkSize: 384 * 1024,
+        onProgress: (loaded, total) => setChunkProgress(`${Math.round((loaded / total) * 100)}%`),
+      })
+      setChunkUrl(r.url)
+      setChunkProgress(`完成（${r.chunkCount} 块 / ${r.size} B）`)
+      await refresh()
+    } catch (e) {
+      setChunkProgress(`失败：${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   const sendNotify = async () => {
@@ -109,12 +129,28 @@ export default function App() {
       {/* ── 上传（层级 4：storage）── */}
       <section>
         <h2>上传</h2>
-        <input type="file" onChange={(e) => e.target.files?.[0] && void onUpload(e.target.files[0])} />
-        {uploadUrl && (
-          <p>
-            已上传：<a href={uploadUrl}>{uploadUrl}</a>
-          </p>
-        )}
+        <p style={{ fontSize: 13, color: '#666' }}>
+          整文件上传（小文件，<code>POST /api/upload</code>）：
+          <input type="file" onChange={(e) => e.target.files?.[0] && void onUpload(e.target.files[0])} />
+          {uploadUrl && (
+            <>
+              已上传：<a href={uploadUrl}>{uploadUrl}</a>
+            </>
+          )}
+        </p>
+        {/* 分块上传（活文档）：大文件用 @homurajs/storage/chunk-client 切片，绕开网关 body 上限。
+            仅 STORAGE_BACKEND=db（或任何分块后端）时服务端挂了 /api/files/init|chunk|complete。 */}
+        <p style={{ fontSize: 13, color: '#666' }}>
+          分块上传（大文件，前端 SDK 切片 + 进度）：
+          <input type="file" onChange={(e) => e.target.files?.[0] && void onChunkedUpload(e.target.files[0])} />
+          {chunkProgress && <span style={{ marginLeft: 8 }}>{chunkProgress}</span>}
+          {chunkUrl && (
+            <>
+              {' '}
+              <a href={chunkUrl}>{chunkUrl}</a>
+            </>
+          )}
+        </p>
       </section>
 
       {/* ── 平台能力（层级 3：3p 能力协商）── */}

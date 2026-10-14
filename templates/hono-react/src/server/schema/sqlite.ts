@@ -6,6 +6,7 @@
 import { sqliteCol, sqliteTable, sqliteJson } from '@homurajs/db/schema-helpers'
 import { sqliteAuthTables } from '@homurajs/auth/tables'
 import { sqliteLicenseTables } from '@homurajs/license/tables'
+import { sqliteStorageTables } from '@homurajs/storage/tables'
 import { integer } from 'drizzle-orm/sqlite-core'
 
 export const todos = sqliteTable('todos', {
@@ -20,5 +21,8 @@ export const todos = sqliteTable('todos', {
 // spread 第三方表：参与本方言迁移
 export const refreshTokens = sqliteAuthTables.refreshTokens
 export const licenseState = sqliteLicenseTables.licenseState
+// DB-backed storage 的 homura_files（清单）+ homura_file_chunks（数据分块），与 pg.ts 严格对应
+export const homuraFiles = sqliteStorageTables.homuraFiles
+export const homuraFileChunks = sqliteStorageTables.homuraFileChunks
 
-export const sqliteSchema = { todos, refreshTokens, licenseState }
+export const sqliteSchema = { todos, refreshTokens, licenseState, homuraFiles, homuraFileChunks }

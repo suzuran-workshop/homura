@@ -286,6 +286,9 @@ importers:
       '@homurajs/core':
         specifier: workspace:*
         version: link:../core
+      '@homurajs/db':
+        specifier: workspace:*
+        version: link:../db
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.700.0
@@ -293,6 +296,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.700.0
         version: 3.1149.0
+      drizzle-orm:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4(postgres@3.4.9)
       hono:
         specifier: ^4.10.0
         version: 4.13.13

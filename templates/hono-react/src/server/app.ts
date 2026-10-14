@@ -34,7 +34,7 @@ import type { FileStorage } from '@homurajs/storage'
 import { resolveDialect, type AppConfig } from './env.js'
 import { buildDb, migrate, type DbBundle } from './db.js'
 import { buildRestTodoRepo, buildTodoRepo, type TodoRepo } from './todos-repo.js'
-import { licenseStateRest, refreshTokensRest, restBusinessTables } from './schema/rest.js'
+import { licenseStateRest, refreshTokensRest, homuraFilesRest, homuraFileChunksRest, restBusinessTables } from './schema/rest.js'
 import { buildApiRoutes } from './routes/api.js'
 import { buildFileRoutes } from './routes/files.js'
 import { buildPlatformRoutes } from './routes/platform.js'
@@ -86,6 +86,7 @@ export async function buildApp(
   const dialect = resolveDialect(config)
   const oauthOrgId = config.get('oauthOrgId')
   const genuineServer = config.get('genuineServer')
+  const storageBackend = config.get('storageBackend')
 
   /**
    * 本 App 实际需要的表 = 业务表（schema/rest.ts 的 restBusinessTables）+ 按启用的能力追加。
@@ -98,6 +99,7 @@ export async function buildApp(
     ...restBusinessTables.map((t) => t.table),
     ...(oauthOrgId ? [refreshTokensRest.table, REST_TTLKV_TABLE] : []),
     ...(genuineServer ? [licenseStateRest.table] : []),
+    ...(storageBackend === 'db' ? [homuraFilesRest.table, homuraFileChunksRest.table] : []),
   ]
 
   const dbBundle: DbBundle = overrides.db ?? (await buildDb(config, dialect))
@@ -135,7 +137,7 @@ export async function buildApp(
   }
 
   // ── 层级 4：storage（STORAGE_BACKEND != none 即启用）──
-  const storage = overrides.storage ?? (await buildStorage(config))
+  const storage = overrides.storage ?? (await buildStorage(config, dbBundle))
 
   // ── 层级 5：license（GENUINE_SERVER 配置即启用；SQL 与 REST 形态均支持）──
   let license: LicenseInject | false = false
@@ -281,7 +283,7 @@ async function buildAuth(
   } satisfies AuthInject
 }
 
-async function buildStorage(config: AppConfig): Promise<FileStorage | undefined> {
+async function buildStorage(config: AppConfig, bundle: DbBundle): Promise<FileStorage | undefined> {
   const backend = config.get('storageBackend')
   if (backend === 'none') return undefined
   if (backend === 'local') {
@@ -309,6 +311,20 @@ async function buildStorage(config: AppConfig): Promise<FileStorage | undefined>
     // ⚠ bucket 必须预先存在：Pages 上 anon 无建桶权（实测 403 RLS），
     // 受控迁移角色对 storage schema 也无权（实测 42501）→ 部署期同样建不出桶。
     return createSupabaseStorage({ platformUrl, apiKey, bucket: config.get('supabaseBucket') })
+  }
+  if (backend === 'db') {
+    // DB-backed：二进制分块存进 homura_files（清单）+ homura_file_chunks（数据）。
+    // **qw-pages 上唯一可用的 storage 后端**（local/s3/supabase 在 Pages 全倒，见 AGENTS.md 支持矩阵）。
+    // 强制分块绕开网关 body 上限；有可配总上限，大文件请改用 s3 预签名直传。
+    const { createDrizzleFileStore, createRestFileStore } = await import('@homurajs/storage/db')
+    const opts = {
+      maxTotalBytes: config.get('storageDbMaxBytes'),
+      chunkSize: config.get('storageDbChunkSize'),
+    }
+    // SQL 形态自建表（CREATE IF NOT EXISTS，与迁移幂等共存）；REST 形态不建表，须部署期迁移预建
+    return bundle.kind === 'sql'
+      ? createDrizzleFileStore(bundle.db, opts)
+      : createRestFileStore(bundle.rest, opts)
   }
   return undefined
 }

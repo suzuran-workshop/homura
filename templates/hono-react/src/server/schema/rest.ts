@@ -35,6 +35,13 @@ export const todosRest = must('todos')
 export const refreshTokensRest = must('refreshTokens')
 /** license 的 license_state（同上） */
 export const licenseStateRest = must('licenseState')
+/**
+ * DB-backed storage 的 homura_files（清单）+ homura_file_chunks（数据分块）。
+ * ⚠ 不进 restBusinessTables（那是「恒需」业务表）——仅在 STORAGE_BACKEND=db 时才需要，
+ * 由 app.ts 按后端条件追加进 requiredTables（与 license_state 同模式）。
+ */
+export const homuraFilesRest = must('homuraFiles')
+export const homuraFileChunksRest = must('homuraFileChunks')
 
 /**
  * 业务表清单：新增业务表时在此登记。

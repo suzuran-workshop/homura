@@ -18,7 +18,7 @@ homura：Hono+React 全栈 template/SDK monorepo。派生 App 的能力都来自
 
 - 全局规则 / 约定：
   - **渐进式耦合是最高设计原则**：任何能力包不得硬依赖其他能力包（app-kit 只依赖 hono+core）；可选依赖走 peer + 动态 import + 子路径导出
-  - 依赖方向：core ← 其余包；auth/license 可依赖 @homurajs/db 的 schema-helpers；禁止反向依赖
+  - 依赖方向：core ← 其余包；auth/license/storage 可依赖 @homurajs/db 的 schema-helpers（storage 仅 `./db` 子路径的 DB-backed 后端用，走 optional peer + 动态 import）；禁止反向依赖
   - **契约文件不许随手改**：`auth/src/types.ts`（OAuth2 上游）、`3p/src/index.ts`（平台能力契约）、`license/src/contract.ts`（genuine 契约）——修改需同步对应外部 repo 并过快照测试。其中 `license/src/contract.ts` 与 `../homura-genuine/src/contract.ts` 必须**逐字一致**（含 `canonicalize` / `normalizePem` / `verifyEntitlement`：它们决定签名字节与 keyId，不一致等于验签静默失效），genuine 侧的 `contract-parity.test.ts` 会报出首个不同行号；同步方式是 `cp` 覆盖，**不要手工合并**
   - drizzle-orm / drizzle-kit 版本精确锁 `1.0.0-rc.4`（根 pnpm.overrides 强制），drizzle import 尽量收敛在 @homurajs/db
   - TS strict 全开（含 noUncheckedIndexedAccess）；测试与实现同文件 colocate（`*.test.ts`）
@@ -47,16 +47,18 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 | storage · `local`                      | ✅                  | ❌              | 默认 `./data/files` 在 Pages 不可写（首次上传才 EACCES，健康检查照报 ok）；改指可写区也跨发布清空                                              |
 | storage · `supabase`                   | ✅（自建 supabase） | ❌              | Pages 上 anon 无建桶权（RLS 403），受控迁移角色对 `storage` schema 也无权（42501）→ 桶建不出来                                                 |
 | storage · `s3`                         | ✅                  | ⚠️ 理论可行     | 需 App 自行安装两个 optional peer（`@aws-sdk/client-s3`、`s3-request-presigner`）；凭据走配置文件；S3 端点出网未验证                           |
+| storage · `db`（DB-backed 分块）       | ✅                  | ✅ **唯一可用** | 二进制**分块** base64 存进 `homura_files`（清单）+ `homura_file_chunks`（数据）走 PostgREST。强制分块（每块 raw≤384KB→base64 512KB）绕开网关 body 上限（实测 ≥1MB 413）与 PostgREST 单值限（~1MB）；2026-10-14 实测 3MB 分 8 块上传 + 流式下载逐字节一致。可配总上限缺省 50MB（非无限，DB 存 blob 是反模式）。`data` 列是 **text 不是 bytea**（PostgREST bytea 编解码不可靠，实测 308B→618B mojibake）。两表须部署期迁移预建。见 ADR-021 |
+| storage · `s3` 预签名直传              | ✅                  | ⚠️ 大文件正解   | `getSignedUploadUrl`（预签名 PUT）+ `/api/files/presign` + 客户端 `uploadViaPresign`：浏览器直传 OSS/S3，字节不过 App/网关 → 绕开 body 上限且不膨胀 DB。需对象存储配 CORS；OSS 从浏览器侧出网未实测 |
 
 图例：✅ 已验证可用 · 🟡 代码就绪但未端到端验证 · ⚪ 未测 · ⚠️ 有前置条件 · ❌ 平台限制导致不可用
 
-**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
+**Pages 部署五条必知**：① 健康检查用 `/_healthz`，`/healthz` 是网关的（本地跑同一产物时形态是 standalone，注册的仍是 `/healthz`）；② 表要在部署期建：模板缺省四张（`todos`/`refresh_tokens`/`license_state`/`homura_ttlkv`）**加上你新增的每张业务表**，逐张都要 anon policy，漏了是静默失败（启用 `STORAGE_BACKEND=db` 时还要建 `homura_files` + `homura_file_chunks` 两张，`data` 列是 text）；③ 密钥放 `config/homura.config.env`，别指望 env 注入；④ 别把 `assetsDir` 指到产物根，否则服务端源码会变成可下载的静态文件；⑤ 平台会改写 HTML 响应（注入页面 chrome 并覆盖 `Cache-Control`），别依赖 HTML 的字节长度或 ETag。
 
 ## 目录速查
 
 - `packages/core` — 基座：runtime 探测 / HEALTHZ_PATH / defineConfig / env-file（配置文件投递）/ logger / TtlKv
 - `packages/db` — Drizzle 双 driver 工厂（sqlite 内置、pg 走 `./pg` 子路径注册）、双方言配方与 parity、迁移双轨、supabase Supavisor 直连（**仅自托管**）、**PostgREST 层**（`createRestDb` / `restSchemaFromPg` 派生 / `createRestTtlKv`，qw-pages 唯一数据路径）
-- `packages/storage` — 三后端对象存储（local/s3/supabase）+ /files 代理路由；⚠ 三后端在 qw-pages 上均不可用，见支持矩阵
+- `packages/storage` — 四后端对象存储（local/s3/supabase/**db**）+ /files 代理路由（`./db`、`./tables` 子路径）；⚠ local/s3/supabase 在 qw-pages 上均不可用，**db 后端是 Pages 唯一可用的 storage**（二进制 base64 存 `homura_files` 表），见支持矩阵
 - `packages/auth` — 通用 OAuth2 客户端 + 自管 session（`./hono`、`./tables` 子路径）；session store 有 drizzle 与 PostgREST 两版
 - `packages/3p` — 第三方平台能力分片抽象 + 钉钉实现（`./dingtalk` 子路径）
 - `packages/license` — 激活心跳客户端（Ed25519 验签 + 本地到期判定）+ 四档处置守卫 + `requireFeature` 功能范围闸门（`./contract` 契约、`./hono` 守卫）；state store 有 drizzle 与 PostgREST 两版
