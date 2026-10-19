@@ -31,42 +31,97 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # exports ↔ tsdown entry 静态一致性（无需 build）。漏了 entry 就是 26.10.14/15 storage ./db
-      # 那类事故：构建照样"成功"、只是少产出文件，直到下游 npm install 才炸。
-      - name: 校验 exports 与 tsdown entry 一致
-        run: node scripts/check-package-exports.mjs --verbose
+      # ── 廉价门禁先跑（纯文本校验，秒级）：不通过就别浪费构建时间 ──
 
-      - name: Build packages
-        run: pnpm build
-
-      # 产物校验（build 之后、publish 之前的最后一道防线）。
-      # 与上面的静态校验互补：那里比 exports ↔ entry 声明，这里额外验证 dist/ 里**真的有文件**。
-      - name: 校验发包产物完整性
-        run: node scripts/check-package-exports.mjs --verbose
-
-      - name: 校验版本号为 CalVer（YY.MM.DD）
+      # 版本权威源 = **根 package.json 的 version**（不再是 packages/core）。
+      # 子包 version 是派生产物，由 scripts/sync-version.mjs 从根同步而来，任何人都不该手工编辑。
+      # 之所以子包仍需保留 version 字段：pnpm publish 硬性要求，缺失即
+      # ERR_PNPM_PACKAGE_VERSION_NOT_FOUND（2026-10-19 实测），所以是"根写死、子派生"。见 ADR-024。
+      - name: 校验根版本号为 CalVer（YY.MM.DD）
         run: |
-          V="$(node -p "require('./packages/core/package.json').version")"
+          V="$(node -p "require('./package.json').version")"
           if ! echo "$V" | grep -Eq '^[0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2}$'; then
             echo "版本号 $V 不是 CalVer（YY.MM.DD）格式" >&2
             exit 1
           fi
           echo "✓ CalVer 格式：$V"
 
-      - name: 检查 npm 是否已有该版本（未 bump 则跳过发布）
+      # 发版前必须确认子包版本已同步到根版本。漂移意味着有人手工改了子包 version（违反约定），
+      # 或改了根版本却忘了跑同步脚本 —— 两种情况都会导致发出去的包版本与根不符，故直接拒绝发布。
+      # 修复方式：node scripts/sync-version.mjs 后提交。
+      - name: 校验子包版本已同步到根版本
+        run: node scripts/sync-version.mjs --check --verbose
+
+      # exports ↔ tsdown entry 静态一致性（无需 build）。漏了就是 26.10.14/15 storage ./db 那类事故。
+      - name: 校验 exports 与 tsdown entry 一致
+        run: node scripts/check-package-exports.mjs --verbose
+
+      # 检查该版本是否已完整发布。**必须逐包检查，不能只查 core**：
+      # 若某次发布中途失败（core 发出去了、storage 没发出去），只查 core 会判定"已存在"→
+      # 之后每次 push 都跳过发布 → 缺的那个包永久停在旧版本。这正是 26.10.14/15
+      # storage ./db 事故的同类复发路径（npm 上 core 正常、storage 残废，无人察觉）。
+      # 三态处理：
+      #   全部已发布 → skip=true（日常 push，版本未 bump）
+      #   全部未发布 → skip=false（正常发版）
+      #   部分已发布 → **直接失败并列出缺失的包**（发布不完整，需人工介入；
+      #                 静默跳过或静默重发都可能把问题继续藏起来）
+      - name: 检查 npm 是否已完整发布该版本
         id: check
         run: |
-          V="$(node -p "require('./packages/core/package.json').version")"
-          if npm view "@homurajs/core@$V" version >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "@homurajs/core@$V 已在 npm，本次推送跳过发布"
+          set -euo pipefail
+          V="$(node -p "require('./package.json').version")"
+          PKGS="$(node -p "
+            const fs=require('fs');
+            fs.readdirSync('packages')
+              .map(d=>{try{return JSON.parse(fs.readFileSync('packages/'+d+'/package.json','utf8'))}catch{return null}})
+              .filter(p=>p&&p.private!==true&&p.name)
+              .map(p=>p.name).join(' ')
+          ")"
+          echo "版本 $V；待检查包：$PKGS"
+          PKG_COUNT="$(echo $PKGS | wc -w | tr -d ' ')"
+          missing=""
+          present=""
+          for p in $PKGS; do
+            if npm view "$p@$V" version >/dev/null 2>&1; then
+              present="$present $p"
+            else
+              missing="$missing $p"
+            fi
+          done
+          echo "已发布:${present:- 无}"
+          echo "未发布:${missing:- 无}"
+          if [ -n "$missing" ] && [ -n "$present" ]; then
+            echo "::error::版本 $V 发布不完整：已发布[${present# }]，缺失[${missing# }]" >&2
+            echo "这是部分失败状态，脚本不自动重发（重发已存在的版本会 403）。" >&2
+            echo "人工修复：对缺失的包单独执行 pnpm --filter <包名> publish --access public --no-git-checks" >&2
+            exit 1
+          fi
+          if [ -z "$missing" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "版本 $V 已完整发布，本次推送跳过发布"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "@homurajs/core@$V 未发布，将发布全部 @homurajs/* 包"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "版本 $V 尚未发布，将发布全部 ${PKG_COUNT} 个包（版本取自根 package.json）"
           fi
 
+      # ── 以下仅在真的要发布时执行 ──
+
+      - name: Build packages
+        if: steps.check.outputs.skip == 'false'
+        run: pnpm build
+
+      # 产物校验（build 之后、publish 之前的最后一道防线）。
+      # 与上面的静态校验互补：那里比 exports ↔ entry 声明，这里额外验证 dist/ 里**真的有文件**。
+      # 之所以必须有这一步：exports 声明了但 entry 漏了，构建会"成功"、只是少产出文件，
+      # 于是 build 步骤照样绿，直到下游 npm install 才炸（26.10.14/15 storage ./db ./tables
+      # ./chunk-client 就是这样漏发的，db 后端是 qw-pages 唯一可用的 storage，等于 Pages
+      # 文件存储整个不可用，且静默潜伏了两个版本）。
+      - name: 校验发包产物完整性
+        if: steps.check.outputs.skip == 'false'
+        run: node scripts/check-package-exports.mjs --verbose
+
       - name: Publish @homurajs/* to npm
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.skip == 'false'
         run: pnpm -r --filter './packages/*' publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

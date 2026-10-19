@@ -333,3 +333,49 @@
   - 密码哈希 CPU 成本约 50-100ms/次（可接受，非高频操作）
   - 未来如需升级算法（如 argon2id），通过解析格式字符串的前缀 `$scrypt$` 平滑迁移
   - 不引入 `@node-rs/bcrypt` 等替代方案，保持依赖最小化
+
+## ADR-024：根 package.json 为唯一版本权威，子包版本派生
+
+- 日期：2026-10-19
+- 状态：已采纳
+- 背景：`@homurajs/*` 七个包历史上用同一 CalVer 号一起发版（`chore(release): 全包版本号 X → Y`），
+  但版本号要在 8 个 `package.json` 里各写一遍。两个真实问题：
+  - **手工同步易漏**：改根版本忘了改子包（或反之），发出去的包版本与仓库声明不符；
+    `release.yml` 原本读 `packages/core/package.json` 判断"npm 上有没有这个版本"，
+    等于把 core 当事实权威，与"根版本"的心智不一致，一旦 core 漏改就会静默跳过发布
+  - **无门禁**：漂移不会被任何测试或 CI 步骤发现，直到发布产物版本错乱
+- 考虑过的方案：
+  - **删掉子包 version 字段**：最彻底，但 pnpm publish 硬性要求该字段，
+    实测缺失即 `ERR_PNPM_PACKAGE_VERSION_NOT_FOUND`（"Package version is not defined in the package.json"）→ 否
+  - **pnpm catalog / workspace 协议注入**：catalog 管的是依赖版本，不是包自身版本；
+    `workspace:*` 只解析依赖引用，不写入被引用包的 version → 不适用
+  - **发布期动态注入**（CI 里改 package.json 再 publish）：能工作，但仓库里的 package.json 与
+    npm 上的实际版本长期不一致，本地 `npm pack` / dry-run / 类型工具看到的都是假版本，
+    排障成本高 → 否
+  - **根为权威 + 脚本派生 + 门禁校验**：子包 version 仍是真实字段（工具链可读），
+    但由脚本从根单向同步，且 CI 拒绝漂移 → 选
+- 决策：
+  1. 根 `package.json` 的 `version` 是唯一权威；改版本**只改这一处**
+  2. `scripts/sync-version.mjs` 把根版本单向写入 `packages/*` 里非 private 的 `@homurajs/*` 包
+     （private 的 `template-hono-react` / `homura-docs` 不发布，不动）
+  3. 脚本用正则原地替换 `"version"` 值，不走 `JSON.stringify` 重写整个文件，
+     以免打乱字段顺序、产生无关 diff
+  4. `sync-version.mjs --check` 作为门禁接入 `test.yml`（PR 阶段就暴露漂移）与
+     `release.yml`（发版前最后一道，漂移直接拒绝发布）
+  5. `release.yml` 的 CalVer 校验与"npm 是否已有该版本"判断改为读**根** `package.json`；
+     且发布完整性检查改为**逐包**——只查 core 会漏掉"部分发布"状态（core 发出去了、
+     storage 没发出去），之后每次 push 都判定"已存在"而跳过，缺的包永久停在旧版本
+  6. CalVer 格式校验（`YY.MM.DD`）收进 `sync-version.mjs`，与 release.yml 的门禁同源
+- 为什么选这个：
+  - 单一权威 = 不会漂移；门禁 = 漂移了也发不出去
+  - 子包保留真实 version 字段，工具链（`npm pack` / dry-run / IDE）看到的版本是真的
+  - lockfile 用 `link:../core` 记录 workspace 依赖、不含版本号，故改版本不会让
+    `pnpm install --frozen-lockfile` 失效（已实测），CI 无需重新解析依赖
+- 后果：
+  - 发版流程：改根 `package.json` 的 version → `node scripts/sync-version.mjs` → 提交
+    （8 个文件各一行 version 变更）
+  - 所有 `@homurajs/*` 包永远同版本发布，无法单独发某个包的补丁版本；
+    对本仓库是可接受的——七包本就一起演进、一起发版
+  - 手工编辑子包 version 会在 CI 被拦下（这正是目的）
+- 何时重新审视：需要各包独立语义化版本（semver）时——届时应改用 changesets 一类工具，
+  而非退回手工多文件维护

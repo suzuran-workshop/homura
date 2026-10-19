@@ -71,6 +71,12 @@ jobs:
       - name: 校验 exports 与 tsdown entry 一致
         run: node scripts/check-package-exports.mjs --verbose
 
+      # 版本同步：根 package.json 的 version 是唯一权威，子包 version 由
+      # scripts/sync-version.mjs 派生。漂移说明有人手工改了子包版本，或改了根版本忘了跑同步。
+      # 在这里挡住（而非等到 release.yml），让问题在 PR 阶段就暴露。
+      - name: 校验子包版本已同步到根版本
+        run: node scripts/sync-version.mjs --check --verbose
+
       - name: Typecheck
         run: pnpm typecheck
 

@@ -27,6 +27,7 @@ homura：Hono+React 全栈 template/SDK monorepo。派生 App 的能力都来自
   - **数据方言三选一，别在 App 里硬编码**：`sqlite`（standalone 单机）/ `pg`（standalone + 自建 pgsql 或自托管 supabase）/ `rest`（qw-pages，PostgREST）。缺省由模板 `resolveDialect()` 按运行形态解析
   - **形态相关常量单点定义**：健康检查路径走 core 的 `healthzPathFor(target)`——qw-pages 是 `/_healthz`，因为 `/healthz` 被平台网关占用（网关自答 `ok`，请求不下发到 App）。app-kit 注册路由与 license guard 豁免清单同源读取，改一处必须同步
   - **qw-pages 的配置与密钥走随产物携带的 `config/homura.config.env`**（平台无自定义 env 注入口）；真实 env 优先于文件；`SESSION_SECRET` 沿用仓库公开缺省值时，生产/Pages 形态**启动即拒绝**
+  - **版本号只改根 `package.json` 一处**（唯一权威，ADR-024）：子包 version 是派生产物，改完跑 `node scripts/sync-version.mjs` 同步到 `packages/*`；**不要手工编辑子包 version**（CI 会拦下漂移）。子包仍需保留 version 字段——pnpm publish 硬性要求，删了会 `ERR_PNPM_PACKAGE_VERSION_NOT_FOUND`
   - **`package.json` 的 exports 必须与 `tsdown.config.ts` 的 entry 一一对应**：漏了 entry，构建照样"成功"但 dist 少文件，而开发态 exports 指向 `./src/*.ts` 直连源码，本地测试与 CI 全绿，只有 npm 发布产物是坏的（消费方 import 即 `ERR_MODULE_NOT_FOUND`）。一致性由 `scripts/check-package-exports.mjs` 双重门禁把守（test.yml 静态校验 + release.yml 产物校验）。26.10.14/15 的 `@homurajs/storage` 就这样漏发了 `./db`/`./tables`/`./chunk-client`，db 后端是 qw-pages 唯一可用的 storage，等于 Pages 文件存储整个不可用
   - 文档全 UTF-8 简体中文；git commit 遵循 Conventional Commits（type/scope 英文、描述简体中文、subject ≤72 字符）
   - 旧 Suzuran 已归档：`git show archive/suzuran-final:<path>` 考古，勿恢复旧代码
@@ -65,5 +66,5 @@ Agent 最常犯的错误是拿 standalone 的直觉写 qw-pages 部署。下表�
 - `packages/license` — 激活心跳客户端（Ed25519 验签 + 本地到期判定）+ 四档处置守卫 + `requireFeature` 功能范围闸门（`./contract` 契约、`./hono` 守卫）；state store 有 drizzle 与 PostgREST 两版
 - `packages/app-kit` — createApp 渐进式装配 + RuntimeAdapter（`./serve`、`./qw-pages`；两形态都自监听端口，差异只在缺省值）
 - `templates/hono-react` — 全栈模板（活文档：每能力都有使用示范 + 部署 runbook）
-- `scripts/` — 发包门禁（CI 与本地共用）：`check-package-exports.mjs`（exports ↔ tsdown entry ↔ dist 产物三重一致性）
+- `scripts/` — 发包门禁（CI 与本地共用）：`sync-version.mjs`（根版本 → 子包单向同步，`--check` 做漂移门禁）、`check-package-exports.mjs`（exports ↔ tsdown entry ↔ dist 产物三重一致性）
 - `docs/` — PRD / ARCHITECTURE / DECISIONS / specs / heritage

@@ -34,5 +34,5 @@ features:
     details: 模板即活文档，契约先行（types.ts / contract.ts 快照锁），测试与实现同文件 colocate；AGENTS.md 提供「能力 × 形态支持矩阵」，模板 README 提供部署 runbook 与排错速查。
   - icon: 📦
     title: npm 直发
-    details: CalVer 版本（YY.MM.DD），@homurajs/* 各包独立发布，tag 触发 CI 全量校验后自动发版。
+    details: CalVer 版本（YY.MM.DD），根 package.json 是唯一版本权威、@homurajs/* 各包同版本发布，push main 触发 CI 全量校验后自动发版。
 ---

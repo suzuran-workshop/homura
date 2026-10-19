@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/storage",
-  "version": "26.10.15",
+  "version": "26.10.19",
   "type": "module",
   "description": "homura 对象存储/图床适配：supabase-storage / s3 兼容(minio/oss) / local-fs 三后端 + 代理路由",
   "engines": {
