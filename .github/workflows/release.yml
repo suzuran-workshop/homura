@@ -31,8 +31,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # exports ↔ tsdown entry 静态一致性（无需 build）。漏了 entry 就是 26.10.14/15 storage ./db
+      # 那类事故：构建照样"成功"、只是少产出文件，直到下游 npm install 才炸。
+      - name: 校验 exports 与 tsdown entry 一致
+        run: node scripts/check-package-exports.mjs --verbose
+
       - name: Build packages
         run: pnpm build
+
+      # 产物校验（build 之后、publish 之前的最后一道防线）。
+      # 与上面的静态校验互补：那里比 exports ↔ entry 声明，这里额外验证 dist/ 里**真的有文件**。
+      - name: 校验发包产物完整性
+        run: node scripts/check-package-exports.mjs --verbose
 
       - name: 校验版本号为 CalVer（YY.MM.DD）
         run: |

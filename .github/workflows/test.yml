@@ -64,6 +64,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # 发包一致性（静态校验，无需 build）：package.json 的 publishConfig.exports 声明的每个子路径，
+      # 必须在 tsdown.config.ts 的 entry 里有对应项。漏了就是 26.10.14/15 storage ./db 那类事故：
+      # 开发态 exports 指向 ./src/*.ts，本地测试与 CI 全绿，但发布产物缺文件 → 消费方 import 即
+      # ERR_MODULE_NOT_FOUND。放在 Typecheck 之前，让它成为最便宜的第一道闸门。
+      - name: 校验 exports 与 tsdown entry 一致
+        run: node scripts/check-package-exports.mjs --verbose
+
       - name: Typecheck
         run: pnpm typecheck
 
