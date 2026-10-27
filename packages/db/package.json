@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/db",
-  "version": "26.10.19",
+  "version": "26.10.27",
   "type": "module",
   "description": "homura 持久层：Drizzle 双 driver（postgres-js / node:sqlite）、双方言 schema 配方、迁移双轨、supabase 直连",
   "engines": {

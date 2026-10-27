@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/auth",
-  "version": "26.10.19",
+  "version": "26.10.27",
   "type": "module",
   "description": "homura 认证：通用标准 OAuth2 (Authorization Code Flow) 客户端 + 自管 session（HS256 短 JWT + opaque refresh rotate）",
   "engines": {

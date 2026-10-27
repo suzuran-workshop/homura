@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/license",
-  "version": "26.10.19",
+  "version": "26.10.27",
   "type": "module",
   "description": "homura 激活客户端：注册、心跳、停服守卫（对接 ../homura-genuine 中央授权服务，契约先行）",
   "engines": {
