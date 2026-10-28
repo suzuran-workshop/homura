@@ -22,7 +22,7 @@ const MIGRATIONS = join(here, '../drizzle/sqlite')
 /**
  * 建 sqlite :memory: + 跑真实迁移。
  *
- * ⚠ 不再手建 auth 表：users/passwords/oauth2_identity_links/webauthn_credentials 已由
+ * ⚠ 不再手建 auth 表：users/passwords/oidc_identity_links/webauthn_credentials 已由
  *   drizzle 迁移（drizzle/sqlite/）产出，runMigrations 会建出来。此前 e2e 用 skipMigrate +
  *   手写 raw DDL 绕开真实迁移路径，恰好盖住了「迁移没生成」这个洞（standalone 部署会
  *   撞 no such table: users）。现在 e2e 走真实迁移——迁移缺表即测试失败，是回归护栏。

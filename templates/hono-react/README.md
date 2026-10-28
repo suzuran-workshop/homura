@@ -14,7 +14,7 @@ homura 全栈模板：Hono + React + Vite，**AI 开发的起点与活文档**�
 | ---- | -------------------------------------------- | ---------------------------------------------------------- | ------------------- |
 | 0    | 无                                           | 纯 routes + 健康检查 + 静态 SPA                            | app.ts              |
 | 1    | `DIALECT=sqlite\|pg`（缺省 sqlite）          | db + schema + 迁移                                         | db.ts / schema/     |
-| 2    | `OAUTH_DINGTALK_ORG_ID`                      | 钉钉登录（oauth2-dingtalk）+ session                       | app.ts buildAuth    |
+| 2    | `OAUTH_DINGTALK_ORG_ID`                      | 钉钉登录（oidc-dingtalk）+ session                         | app.ts buildAuth    |
 | 3    | `DINGTALK_APP_KEY`+`_SECRET`                 | 平台消息/审批/通讯录（3p 能力协商）                        | routes/platform.ts  |
 | 4    | `STORAGE_BACKEND=local\|s3\|supabase`        | 图床/文件                                                  | routes/files.ts     |
 | 5    | `GENUINE_SERVER`（+ `GENUINE_PUBLIC_KEY`）   | 激活心跳 + Ed25519 验签 + 到期/停服四档处置 + 功能范围闸门 | app.ts buildLicense |

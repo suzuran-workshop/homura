@@ -12,7 +12,7 @@ import { isSqlite } from '@homurajs/db'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { DirectoryEntry, DirectoryStore } from './types.js'
-import type { DrizzleDb } from './oauth2-link-store.js'
+import type { DrizzleDb } from './oidc-link-store.js'
 
 async function exec(db: DrizzleDb, q: ReturnType<typeof sql>): Promise<void> {
   if (isSqlite(db)) await db.run(q)

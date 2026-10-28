@@ -23,7 +23,7 @@ export const licenseState = sqliteLicenseTables.licenseState
 // auth 多凭证身份表，与 pg.ts 严格对应
 export const users = sqliteAuthTables.users
 export const passwords = sqliteAuthTables.passwords
-export const oauth2IdentityLinks = sqliteAuthTables.oauth2IdentityLinks
+export const oidcIdentityLinks = sqliteAuthTables.oidcIdentityLinks
 export const webauthnCredentials = sqliteAuthTables.webauthnCredentials
 
 export const sqliteSchema = {
@@ -32,6 +32,6 @@ export const sqliteSchema = {
   licenseState,
   users,
   passwords,
-  oauth2IdentityLinks,
+  oidcIdentityLinks,
   webauthnCredentials,
 }

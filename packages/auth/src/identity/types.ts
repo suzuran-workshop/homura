@@ -16,7 +16,7 @@ export interface LocalUser {
   updatedAt: number
 }
 
-/** OAuth2 身份关联（oauth2_identity_links 表行） */
+/** IdP 身份关联（oidc_identity_links 表行） */
 export interface IdentityLink {
   id: string
   userId: string
@@ -62,17 +62,17 @@ export interface UserStore {
   update(id: string, patch: { nickname?: string; avatarUrl?: string }): Promise<LocalUser>
   /**
    * 删除用户（按 id）。用于注册失败时清理孤儿 user（见 PasswordProvider.register）。
-   * ⚠ 不级联删除凭证记录（passwords/oauth2_identity_links/webauthn_credentials）——
+   * ⚠ 不级联删除凭证记录（passwords/oidc_identity_links/webauthn_credentials）——
    *   调用方自行保证只在「刚建、尚无凭证」的 user 上调用，或先清凭证再删 user。
    */
   delete(id: string): Promise<void>
 }
 
 /**
- * IdP 身份关联仓储（oauth2_identity_links 表）。
+ * IdP 身份关联仓储（oidc_identity_links 表）。
  * 用于 identity resolver 在 callback 时查 link → 找 user，或 JIT 建户时创建 link。
  */
-export interface OAuth2LinkStore {
+export interface OidcLinkStore {
   /** 按 (provider, providerSub) 查关联；不存在返回 null */
   findByProvider(provider: string, providerSub: string): Promise<IdentityLink | null>
   /** 按 userId 查所有关联 */

@@ -108,7 +108,7 @@ describe('PasswordProvider.verify', () => {
   })
 
   it('用户存在但无密码记录 → null 且不抛', async () => {
-    // 直接建一个无密码的 user（模拟 OAuth2-only 用户）
+    // 直接建一个无密码的 user（模拟纯 OIDC 登录用户）
     await userStore.create({ username: 'oauth-only' })
     await expect(provider.verify('oauth-only', 'whatever123')).resolves.toBeNull()
   })

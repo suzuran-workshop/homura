@@ -2,10 +2,10 @@
 
 ## 要构建什么
 
-- 目标：基于用户名密码的本地认证，零外部依赖，作为 OAuth2 的补充/替代
+- 目标：基于用户名密码的本地认证，零外部依赖，作为 OIDC 的补充/替代
 - 依赖：`node:crypto` 内置 `scrypt`（零原生依赖）
 - 模板配置：`AUTH_PASSWORD_ENABLED`（**默认 false，opt-in**）+ `AUTH_PASSWORD_ALLOW_SELF_REGISTER`（默认 true）。
-  与 OAuth2（靠 `OAUTH_DINGTALK_ORG_ID`）、WebAuthn（`AUTH_WEBAUTHN_ENABLED` 默认 false）一致——三类认证
+  与 OIDC（靠 `OAUTH_DINGTALK_ORG_ID`）、WebAuthn（`AUTH_WEBAUTHN_ENABLED` 默认 false）一致——三类认证
   均「配了啥才启用啥」，各能力独立开关，不配则不挂载对应路由（SDK 层 `createAuthRoutes` 也是按传入的
   capability 组合路由，不传 password 就不挂 `/auth/password/*`）
 
@@ -39,7 +39,7 @@
 
 ### 删密码（deletePassword）
 
-- 删除 passwords 记录（用户将无法用密码登录，但 OAuth2/WebAuthn 不受影响）
+- 删除 passwords 记录（用户将无法用密码登录，但 OIDC/WebAuthn 不受影响）
 
 ## 存储
 
@@ -70,7 +70,7 @@
 - [x] username 重复注册 → 409（预检 UsernameTakenError + 唯一索引兜底，cause 链识别）
 - [x] 密码错误 → 401（不泄露"用户是否存在"，且耗时均衡）
 - [x] 改密码：旧密码错误 → 400；成功 → 旧密码无法登录 + 旧 refresh 失效（reloginRequired）
-- [x] 删密码 → 密码登录不可用，OAuth2/WebAuthn 不受影响
+- [x] 删密码 → 密码登录不可用，OIDC/WebAuthn 不受影响
 - [x] 注册时 password 写入失败 → 清理孤儿 user，username 不被占用
 - [ ] 1:1 约束：同 user_id 不能建第二条 password 记录（由 PK 保证，未单测）
 - [x] 双 store 接口一致（Drizzle SQL 双方言）

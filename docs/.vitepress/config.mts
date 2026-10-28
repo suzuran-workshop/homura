@@ -21,7 +21,7 @@ export default defineConfig({
           text: '模块规格（specs）',
           items: [
             { text: 'schema 双方言配方', link: '/specs/module-schema' },
-            { text: 'OAuth2 客户端', link: '/specs/module-oauth2' },
+            { text: 'OIDC 客户端', link: '/specs/module-oidc' },
             { text: 'session 自管', link: '/specs/module-session' },
             { text: '3p 平台能力分片', link: '/specs/module-3p' },
             { text: 'license 激活心跳', link: '/specs/module-license' },

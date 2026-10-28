@@ -8,7 +8,7 @@ import { OidcClient } from '../oidc/client.js'
 import { SessionManager } from '../session/manager.js'
 import { createDrizzleSessionStore } from '../session/store.js'
 import { createDrizzleUserStore } from '../identity/user-store.js'
-import { createDrizzleOAuth2LinkStore } from '../identity/oauth2-link-store.js'
+import { createDrizzleOidcLinkStore } from '../identity/oidc-link-store.js'
 import { createDefaultIdentityResolver } from '../identity/resolver.js'
 import { createAuthRoutes } from './routes.js'
 import { sessionMiddleware, requireAuth } from './middleware.js'
@@ -61,13 +61,13 @@ async function buildApp(opts?: { accessTtl?: number; now?: () => Date }) {
     )`,
   ))
   await db.run(sql.raw(
-    `CREATE TABLE oauth2_identity_links (
+    `CREATE TABLE oidc_identity_links (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
       provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
     )`,
   ))
   await db.run(sql.raw(
-    `CREATE UNIQUE INDEX oauth2_links_provider_sub_uidx ON oauth2_identity_links (provider, provider_sub)`,
+    `CREATE UNIQUE INDEX oidc_links_provider_sub_uidx ON oidc_identity_links (provider, provider_sub)`,
   ))
   const kv = createMemoryTtlKv()
   const nowMs = opts?.now ? () => opts.now!().getTime() : undefined
@@ -81,7 +81,7 @@ async function buildApp(opts?: { accessTtl?: number; now?: () => Date }) {
     store,
   )
   const userStore = createDrizzleUserStore(db, nowMs ? { now: nowMs } : undefined)
-  const linkStore = createDrizzleOAuth2LinkStore(db, nowMs ? { now: nowMs } : undefined)
+  const linkStore = createDrizzleOidcLinkStore(db, nowMs ? { now: nowMs } : undefined)
   const identityResolver = createDefaultIdentityResolver(userStore, linkStore)
 
   const client = new OidcClient({

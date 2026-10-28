@@ -9,14 +9,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createSqliteDb } from '@homurajs/db'
 import { createDrizzleUserStore } from './user-store.js'
-import { createDrizzleOAuth2LinkStore } from './oauth2-link-store.js'
+import { createDrizzleOidcLinkStore } from './oidc-link-store.js'
 import { createDrizzleDirectoryStore } from './directory-store.js'
 import {
   createDirectoryProvisioningResolver,
   ProvisionBlockedError,
 } from './resolver.js'
 import type { DirectoryProvisioningResolverOptions } from './resolver.js'
-import type { DirectoryStore, OAuth2LinkStore, UserStore } from './types.js'
+import type { DirectoryStore, OidcLinkStore, UserStore } from './types.js'
 
 async function makeDb() {
   const db = createSqliteDb({ dialect: 'sqlite', path: ':memory:' })
@@ -28,13 +28,13 @@ async function makeDb() {
   ))
   await db.run(sql.raw(`CREATE UNIQUE INDEX users_username_uidx ON users (username)`))
   await db.run(sql.raw(
-    `CREATE TABLE oauth2_identity_links (
+    `CREATE TABLE oidc_identity_links (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
       provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
     )`,
   ))
   await db.run(sql.raw(
-    `CREATE UNIQUE INDEX oauth2_links_provider_sub_uidx ON oauth2_identity_links (provider, provider_sub)`,
+    `CREATE UNIQUE INDEX oidc_links_provider_sub_uidx ON oidc_identity_links (provider, provider_sub)`,
   ))
   await db.run(sql.raw(
     `CREATE TABLE identity_directory (
@@ -53,13 +53,13 @@ const SUB = '025216385646-917635624'
 
 let db: Awaited<ReturnType<typeof makeDb>>
 let userStore: UserStore
-let linkStore: OAuth2LinkStore
+let linkStore: OidcLinkStore
 let directory: DirectoryStore
 
 beforeEach(async () => {
   db = await makeDb()
   userStore = createDrizzleUserStore(db)
-  linkStore = createDrizzleOAuth2LinkStore(db)
+  linkStore = createDrizzleOidcLinkStore(db)
   directory = createDrizzleDirectoryStore(db)
 })
 
@@ -187,7 +187,7 @@ describe('createDirectoryProvisioningResolver', () => {
     })
     // 输家视角：查不到 link（竞态窗口），create 抛唯一冲突
     let findCalls = 0
-    const racingLinkStore: OAuth2LinkStore = {
+    const racingLinkStore: OidcLinkStore = {
       ...linkStore,
       findByProvider: async (p, s) => {
         findCalls++
@@ -195,7 +195,7 @@ describe('createDirectoryProvisioningResolver', () => {
         return linkStore.findByProvider(p, s)
       },
       create: async () => {
-        throw new Error('UNIQUE constraint failed: oauth2_identity_links.provider, provider_sub')
+        throw new Error('UNIQUE constraint failed: oidc_identity_links.provider, provider_sub')
       },
     }
     const resolver = createDirectoryProvisioningResolver({

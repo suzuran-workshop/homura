@@ -95,7 +95,7 @@ export const configSpecs = {
     description: '回调地址（如 https://app.example/auth/oidc/callback）',
   },
   authOidcJit: {
-    env: 'AUTH_OAUTH2_JIT',
+    env: 'AUTH_OIDC_JIT',
     default: true,
     parse: parses.boolean,
     description: 'OIDC 首次登录是否自动建户（JIT provisioning）；false 则要求预先注册并关联',

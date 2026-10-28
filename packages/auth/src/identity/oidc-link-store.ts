@@ -1,6 +1,6 @@
 /**
- * Drizzle 双方言 OAuth2LinkStore —— oauth2_identity_links 表的 CRUD。
- * identity resolver 在 OAuth2 callback 时用 findByProvider 查已有 link，
+ * Drizzle 双方言 OidcLinkStore —— oidc_identity_links 表的 CRUD。
+ * identity resolver 在 OIDC callback 时用 findByProvider 查已有 link，
  * JIT 模式时 create 新 link 并关联新建的 user。
  *
  * ⚠ 列名必须与 tables.ts 的显式 snake_case 对齐
@@ -11,7 +11,7 @@ import { sql } from 'drizzle-orm'
 import { isSqlite } from '@homurajs/db'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { IdentityLink, OAuth2LinkStore } from './types.js'
+import type { IdentityLink, OidcLinkStore } from './types.js'
 
 export type DrizzleDb = PostgresJsDatabase | NodeSQLiteDatabase
 
@@ -48,17 +48,17 @@ function toLink(row: LinkRow): IdentityLink {
 
 const SELECT_COLS = sql.raw('id, user_id, provider, provider_sub, raw_profile, created_at')
 
-export function createDrizzleOAuth2LinkStore(
+export function createDrizzleOidcLinkStore(
   db: DrizzleDb,
   opts?: { now?: () => number },
-): OAuth2LinkStore {
+): OidcLinkStore {
   const now = opts?.now ?? (() => Date.now())
 
   return {
     async findByProvider(provider, providerSub) {
       const rows = await query<LinkRow>(
         db,
-        sql`SELECT ${SELECT_COLS} FROM oauth2_identity_links
+        sql`SELECT ${SELECT_COLS} FROM oidc_identity_links
 WHERE provider = ${provider} AND provider_sub = ${providerSub}`,
       )
       return rows[0] ? toLink(rows[0]) : null
@@ -67,7 +67,7 @@ WHERE provider = ${provider} AND provider_sub = ${providerSub}`,
     async findByUserId(userId) {
       const rows = await query<LinkRow>(
         db,
-        sql`SELECT ${SELECT_COLS} FROM oauth2_identity_links WHERE user_id = ${userId}`,
+        sql`SELECT ${SELECT_COLS} FROM oidc_identity_links WHERE user_id = ${userId}`,
       )
       return rows.map(toLink)
     },
@@ -77,7 +77,7 @@ WHERE provider = ${provider} AND provider_sub = ${providerSub}`,
       const ts = now()
       await exec(
         db,
-        sql`INSERT INTO oauth2_identity_links (id, user_id, provider, provider_sub, raw_profile, created_at)
+        sql`INSERT INTO oidc_identity_links (id, user_id, provider, provider_sub, raw_profile, created_at)
 VALUES (${id}, ${input.userId}, ${input.provider}, ${input.providerSub}, ${input.rawProfile ?? null}, ${ts})`,
       )
       return {
@@ -91,7 +91,7 @@ VALUES (${id}, ${input.userId}, ${input.provider}, ${input.providerSub}, ${input
     },
 
     async delete(id) {
-      await exec(db, sql`DELETE FROM oauth2_identity_links WHERE id = ${id}`)
+      await exec(db, sql`DELETE FROM oidc_identity_links WHERE id = ${id}`)
     },
   }
 }

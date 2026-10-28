@@ -14,7 +14,7 @@ describe('schema parity（pg ↔ sqlite）', () => {
 
   it('覆盖业务表 + 第三方表（todos/refresh_tokens/license_state + auth 新表）', () => {
     const expected = [
-      'licenseState', 'oauth2IdentityLinks',
+      'licenseState', 'oidcIdentityLinks',
       'passwords', 'refreshTokens', 'todos', 'users', 'webauthnCredentials',
     ]
     expect(Object.keys(pgSchema).sort()).toEqual(expected)

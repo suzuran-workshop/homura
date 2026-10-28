@@ -12,7 +12,7 @@
 
 | Capability | 接口 | 钉钉实现端点（实测） |
 |-----------|------|-------------|
-| oauth | oauth(): OAuthPreset | ../oauth2-dingtalk 三端点（结构化契约喂 auth 包） |
+| oauth | oauth(): OidcPreset | ../oidc-dingtalk issuer+三端点（结构化契约喂 auth 包） |
 | message | sendWorkMessage / **getSendResult** / **getSendProgress** | POST **oapi/topapi/message/corpconversation/asyncsend_v2**（旧版通用端点；v1.0 需白名单）· POST oapi/topapi/message/corpconversation/**getsendresult** · **getsendprogress** |
 | approval | listProcessCodes / createApprovalInstance / getApprovalInstance | GET /v1.0/workflow/processCentres/schemaNames/processCodes · POST /v1.0/workflow/processInstances · GET /v1.0/workflow/processInstances?**processInstanceId=**（query 参数，非路径参数） |
 | contacts | getUserDetail / listDeptUsers / listSubDepts / **getDeptDetail** / **getUserByMobile** / **listAdmins** / **fetchAllContacts** | POST oapi/topapi/v2/user/get · oapi/topapi/v2/user/list（游标）· oapi/topapi/v2/department/listsub · oapi/topapi/v2/department/get · oapi/topapi/v2/user/getbymobile · oapi/topapi/user/listadmin |

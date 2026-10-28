@@ -35,7 +35,7 @@ src/server/schema/
 ```
 
 第三方包的表从子路径 spread 进两侧 schema 参与迁移：
-`@homurajs/auth/tables`（六张：users / passwords / oauth2_identity_links / webauthn_credentials / refresh_tokens / identity_directory）、`@homurajs/license/tables`（license_state）。
+`@homurajs/auth/tables`（六张：users / passwords / oidc_identity_links / webauthn_credentials / refresh_tokens / identity_directory）、`@homurajs/license/tables`（license_state）。
 
 ## 迁移轨道
 

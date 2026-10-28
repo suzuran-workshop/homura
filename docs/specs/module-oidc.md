@@ -8,7 +8,7 @@
 - authorizeUrl(returnTo?)：state（16B base64url）入 TtlKv（TTL 5min，value=returnTo），拼 authorize URL（client_id/redirect_uri/response_type=code/scope（缺省 openid）/extraParams）
 - callback({code, state})：kv.take(state) 一次性消费（未命中拒绝；allowNoState=true 显式 dev 放行）→ POST tokenUrl（form: grant_type/code/client_id/client_secret/redirect_uri）→ **id_token 验签**（HS256，密钥=clientSecret；jwtVerify 校验 iss=issuer、aud=clientId、exp±60s leeway）→ GET userinfoUrl（Bearer）→ mapUser → **userinfo.sub 与 id_token.sub 交叉核对**（不一致即 sub_mismatch 拒绝）
 - 错误：统一 `OidcError`（code：invalid_state/missing_code/token_failed/userinfo_failed/missing_id_token/id_token_invalid/sub_mismatch/map_failed），App 可按 code 渲染友好页；hono 路由映射 401 `{ error: 'oidc_failed', code }`
-- **Identity Resolver**：callback 路由拿到 IdP 的 AuthUser 后，调用 identityResolver.resolve(provider, idpSub, profile) → local user。默认实现 createDefaultIdentityResolver 在 oauth2_identity_links 查 link → 有则返回已有 user → 无则 JIT 建户+建 link（jit 默认 true，可配 false 拒绝未知身份）。目录白名单准入用 createDirectoryProvisioningResolver（见 ADR-026）。session 的 sub 是 local user.id
+- **Identity Resolver**：callback 路由拿到 IdP 的 AuthUser 后，调用 identityResolver.resolve(provider, idpSub, profile) → local user。默认实现 createDefaultIdentityResolver 在 oidc_identity_links 查 link → 有则返回已有 user → 无则 JIT 建户+建 link（jit 默认 true，可配 false 拒绝未知身份）。目录白名单准入用 createDirectoryProvisioningResolver（见 ADR-026）。session 的 sub 是 local user.id
 - 路径统一 /auth/oidc/*（authorize/callback）；requireAuth 缺省 loginPath 同步
 
 ## 上游契约快照（oidc-dingtalk v2.0.0，3p/dingtalk/oauth.ts 消费）

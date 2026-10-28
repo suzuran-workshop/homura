@@ -8,7 +8,7 @@
  * 注册：generateRegistrationOptions → 客户端 attestation → verifyRegistrationResponse → store credential
  * 认证：generateAuthenticationOptions → 客户端 assertion → verifyAuthenticationResponse → 更新 counter
  *
- * challenge 存储复用 core 的 TtlKv（与 OAuth2 state 同一机制）。
+ * challenge 存储复用 core 的 TtlKv（与 OIDC state 同一机制）。
  */
 import { randomToken } from '@homurajs/core'
 import type { TtlKv } from '@homurajs/core'

@@ -7,7 +7,7 @@
 **身份模型（ADR-022）**：`users` 表是本地身份锚点，三种凭证都通过 `user_id` 关联：
 
 - `passwords`：1:1 users，scrypt 哈希（Node 内置 crypto，零依赖，ADR-023）
-- `oauth2_identity_links`：1:N users，UNIQUE(provider, provider_sub)
+- `oidc_identity_links`：1:N users，UNIQUE(provider, provider_sub)
 - `webauthn_credentials`：1:N users，PK = credentialId base64url
 
 **session.sub = local user ID**（Breaking：不再是 IdP subject）。Identity Resolver 在 OIDC callback 时桥接 IdP sub → local user，JIT 默认开启（首次登录自动建户），可配 false 拒绝未知身份。
@@ -24,7 +24,7 @@
 | ----------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `createDrizzleSessionStore(db)`     | `sqlite` / `pg`    | 原生 SQL，`UPDATE...WHERE used_at IS NULL RETURNING` 做原子抢占                                                 |
 | `createDrizzleUserStore(db)`        | `sqlite` / `pg`    | users 表 CRUD                                                                                                   |
-| `createDrizzleOAuth2LinkStore(db)`  | `sqlite` / `pg`    | oauth2_identity_links 表 CRUD                                                                                   |
+| `createDrizzleOidcLinkStore(db)`    | `sqlite` / `pg`    | oidc_identity_links 表 CRUD                                                                                   |
 | `createDrizzlePasswordStore(db)`    | `sqlite` / `pg`    | passwords 表 CRUD                                                                                               |
 | `createDrizzleWebauthnCredentialStore(db)` | `sqlite` / `pg` | webauthn_credentials 表 CRUD                                                                                |
 | `createDrizzleDirectoryStore(db)`   | `sqlite` / `pg`    | identity_directory 表 CRUD（upsert 快照语义）                                                                   |
@@ -40,7 +40,7 @@ import {
   SessionManager,
   createDrizzleSessionStore,
   createDrizzleUserStore,
-  createDrizzleOAuth2LinkStore,
+  createDrizzleOidcLinkStore,
   createDefaultIdentityResolver,
   createMemoryTtlKv,
 } from '@homurajs/auth'

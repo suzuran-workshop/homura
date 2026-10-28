@@ -4,9 +4,9 @@
  *
  * 包含六张表：
  * - `refresh_tokens`：session refresh token（rotate + family 吊销）
- * - `users`：本地身份锚点（密码/WebAuthn/OAuth2 共享）
+ * - `users`：本地身份锚点（密码/WebAuthn/OIDC 共享）
  * - `passwords`：密码凭证（1:1 users）
- * - `oauth2_identity_links`：OAuth2 身份关联（1:N users）
+ * - `oidc_identity_links`：IdP 身份关联（1:N users）
  * - `webauthn_credentials`：WebAuthn 凭证（1:N users）
  * - `identity_directory`：外部身份目录（provider+sub+name 白名单快照，JIT 准入依据）
  *
@@ -20,7 +20,7 @@ import { index as sqliteIndex, uniqueIndex as sqliteUniqueIndex } from 'drizzle-
 
 export const USERS_TABLE = 'users'
 export const PASSWORDS_TABLE = 'passwords'
-export const OAUTH2_IDENTITY_LINKS_TABLE = 'oauth2_identity_links'
+export const OIDC_IDENTITY_LINKS_TABLE = 'oidc_identity_links'
 export const WEBAUTHN_CREDENTIALS_TABLE = 'webauthn_credentials'
 export const IDENTITY_DIRECTORY_TABLE = 'identity_directory'
 
@@ -109,10 +109,10 @@ const sqlitePasswords = sqliteTable(PASSWORDS_TABLE, {
   updatedAt: sqliteCol.epochMs('updated_at').notNull(),
 })
 
-// ── oauth2_identity_links（1:N，UNIQUE provider+sub）──
+// ── oidc_identity_links（1:N，UNIQUE provider+sub）──
 
-const pgOAuth2IdentityLinks = pgTable(
-  OAUTH2_IDENTITY_LINKS_TABLE,
+const pgOidcIdentityLinks = pgTable(
+  OIDC_IDENTITY_LINKS_TABLE,
   {
     id: pgCol.id('id'),
     userId: pgCol.text('user_id').notNull(),
@@ -122,13 +122,13 @@ const pgOAuth2IdentityLinks = pgTable(
     createdAt: pgCol.epochMs('created_at').notNull(),
   },
   (t) => [
-    index('oauth2_links_user_idx').on(t.userId),
-    uniqueIndex('oauth2_links_provider_sub_uidx').on(t.provider, t.providerSub),
+    index('oidc_links_user_idx').on(t.userId),
+    uniqueIndex('oidc_links_provider_sub_uidx').on(t.provider, t.providerSub),
   ],
 )
 
-const sqliteOAuth2IdentityLinks = sqliteTable(
-  OAUTH2_IDENTITY_LINKS_TABLE,
+const sqliteOidcIdentityLinks = sqliteTable(
+  OIDC_IDENTITY_LINKS_TABLE,
   {
     id: sqliteCol.id('id'),
     userId: sqliteCol.text('user_id').notNull(),
@@ -138,8 +138,8 @@ const sqliteOAuth2IdentityLinks = sqliteTable(
     createdAt: sqliteCol.epochMs('created_at').notNull(),
   },
   (t) => [
-    sqliteIndex('oauth2_links_user_idx').on(t.userId),
-    sqliteUniqueIndex('oauth2_links_provider_sub_uidx').on(t.provider, t.providerSub),
+    sqliteIndex('oidc_links_user_idx').on(t.userId),
+    sqliteUniqueIndex('oidc_links_provider_sub_uidx').on(t.provider, t.providerSub),
   ],
 )
 
@@ -217,7 +217,7 @@ export const pgAuthTables = {
   refreshTokens: pgRefreshTokens,
   users: pgUsers,
   passwords: pgPasswords,
-  oauth2IdentityLinks: pgOAuth2IdentityLinks,
+  oidcIdentityLinks: pgOidcIdentityLinks,
   webauthnCredentials: pgWebauthnCredentials,
   identityDirectory: pgIdentityDirectory,
 }
@@ -226,7 +226,7 @@ export const sqliteAuthTables = {
   refreshTokens: sqliteRefreshTokens,
   users: sqliteUsers,
   passwords: sqlitePasswords,
-  oauth2IdentityLinks: sqliteOAuth2IdentityLinks,
+  oidcIdentityLinks: sqliteOidcIdentityLinks,
   webauthnCredentials: sqliteWebauthnCredentials,
   identityDirectory: sqliteIdentityDirectory,
 }

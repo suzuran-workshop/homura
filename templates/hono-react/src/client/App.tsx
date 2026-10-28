@@ -115,7 +115,7 @@ export default function App() {
         ) : (
           <div>
             <p>
-              未登录 <a href="/auth/oauth2/authorize">钉钉登录</a>（匿名可操作公共 todos）
+              未登录 <a href="/auth/oidc/authorize">钉钉登录</a>（匿名可操作公共 todos）
             </p>
             {/* 密码登录/注册：演示 TextPassword 能力（AUTH_PASSWORD_ENABLED，缺省开）。
                 SDK 不渲染页面，故表单由 App 自绘，调 /auth/password/* JSON 路由。 */}

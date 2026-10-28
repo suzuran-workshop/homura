@@ -18,12 +18,12 @@ export type {
   LocalUser,
   IdentityLink,
   UserStore,
-  OAuth2LinkStore,
+  OidcLinkStore,
   DirectoryEntry,
   DirectoryStore,
 } from './identity/types.js'
 export { createDrizzleUserStore } from './identity/user-store.js'
-export { createDrizzleOAuth2LinkStore } from './identity/oauth2-link-store.js'
+export { createDrizzleOidcLinkStore } from './identity/oidc-link-store.js'
 export { createDrizzleDirectoryStore } from './identity/directory-store.js'
 
 // ── Identity Resolver（IdP sub → local user 桥接）────

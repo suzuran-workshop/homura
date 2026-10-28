@@ -2,7 +2,7 @@
 
 ## 要构建什么
 
-- 目标：基于 WebAuthn/Passkey 的无密码认证，作为 OAuth2/TextPassword 的补充
+- 目标：基于 WebAuthn/Passkey 的无密码认证，作为 OIDC/TextPassword 的补充
 - 依赖：`@simplewebauthn/server` ^11 作为 **optional peer dep**，动态 import
 - 子路径：`@homurajs/auth/webauthn`（独立入口，不用 WebAuthn 的 App 零依赖零负担）
 
@@ -52,7 +52,7 @@
 - `AUTH_WEBAUTHN_RP_NAME`（显示名，如 "My App"）
 - `AUTH_WEBAUTHN_ORIGIN`（允许的 origin，如 https://app.example.com；多 origin 逗号分隔）
 
-> 模板接线（templates/hono-react `buildAuth`）：`AUTH_WEBAUTHN_ENABLED=true` 且配齐 `RP_ID`/`ORIGIN` 时，构造 `WebAuthProvider`（challenge 复用 OAuth2 state 的 TtlKv）并把 `createWebAuthnRoutes` 挂进 authRoutes；缺 RP_ID/ORIGIN 则告警且不挂载。此前该开关只决定建不建表、路由从不挂载（死配置），现已接通服务端。客户端 passkey UI 仍由 App 自绘（SDK 只给 JSON 路由）。
+> 模板接线（templates/hono-react `buildAuth`）：`AUTH_WEBAUTHN_ENABLED=true` 且配齐 `RP_ID`/`ORIGIN` 时，构造 `WebAuthProvider`（challenge 复用 OIDC state 的 TtlKv）并把 `createWebAuthnRoutes` 挂进 authRoutes；缺 RP_ID/ORIGIN 则告警且不挂载。此前该开关只决定建不建表、路由从不挂载（死配置），现已接通服务端。客户端 passkey UI 仍由 App 自绘（SDK 只给 JSON 路由）。
 
 ## 依赖策略
 

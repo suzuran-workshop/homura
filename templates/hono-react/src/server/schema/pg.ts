@@ -1,7 +1,7 @@
 /**
  * PG 方言 schema（pgsql 独立部署 + 自托管 supabase 共用）。
  * 业务表 todos + spread 进 auth/license 的第三方表（refresh_tokens / license_state）
- * + auth 新表（users / passwords / oauth2_identity_links / webauthn_credentials）。
+ * + auth 新表（users / passwords / oidc_identity_links / webauthn_credentials）。
  * 与 sqlite.ts 严格对应，parity 测试锁一致。
  */
 import { pgCol, pgTable, pgJson } from '@homurajs/db/schema-helpers'
@@ -21,10 +21,10 @@ export const todos = pgTable('todos', {
 // spread 第三方表：参与本方言迁移
 export const refreshTokens = pgAuthTables.refreshTokens
 export const licenseState = pgLicenseTables.licenseState
-// auth 多凭证身份表（TextPassword + WebAuthn + OAuth2 identity links）
+// auth 多凭证身份表（TextPassword + WebAuthn + OIDC identity links）
 export const users = pgAuthTables.users
 export const passwords = pgAuthTables.passwords
-export const oauth2IdentityLinks = pgAuthTables.oauth2IdentityLinks
+export const oidcIdentityLinks = pgAuthTables.oidcIdentityLinks
 export const webauthnCredentials = pgAuthTables.webauthnCredentials
 
 export const pgSchema = {
@@ -33,6 +33,6 @@ export const pgSchema = {
   licenseState,
   users,
   passwords,
-  oauth2IdentityLinks,
+  oidcIdentityLinks,
   webauthnCredentials,
 }

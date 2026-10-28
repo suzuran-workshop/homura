@@ -209,7 +209,7 @@ async function buildAuth(
     SessionManager,
     createDrizzleSessionStore,
     createDrizzleUserStore,
-    createDrizzleOAuth2LinkStore,
+    createDrizzleOidcLinkStore,
     createDefaultIdentityResolver,
     PasswordProvider,
     createDrizzlePasswordStore,
@@ -226,7 +226,7 @@ async function buildAuth(
 
   // 多凭证身份：user store + identity link store + password store（共享）
   const userStore = createDrizzleUserStore(db)
-  const linkStore = createDrizzleOAuth2LinkStore(db)
+  const linkStore = createDrizzleOidcLinkStore(db)
 
   // Password provider（如果启用）：通过 PasswordStore 接口操作，不直接依赖数据库实例
   const passwordEnabled = config.get('authPasswordEnabled')

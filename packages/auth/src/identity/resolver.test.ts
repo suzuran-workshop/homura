@@ -1,5 +1,5 @@
 /**
- * Identity Resolver 单测 —— OAuth2 IdP sub → local user 桥接。
+ * Identity Resolver 单测 —— IdP sub → local user 桥接。
  *
  * 覆盖：JIT 建户、再次登录复用同一 user、孤儿 link 清理、profile 回填、
  * JIT 关闭拒绝未知身份、JIT 关闭但已有 link 放行、并发首次登录竞态（#10）。
@@ -8,9 +8,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createSqliteDb } from '@homurajs/db'
 import { createDrizzleUserStore } from './user-store.js'
-import { createDrizzleOAuth2LinkStore } from './oauth2-link-store.js'
+import { createDrizzleOidcLinkStore } from './oidc-link-store.js'
 import { createDefaultIdentityResolver, IdentityNotLinkedError } from './resolver.js'
-import type { OAuth2LinkStore, UserStore } from './types.js'
+import type { OidcLinkStore, UserStore } from './types.js'
 
 async function makeDb() {
   const db = createSqliteDb({ dialect: 'sqlite', path: ':memory:' })
@@ -22,20 +22,20 @@ async function makeDb() {
   ))
   await db.run(sql.raw(`CREATE UNIQUE INDEX users_username_uidx ON users (username)`))
   await db.run(sql.raw(
-    `CREATE TABLE oauth2_identity_links (
+    `CREATE TABLE oidc_identity_links (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL,
       provider_sub TEXT NOT NULL, raw_profile TEXT, created_at INTEGER NOT NULL
     )`,
   ))
   await db.run(sql.raw(
-    `CREATE UNIQUE INDEX oauth2_links_provider_sub_uidx ON oauth2_identity_links (provider, provider_sub)`,
+    `CREATE UNIQUE INDEX oidc_links_provider_sub_uidx ON oidc_identity_links (provider, provider_sub)`,
   ))
   return db
 }
 
 let db: Awaited<ReturnType<typeof makeDb>>
 let userStore: UserStore
-let linkStore: OAuth2LinkStore
+let linkStore: OidcLinkStore
 
 const PROVIDER = 'dingtalk'
 const SUB = 'idp-sub-1'
@@ -43,7 +43,7 @@ const SUB = 'idp-sub-1'
 beforeEach(async () => {
   db = await makeDb()
   userStore = createDrizzleUserStore(db)
-  linkStore = createDrizzleOAuth2LinkStore(db)
+  linkStore = createDrizzleOidcLinkStore(db)
 })
 
 async function countUsers(): Promise<number> {
@@ -57,7 +57,7 @@ describe('createDefaultIdentityResolver — JIT 开启（缺省）', () => {
     const user = await resolver.resolve(PROVIDER, SUB, { nickname: '张三', avatarUrl: 'http://a/p.png' })
     expect(user.id).toBeTruthy()
     expect(user.nickname).toBe('张三')
-    expect(user.username).toBeNull() // OAuth2-only 用户无 username
+    expect(user.username).toBeNull() // 纯 OIDC 登录用户无 username
     // link 已建
     const link = await linkStore.findByProvider(PROVIDER, SUB)
     expect(link?.userId).toBe(user.id)
@@ -102,7 +102,7 @@ describe('createDefaultIdentityResolver — JIT 开启（缺省）', () => {
     // 构造竞态 linkStore：第一次 findByProvider 返回 null（双方都没看到 link），
     // create 抛唯一冲突（输家），之后 findByProvider 能读到赢家。
     let findCalls = 0
-    const racingLinkStore: OAuth2LinkStore = {
+    const racingLinkStore: OidcLinkStore = {
       ...linkStore,
       findByProvider: async (p, s) => {
         findCalls++
@@ -110,7 +110,7 @@ describe('createDefaultIdentityResolver — JIT 开启（缺省）', () => {
         return linkStore.findByProvider(p, s)
       },
       create: async () => {
-        throw new Error('UNIQUE constraint failed: oauth2_identity_links.provider, provider_sub')
+        throw new Error('UNIQUE constraint failed: oidc_identity_links.provider, provider_sub')
       },
     }
     const resolver = createDefaultIdentityResolver(userStore, racingLinkStore)

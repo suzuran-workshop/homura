@@ -11,7 +11,7 @@
 - 一次登录会话 = 一个 token family：**sid 与 familyId 合一**（使 revokeSession 可直接走 family 维度吊销）
 - HS256 JWT（claims: sub/nickname/avatarUrl/sid/exp + **jti** 保证同秒 rotate 也唯一），TTL 默认 7200s
 - **sub 语义（2026-10-14 变更）**：sub 是 local user ID（users 表的 id），不再是 IdP subject。
-  三种凭证（TextPassword / WebAuthn / OAuth2）都通过 local user 统一身份，session 层不感知凭证来源
+  三种凭证（TextPassword / WebAuthn / OIDC）都通过 local user 统一身份，session 层不感知凭证来源
 - refresh token：32B base64url，SHA-256 hex 入库（token_hash/family_id/sid/sub/expires_at/**used_at**/**profile**），TTL 默认 30d
 - profile（nickname/avatarUrl）持久化在 refresh_tokens，rotate 时回填新 access token（上游无 refresh，身份不能丢）
 
@@ -31,13 +31,13 @@
 
 ### 兜底
 
-- refresh 链终态（过期/吊销/复用检出）：页面请求 302 登录入口（缺省 `/auth/oauth2/authorize`，钉钉免登一跳无感）；API 401
+- refresh 链终态（过期/吊销/复用检出）：页面请求 302 登录入口（缺省 `/auth/oidc/authorize`，钉钉免登一跳无感）；API 401
 
 ### Hono 集成
 
 - sessionMiddleware：cookie 优先、Bearer 兼容；access 过期且 refresh 有效 → 透明 rotate
-- requireAuth：无身份 → /api 或 Accept:json 401 JSON；页面 302 到 `loginPath`（缺省 `/auth/oauth2/authorize`，旧 `/auth/login` 已废弃见 ADR-022）。⚠ SDK 不渲染登录页，纯密码认证或自带登录 UI 的 App 必须显式传 `loginPath` 指向自己的登录页，否则页面请求会 302 到不存在的路径（被 SPA fallback 判 404 JSON）
-- createAuthRoutes：GET /auth/oauth2/authorize、GET /auth/oauth2/callback、POST /auth/refresh、POST /auth/logout（路径可配）；密码路由见 module-password.md，WebAuthn 路由见 module-webauthn.md
+- requireAuth：无身份 → /api 或 Accept:json 401 JSON；页面 302 到 `loginPath`（缺省 `/auth/oidc/authorize`）。⚠ SDK 不渲染登录页，纯密码认证或自带登录 UI 的 App 必须显式传 `loginPath` 指向自己的登录页，否则页面请求会 302 到不存在的路径（被 SPA fallback 判 404 JSON）
+- createAuthRoutes：GET /auth/oidc/authorize、GET /auth/oidc/callback、POST /auth/refresh、POST /auth/logout（路径可配）；密码路由见 module-password.md，WebAuthn 路由见 module-webauthn.md
 - cookie：HttpOnly + SameSite=Lax；反代后（TRUST_PROXY=1）下 Secure
 
 ## 存储

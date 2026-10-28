@@ -2,14 +2,14 @@
  * Identity Resolver —— 将 IdP 身份映射到本地用户。
  *
  * 流程（在 OIDC callback 路由中调用）：
- *   1. 查 oauth2_identity_links：(provider, providerSub) → 有 link → 找 user
+ *   1. 查 oidc_identity_links：(provider, providerSub) → 有 link → 找 user
  *   2. 无 link + JIT 开启 → 创建 user + 创建 link
  *   3. 无 link + JIT 关闭 → 抛错（拒绝未知身份）
  *
  * SDK 提供 createDefaultIdentityResolver 默认实现。
  * App 可自行实现 IdentityResolver 接口覆盖策略（如拒绝注册、合并账户）。
  */
-import type { DirectoryEntry, DirectoryStore, IdentityLink, LocalUser, OAuth2LinkStore, UserStore } from './types.js'
+import type { DirectoryEntry, DirectoryStore, IdentityLink, LocalUser, OidcLinkStore, UserStore } from './types.js'
 
 export interface IdentityResolverOptions {
   /** 首次 OIDC 登录时自动建户（默认 true） */
@@ -48,7 +48,7 @@ export interface IdentityResolver {
  */
 export function createDefaultIdentityResolver(
   userStore: UserStore,
-  linkStore: OAuth2LinkStore,
+  linkStore: OidcLinkStore,
   opts: IdentityResolverOptions = {},
 ): IdentityResolver {
   const jit = opts.jit ?? true
@@ -167,7 +167,7 @@ export type ProvisionOutcome =
 
 export interface DirectoryProvisioningResolverOptions {
   userStore: UserStore
-  linkStore: OAuth2LinkStore
+  linkStore: OidcLinkStore
   directory: DirectoryStore
   /**
    * App 策略回调：目录命中后由 App 决定准入结果。

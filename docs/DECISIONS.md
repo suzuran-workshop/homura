@@ -291,7 +291,7 @@
 - 决策：
   1. 引入 `users` 表作为本地身份锚点，所有凭证通过 `user_id` 关联
   2. `session.sub` 从 IdP subject 改为 local user ID（**Breaking**：现有 refresh token 全部失效）
-  3. 三类凭证各自一张表：`passwords`（PK = user_id，1:1）、`oauth2_identity_links`
+  3. 三类凭证各自一张表：`passwords`（PK = user_id，1:1）、`oidc_identity_links`
      （UNIQUE provider+provider_sub，1:N）、`webauthn_credentials`（PK = credentialId，1:N）
   4. `createDefaultIdentityResolver(userStore, linkStore, { jit })` 在 OAuth2 callback 时
      桥接 IdP sub → local user；JIT 默认开启（首次登录自动建户），可配置关闭（403 拒绝未知身份）
@@ -305,7 +305,7 @@
   - SDK 不渲染页面守住了"渐进式耦合"边界——App 自行决定登录 UI
 - 后果：
   - Breaking change：session sub 语义变更 + OAuth2 路径迁移，所有已部署 App 需更新 redirect_uri
-  - 4 张新表（users/passwords/oauth2_identity_links/webauthn_credentials）需加入部署期受控迁移
+  - 4 张新表（users/passwords/oidc_identity_links/webauthn_credentials）需加入部署期受控迁移
   - `createAuthRoutes` 签名变更（`client` → `oauth2: { client, identityResolver, provider }`）
 
 ## ADR-023：密码哈希选型——Node 内置 scrypt，零依赖
@@ -412,7 +412,7 @@
 - **状态**：已采纳（本次提交执行完毕）
 - **背景**：ADR-7（@guga-onduty）定调钉钉身份三层——IdP 封协议 / homura 承机制 / App 留策略。
   通讯录白名单 JIT 建户在 guga-onduty 与 guga-onduty-w 已各复制一份「contacts 表 + 同步 + 准入判定」，
-  且补充决议已明确：contacts 实为「外部身份目录」——oauth2_identity_links 的伴生表，归属 auth
+  且补充决议已明确：contacts 实为「外部身份目录」——oidc_identity_links 的伴生表，归属 auth
   （泛型化 provider+sub+name），3p 保持无状态（依赖方向 auth ⇏ 3p、3p ⇏ auth）。
   ADR-025 砍掉 rest/qw-pages 后框架形态收敛，下沉时机成熟。
 - **决策**：
@@ -451,8 +451,9 @@
   - `3p`：`dingtalkOAuth` → `dingtalkOidc`（预设新增 issuer；默认域名修正如
     dingtalk.auth.ahkdxx.cn）；`OAuthPreset` → `OidcPreset`。
   - 模板：app.ts/env.ts/client 同步（回调地址 /auth/oidc/callback）。
-  - identity link 表名 `oauth2_identity_links` **不改**：链接的语义仍是「OAuth2/OIDC 系列
-    协议的身份关联」，改名只会打破既有库表无收益。
+  - identity link 全链统一 oidc：表名 `oidc_identity_links` → `oidc_identity_links`（含索引、
+    schema 键、store/类型 `OAuth2LinkStore` → `OidcLinkStore`）。自用无存量库，直接改历史迁移；
+    半吊子的 oauth2 残留（表叫 oidc、类型叫 OAuth2）比彻底切换更伤一致性。
 - **理由**：登录场景的本质是认证，OIDC 的 id_token（签名 + 受众 + 过期 + issuer）把信任锚
   从「上游返回什么」升级为「签名说了算」；userinfo.sub 交叉核对堵住 token 替换类攻击。
   IdP 与客户端同仓库群同步升级，一次性切换零过渡成本。
