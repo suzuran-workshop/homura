@@ -1,9 +1,9 @@
 /**
  * 本地身份模型核心类型。
  *
- * - `users` 表是身份锚点：三类凭证（TextPassword / WebAuthn / OAuth2 identity link）
+ * - `users` 表是身份锚点：三类凭证（TextPassword / WebAuthn / IdP identity link）
  *   都指向它，session 的 sub 也是 local user.id（不再是 IdP subject）。
- * - OAuth2-only 用户的 username 可为 null（没有密码登录能力）。
+ * - 纯 OIDC 登录用户的 username 可为 null（没有密码登录能力）。
  */
 
 /** 本地用户（users 表行） */
@@ -69,7 +69,7 @@ export interface UserStore {
 }
 
 /**
- * OAuth2 身份关联仓储。
+ * IdP 身份关联仓储（oauth2_identity_links 表）。
  * 用于 identity resolver 在 callback 时查 link → 找 user，或 JIT 建户时创建 link。
  */
 export interface OAuth2LinkStore {

@@ -1,6 +1,6 @@
 /**
  * API 封装：fetch + 401 → 登录入口跳转（与后端 requireAuth 302 策略闭环）。
- * 缺省登录入口 = OAuth2 授权页 `/auth/oauth2/authorize`（旧 `/auth/login` 已废弃，ADR-022）。
+ * 缺省登录入口 = OIDC 授权页 `/auth/oidc/authorize`。
  */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -8,7 +8,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   })
   if (res.status === 401) {
-    window.location.href = `/auth/oauth2/authorize?returnTo=${encodeURIComponent(location.pathname)}`
+    window.location.href = `/auth/oidc/authorize?returnTo=${encodeURIComponent(location.pathname)}`
     throw new Error('unauthorized')
   }
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`)

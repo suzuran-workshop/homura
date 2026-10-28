@@ -67,43 +67,43 @@ export const configSpecs = {
     description: 'sqlite 文件路径（:memory: 支持）',
   },
 
-  // ── auth: oauth2-dingtalk ──
+  // ── auth: oidc-dingtalk ──
   oauthOrgId: {
     env: 'OAUTH_DINGTALK_ORG_ID',
     parse: parses.string,
-    description: 'oauth2-dingtalk 组织标识（配置即启用登录）',
+    description: 'oidc-dingtalk 组织标识（配置即启用登录）',
   },
   oauthBaseUrl: {
     env: 'OAUTH_DINGTALK_BASE_URL',
     parse: parses.string,
-    description: 'oauth2-dingtalk 部署地址（默认线上）',
+    description: 'oidc-dingtalk 部署地址（默认线上）',
   },
   oauthClientId: {
     env: 'OAUTH_CLIENT_ID',
     parse: parses.string,
-    description: 'OAuth2 client id（= 钉钉 AppKey）',
+    description: 'OIDC client id（= 钉钉 AppKey）',
   },
   oauthClientSecret: {
     env: 'OAUTH_CLIENT_SECRET',
     parse: parses.string,
     secret: true,
-    description: 'OAuth2 client secret',
+    description: 'OIDC client secret（兼作 id_token HS256 验签密钥）',
   },
   oauthRedirectUri: {
     env: 'OAUTH_REDIRECT_URI',
     parse: parses.string,
-    description: '回调地址（如 https://app.example/auth/oauth2/callback）',
+    description: '回调地址（如 https://app.example/auth/oidc/callback）',
   },
-  authOauth2Jit: {
+  authOidcJit: {
     env: 'AUTH_OAUTH2_JIT',
     default: true,
     parse: parses.boolean,
-    description: 'OAuth2 首次登录是否自动建户（JIT provisioning）；false 则要求预先注册并关联',
+    description: 'OIDC 首次登录是否自动建户（JIT provisioning）；false 则要求预先注册并关联',
   },
   authPasswordEnabled: {
     env: 'AUTH_PASSWORD_ENABLED',
-    // 缺省 false：渐进式能力包「配了啥才启用啥」——密码认证与 OAuth2（靠 oauthOrgId）/
-    // WebAuthn（靠 AUTH_WEBAUTHN_ENABLED）一样是 opt-in。此前缺省 true 会让「只配了 OAuth2」
+    // 缺省 false：渐进式能力包「配了啥才启用啥」——密码认证与 OIDC（靠 OAUTH_ORG_ID）/
+    // WebAuthn（靠 AUTH_WEBAUTHN_ENABLED）一样是 opt-in。此前缺省 true 会让「只配了 OIDC」
     // 的部署连带开放密码自助注册，违反能力独立开关的契约。
     default: false,
     parse: parses.boolean,
@@ -270,7 +270,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
  * access/refresh token 冒充任意用户（含绕过 license 停服后的用户态）。
  * 很容易顺手拿缺省值上线，故在启动期直接拒绝。
  *
- * ⚠ 只在**真的会签 session** 时拦：OAuth2 / TextPassword / WebAuthn 任一启用都会签 JWT，
+ * ⚠ 只在**真的会签 session** 时拦：OIDC / TextPassword / WebAuthn 任一启用都会签 JWT，
  *   三者全关的纯匿名 App 根本不用这个密钥，无条件拦会误伤——冷启动验收发现过这个 bug
  *   （Pages 上纯匿名 App 也无法启动）。
  *   历史教训：本检查曾只看 oauthOrgId，导致「纯密码认证 + 公开缺省密钥」的生产部署
@@ -292,7 +292,7 @@ export function assertSecretsOverridden(
   if (!signsSession) return
   if (config.get('sessionSecret') === INSECURE_SESSION_SECRET) {
     throw new Error(
-      'SESSION_SECRET 仍是仓库里公开的缺省值，而本 App 启用了登录（OAuth2 / 密码 / WebAuthn 至少其一）：' +
+      'SESSION_SECRET 仍是仓库里公开的缺省值，而本 App 启用了登录（OIDC / 密码 / WebAuthn 至少其一）：' +
         '生产拒绝启动（HS256 密钥公开等于任何人可伪造会话）。' +
         '请通过 homura.config.env（随部署产物携带）或真实环境变量提供 >=32B 随机值。',
     )

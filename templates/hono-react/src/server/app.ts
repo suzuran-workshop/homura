@@ -77,7 +77,7 @@ export async function buildApp(
   }
   const todoRepo: TodoRepo = buildTodoRepo(dbBundle.db, dbBundle.dialect)
 
-  // ── 层级 2：auth（OAuth2 / Password / WebAuthn 任一启用即挂载）──
+  // ── 层级 2：auth（OIDC / Password / WebAuthn 任一启用即挂载）──
   const oauthOrgId = config.get('oauthOrgId')
   const authPasswordEnabled = config.get('authPasswordEnabled')
   const authWebauthnEnabled = config.get('authWebauthnEnabled')
@@ -205,7 +205,7 @@ async function buildAuth(
   logger?: Logger,
 ) {
   const {
-    OAuth2Client,
+    OidcClient,
     SessionManager,
     createDrizzleSessionStore,
     createDrizzleUserStore,
@@ -224,7 +224,7 @@ async function buildAuth(
     createDrizzleSessionStore(db),
   )
 
-  // 多凭证身份：user store + oauth2 link store + password store（共享）
+  // 多凭证身份：user store + identity link store + password store（共享）
   const userStore = createDrizzleUserStore(db)
   const linkStore = createDrizzleOAuth2LinkStore(db)
 
@@ -234,14 +234,14 @@ async function buildAuth(
     ? new PasswordProvider({ userStore, passwordStore: createDrizzlePasswordStore(db) })
     : undefined
 
-  // OAuth2 client（如果配置了钉钉）
+  // OIDC client（如果配置了钉钉 IdP）
   const oauthOrgId = config.get('oauthOrgId')
-  let client: InstanceType<typeof OAuth2Client> | undefined
+  let client: InstanceType<typeof OidcClient> | undefined
   let identityResolver: ReturnType<typeof createDefaultIdentityResolver> | undefined
   if (oauthOrgId) {
-    const { dingtalkOAuth } = await import('@homurajs/3p/dingtalk')
-    const preset = dingtalkOAuth({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
-    client = new OAuth2Client({
+    const { dingtalkOidc } = await import('@homurajs/3p/dingtalk')
+    const preset = dingtalkOidc({ orgId: oauthOrgId, baseUrl: config.get('oauthBaseUrl') })
+    client = new OidcClient({
       clientId: config.get('oauthClientId') ?? '',
       clientSecret: config.get('oauthClientSecret') ?? '',
       redirectUri: config.get('oauthRedirectUri') ?? '',
@@ -250,14 +250,14 @@ async function buildAuth(
       fetchImpl,
       ...preset,
     })
-    // Identity resolver：JIT 默认开启，OAuth2 首次登录自动建户
+    // Identity resolver：JIT 默认开启，OIDC 首次登录自动建户
     identityResolver = createDefaultIdentityResolver(userStore, linkStore, {
-      jit: config.get('authOauth2Jit'),
+      jit: config.get('authOidcJit'),
     })
   }
 
   // WebAuthn provider（如果启用且配齐 rpId/origin）。
-  // ⚠ challenge 复用 stateKv（与 OAuth2 state 同机制）；
+  // ⚠ challenge 复用 stateKv（与 OIDC state 同机制）；
   //   @simplewebauthn/server 是 optional peer，provider 内部动态 import，未装也不影响挂载，
   //   只有真正调用 WebAuthn 端点时才需要该依赖。客户端 passkey UI 由 App 自绘（SDK 只给 JSON 路由）。
   const webauthnEnabled = config.get('authWebauthnEnabled')
@@ -289,11 +289,11 @@ async function buildAuth(
     }
   }
 
-  // 组合 auth 路由：createAuthRoutes 装 OAuth2 + Password + refresh/logout，
+  // 组合 auth 路由：createAuthRoutes 装 OIDC + Password + refresh/logout，
   // WebAuthn 路由是独立子路径，route() 进同一个 authRoutes（AuthInject 契约不变）。
   const authRoutes = createAuthRoutes({
     sessions,
-    oauth2: client && identityResolver ? { client, identityResolver, provider: 'dingtalk' } : undefined,
+    oidc: client && identityResolver ? { client, identityResolver, provider: 'dingtalk' } : undefined,
     password,
     // 自助注册开关（此前定义了却没传，恒取缺省 true → "仅管理员建户"模式不可达）
     allowRegister: config.get('authPasswordAllowSelfRegister'),

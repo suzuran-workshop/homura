@@ -1,36 +1,34 @@
 /**
- * 主路由组合器 —— 按配置的能力（OAuth2 / Password）组装路由。
+ * 主路由组合器 —— 按配置的能力（OIDC / Password）组装路由。
  *
  * createAuthRoutes(opts) 根据 opts 提供的 capability 自动组合：
- * - opts.oauth2（OAuth2Client + IdentityResolver + provider）→ /auth/oauth2/*
+ * - opts.oidc（OidcClient + IdentityResolver + provider）→ /auth/oidc/*
  * - opts.password（PasswordProvider）→ /auth/password/*
  * - 无条件挂载：/auth/refresh、/auth/logout
  *
  * WebAuthn 路由**不在**此组合器内——消费者从 @homurajs/auth/webauthn 取
  * createWebAuthnRoutes 自行挂载。
- *
- * ⚠ Breaking：旧 /auth/login + /auth/callback 路径已迁移到 /auth/oauth2/*。
  */
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
-import type { OAuth2Client } from '../oauth2/client.js'
+import type { OidcClient } from '../oidc/client.js'
 import type { SessionManager } from '../session/manager.js'
 import type { IdentityResolver } from '../identity/resolver.js'
 import type { PasswordProvider } from '../password/provider.js'
-import { createOAuth2Routes } from './oauth2-routes.js'
+import { createOidcRoutes } from './oidc-routes.js'
 import { createPasswordRoutes } from './password-routes.js'
 
-export interface OAuth2Inject {
-  client: OAuth2Client
+export interface OidcInject {
+  client: OidcClient
   identityResolver: IdentityResolver
-  /** OAuth2 provider 标识（如 'dingtalk'） */
+  /** OIDC provider 标识（如 'dingtalk'） */
   provider: string
 }
 
 export interface AuthRoutesOptions {
   sessions: SessionManager
-  /** OAuth2 能力（不传则不挂载 OAuth2 路由） */
-  oauth2?: OAuth2Inject
+  /** OIDC 能力（不传则不挂载 OIDC 路由） */
+  oidc?: OidcInject
   /** Password 能力（不传则不挂载 Password 路由） */
   password?: PasswordProvider
   /** 是否允许自助注册（默认 true） */
@@ -42,7 +40,7 @@ export interface AuthRoutesOptions {
 }
 
 /**
- * 组合 auth 路由：OAuth2 + Password（按配置）+ refresh + logout。
+ * 组合 auth 路由：OIDC + Password（按配置）+ refresh + logout。
  */
 export function createAuthRoutes(opts: AuthRoutesOptions): Hono {
   const { sessions } = opts
@@ -51,17 +49,17 @@ export function createAuthRoutes(opts: AuthRoutesOptions): Hono {
 
   const app = new Hono()
 
-  // OAuth2 路由（可选）
-  if (opts.oauth2) {
-    const oauth2App = createOAuth2Routes({
-      client: opts.oauth2.client,
+  // OIDC 路由（可选）
+  if (opts.oidc) {
+    const oidcApp = createOidcRoutes({
+      client: opts.oidc.client,
       sessions,
-      identityResolver: opts.oauth2.identityResolver,
-      provider: opts.oauth2.provider,
+      identityResolver: opts.oidc.identityResolver,
+      provider: opts.oidc.provider,
       secure,
       defaultReturnTo: opts.defaultReturnTo,
     })
-    app.route('/', oauth2App)
+    app.route('/', oidcApp)
   }
 
   // Password 路由（可选）

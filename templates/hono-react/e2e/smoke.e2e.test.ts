@@ -6,6 +6,7 @@
  * → 上传（local tmpdir）→ license suspended 503 → refresh rotate。
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { SignJWT } from 'jose'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -37,8 +38,17 @@ function stubIdpFetch() {
   return vi.fn(async (url: string | URL | Request) => {
     const u = String(url)
     if (u.includes('/token')) {
+      const now = Math.floor(Date.now() / 1000)
+      const idToken = await new SignJWT({ name: '张三' })
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setIssuer('https://idp.test/test_org')
+        .setSubject('user-1')
+        .setAudience('cid')
+        .setIssuedAt(now)
+        .setExpirationTime(now + 3600)
+        .sign(new TextEncoder().encode('csec'))
       return new Response(
-        JSON.stringify({ access_token: 'at-1', token_type: 'bearer', expires_in: 3600 }),
+        JSON.stringify({ access_token: 'at-1', token_type: 'bearer', expires_in: 3600, id_token: idToken }),
         { status: 200 },
       )
     }
@@ -84,8 +94,9 @@ describe('模板 e2e — 渐进式全链路', () => {
     const config = loadConfig({
       DIALECT: 'sqlite',
       SESSION_SECRET: 'e2e-secret-key-that-is-long-enough-32b',
-      // 启用 auth（oauth2-dingtalk 预设）
+      // 启用 auth（oidc-dingtalk 预设）
       OAUTH_DINGTALK_ORG_ID: 'test_org',
+      OAUTH_DINGTALK_BASE_URL: 'https://idp.test',
       OAUTH_CLIENT_ID: 'cid',
       OAUTH_CLIENT_SECRET: 'csec',
       OAUTH_REDIRECT_URI: 'https://app.test/auth/callback',
@@ -158,14 +169,14 @@ describe('模板 e2e — 渐进式全链路', () => {
   it('OAuth 登录全链路：authorize→callback→session→/api/me', async () => {
     const jar = new CookieJar()
     // authorize → 302 到 IdP authorize（带 state）
-    const login = await built.app.request('/auth/oauth2/authorize?returnTo=%2Fdashboard')
+    const login = await built.app.request('/auth/oidc/authorize?returnTo=%2Fdashboard')
     expect(login.status).toBe(302)
     const loc = new URL(login.headers.get('location')!)
     expect(loc.pathname).toBe('/test_org/authorize')
     const state = loc.searchParams.get('state')!
 
     // callback → 建 session + 双 cookie + 302 returnTo
-    const cb = await built.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
+    const cb = await built.app.request(`/auth/oidc/callback?code=abc&state=${state}`)
     expect(cb.status).toBe(302)
     expect(cb.headers.get('location')).toBe('/dashboard')
     jar.absorb(cb)
@@ -197,9 +208,9 @@ describe('模板 e2e — 渐进式全链路', () => {
 
   it('refresh rotate：POST /auth/refresh 换新 cookie', async () => {
     const jar = new CookieJar()
-    const login = await built.app.request('/auth/oauth2/authorize')
+    const login = await built.app.request('/auth/oidc/authorize')
     const state = new URL(login.headers.get('location')!).searchParams.get('state')!
-    const cb = await built.app.request(`/auth/oauth2/callback?code=abc&state=${state}`)
+    const cb = await built.app.request(`/auth/oidc/callback?code=abc&state=${state}`)
     jar.absorb(cb)
     const oldRt = jar.get('homura_rt')!
 

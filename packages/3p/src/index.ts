@@ -5,7 +5,7 @@
  * supports() 类型守卫做运行时协商。App 代码：
  *   if (supports(p, 'approval')) { await p.createApprovalInstance(...) }
  *
- * OAuth 预设采用结构化契约（与 @homurajs/auth 的 OAuth2ClientConfig 鸭子类型互操作），
+ * OAuth 预设采用结构化契约（与 @homurajs/auth 的 OidcClientConfig 鸭子类型互操作），
  * 3p 与 auth 之间零 import 依赖，避免包依赖环。
  *
  * ── 2026-10-23 契约扩展（向后兼容加法，据真实钉钉 API 实测）──
@@ -23,8 +23,10 @@
 
 export type Capability = 'oauth' | 'message' | 'approval' | 'contacts' | 'apps' | 'webhook'
 
-/** 结构化 OAuth 预设（喂给 @homurajs/auth 的 OAuth2Client.config） */
-export interface OAuthPreset {
+/** 结构化 OIDC 预设（喂给 @homurajs/auth 的 OidcClient.config） */
+export interface OidcPreset {
+  /** IdP issuer（id_token 的 iss 校验值） */
+  issuer: string
   endpoints: {
     authorizeUrl: string
     tokenUrl: string
@@ -216,9 +218,9 @@ export interface MicroApp {
   desc?: string
 }
 
-/** OAuth 身份预设能力 */
+/** OIDC 身份预设能力 */
 export interface OAuthCap {
-  oauth(): OAuthPreset
+  oauth(): OidcPreset
 }
 
 export interface PlatformCaps

@@ -1,7 +1,7 @@
 /**
- * OAuth2 Identity Resolver —— 将 IdP 身份映射到本地用户。
+ * Identity Resolver —— 将 IdP 身份映射到本地用户。
  *
- * 流程（在 OAuth2 callback 路由中调用）：
+ * 流程（在 OIDC callback 路由中调用）：
  *   1. 查 oauth2_identity_links：(provider, providerSub) → 有 link → 找 user
  *   2. 无 link + JIT 开启 → 创建 user + 创建 link
  *   3. 无 link + JIT 关闭 → 抛错（拒绝未知身份）
@@ -12,7 +12,7 @@
 import type { DirectoryEntry, DirectoryStore, IdentityLink, LocalUser, OAuth2LinkStore, UserStore } from './types.js'
 
 export interface IdentityResolverOptions {
-  /** 首次 OAuth2 登录时自动建户（默认 true） */
+  /** 首次 OIDC 登录时自动建户（默认 true） */
   jit?: boolean
 }
 
@@ -114,7 +114,7 @@ export class IdentityNotLinkedError extends Error {
     public readonly provider: string,
     public readonly providerSub: string,
   ) {
-    super(`OAuth2 身份未关联: provider=${provider}, sub=${providerSub}（JIT 已关闭）`)
+    super(`IdP 身份未关联: provider=${provider}, sub=${providerSub}（JIT 已关闭）`)
     this.name = 'IdentityNotLinkedError'
   }
 }

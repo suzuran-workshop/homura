@@ -1,9 +1,9 @@
 // ── 核心类型 ─────────────────────────────────────────
-export type { AuthUser, OAuth2Endpoints, TokenResponse } from './types.js'
+export type { AuthUser, OidcEndpoints, OidcTokenResponse } from './types.js'
 
-// ── OAuth2 ───────────────────────────────────────────
-export { OAuth2Client } from './oauth2/client.js'
-export type { OAuth2ClientConfig } from './oauth2/client.js'
+// ── OIDC ─────────────────────────────────────────────
+export { OidcClient, OidcError } from './oidc/client.js'
+export type { OidcClientConfig, OidcClaims } from './oidc/client.js'
 
 // ── Session ──────────────────────────────────────────
 export { SessionManager } from './session/manager.js'
@@ -13,7 +13,7 @@ export { createDrizzleSessionStore } from './session/store.js'
 export type { DrizzleDb } from './session/store.js'
 export type { RefreshTokenRecord, ConsumedToken } from './session/record.js'
 
-// ── Identity（本地用户 + OAuth2 关联）────────────────
+// ── Identity（本地用户 + IdP 关联）────────────────
 export type {
   LocalUser,
   IdentityLink,
@@ -26,7 +26,7 @@ export { createDrizzleUserStore } from './identity/user-store.js'
 export { createDrizzleOAuth2LinkStore } from './identity/oauth2-link-store.js'
 export { createDrizzleDirectoryStore } from './identity/directory-store.js'
 
-// ── Identity Resolver（OAuth2 → local user 桥接）────
+// ── Identity Resolver（IdP sub → local user 桥接）────
 export {
   createDefaultIdentityResolver,
   createDirectoryProvisioningResolver,

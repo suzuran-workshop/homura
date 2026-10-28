@@ -1,6 +1,6 @@
 # @homurajs/auth
 
-多凭证身份认证：OAuth2 客户端 + TextPassword（scrypt）+ WebAuthn（可选）+ 自管 session（HS256 短 JWT + opaque refresh rotate + 族吊销）。
+多凭证身份认证：OIDC 客户端（id_token 验签 + sub 交叉核对）+ TextPassword（scrypt）+ WebAuthn（可选）+ 自管 session（HS256 短 JWT + opaque refresh rotate + 族吊销）。
 
 ## 架构
 
@@ -10,7 +10,7 @@
 - `oauth2_identity_links`：1:N users，UNIQUE(provider, provider_sub)
 - `webauthn_credentials`：1:N users，PK = credentialId base64url
 
-**session.sub = local user ID**（Breaking：不再是 IdP subject）。Identity Resolver 在 OAuth2 callback 时桥接 IdP sub → local user，JIT 默认开启（首次登录自动建户），可配 false 拒绝未知身份。
+**session.sub = local user ID**（Breaking：不再是 IdP subject）。Identity Resolver 在 OIDC callback 时桥接 IdP sub → local user，JIT 默认开启（首次登录自动建户），可配 false 拒绝未知身份。
 
 **目录白名单 JIT（ADR-026）**：`identity_directory` 是泛型的外部身份目录（provider+sub+name，App 把上游来源如钉钉通讯录快照进来）。`createDirectoryProvisioningResolver` 提供准入骨架——查 link → 查目录（白名单）→ 调 App 的 `provision(sub, entry)` 回调拿建户决策 → 建 link；目录外身份一律 `ProvisionBlockedError` 拒绝。**建户策略（默认角色、校区、允许性）留在 App 回调，永不下沉。**
 
@@ -31,12 +31,12 @@
 
 ## 使用示例
 
-### OAuth2 + Identity Resolver
+### OIDC + Identity Resolver
 
 ```ts
-import { dingtalkOAuth } from '@homurajs/3p/dingtalk'
+import { dingtalkOidc } from '@homurajs/3p/dingtalk'
 import {
-  OAuth2Client,
+  OidcClient,
   SessionManager,
   createDrizzleSessionStore,
   createDrizzleUserStore,
@@ -46,11 +46,11 @@ import {
 } from '@homurajs/auth'
 import { createAuthRoutes, sessionMiddleware } from '@homurajs/auth/hono'
 
-const preset = dingtalkOAuth({ orgId: 'my_org' })
-const client = new OAuth2Client({
+const preset = dingtalkOidc({ orgId: 'my_org' }) // 含 issuer + 三端点
+const client = new OidcClient({
   clientId: '...',
-  clientSecret: '...',
-  redirectUri: 'https://app.example/auth/oauth2/callback',
+  clientSecret: '...', // 兼作 id_token HS256 验签密钥
+  redirectUri: 'https://app.example/auth/oidc/callback',
   stateKv: createMemoryTtlKv(),
   ...preset,
 })
@@ -64,9 +64,11 @@ const sessions = new SessionManager({ secret: SESSION_SECRET }, createDrizzleSes
 app.use('*', sessionMiddleware(sessions, { secure }))
 app.route('/', createAuthRoutes({
   sessions,
-  oauth2: { client, identityResolver, provider: 'dingtalk' },
+  oidc: { client, identityResolver, provider: 'dingtalk' },
 }))
 ```
+
+客户端在 callback 内强制：token 响应的 `id_token`（HS256）验签（iss/aud/exp）→ userinfo 的 sub 与 id_token 的 sub 交叉核对 → 才交给 resolver。协议失败统一 `OidcError`（code 封闭枚举），hono 路由映射 401 `{ error: 'oidc_failed', code }`。
 
 ### 目录白名单 JIT（Directory Provisioning）
 
@@ -141,7 +143,7 @@ app.route('/', createWebAuthnRoutes({ webauthn, sessions }))
 
 ## 子路径导出
 
-- `@homurajs/auth`：核心（OAuth2Client, SessionManager, PasswordProvider, IdentityResolver, 各 store 工厂）
+- `@homurajs/auth`：核心（OidcClient, SessionManager, PasswordProvider, IdentityResolver, 各 store 工厂）
 - `@homurajs/auth/hono`：Hono 路由（createAuthRoutes, createPasswordRoutes, sessionMiddleware, requireAuth）
 - `@homurajs/auth/tables`：表定义（pgAuthTables, sqliteAuthTables，含 6 张表）
 - `@homurajs/auth/webauthn`：WebAuthn（WebAuthProvider, createWebAuthnRoutes, credential store 工厂）
@@ -150,9 +152,15 @@ app.route('/', createWebAuthnRoutes({ webauthn, sessions }))
 
 **`secure` 必须按部署传**：平台网关后对外是 https 时 `secure` 应为 `true`，否则 cookie 不带 `Secure`。
 
+**Breaking（2026-10-28，OIDC 化）**：
+- `OAuth2Client` → `OidcClient`：token 响应必须含 `id_token`（HS256，密钥=clientSecret），强制验签（iss/aud/exp）+ userinfo.sub 交叉核对；配置新增 `issuer`
+- 路径从 `/auth/oauth2/*` 迁移到 `/auth/oidc/*`；`requireAuth` 缺省 loginPath 同步
+- `createAuthRoutes` 签名变更：`oauth2: {...}` → `oidc: { client, identityResolver, provider }`
+- 协议失败统一 `OidcError`（原裸 Error）
+
 **Breaking（2026-10-14）**：
 - session.sub 从 IdP subject 改为 local user ID（现有 refresh token 全部失效，重登即恢复）
-- OAuth2 路径从 `/auth/login` + `/auth/callback` 迁移到 `/auth/oauth2/authorize` + `/auth/oauth2/callback`
+- OAuth2 路径从 `/auth/login` + `/auth/callback` 迁移到 `/auth/oauth2/*`
 - `createAuthRoutes` 签名变更：`client` → `oauth2: { client, identityResolver, provider }`
 
-`consume` 的原子抢占语义已在真实数据库上验证。详见 `docs/specs/module-oauth2`、`module-session`、`module-password`、`module-webauthn`、ADR-022、ADR-023、ADR-026。使用示范见模板 `src/server/app.ts`（buildAuth）。
+`consume` 的原子抢占语义已在真实数据库上验证。详见 `docs/specs/module-oidc`、`module-session`、`module-password`、`module-webauthn`、ADR-022、ADR-023、ADR-026。使用示范见模板 `src/server/app.ts`（buildAuth）。

@@ -33,7 +33,7 @@ const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex
 
 /**
  * 自管 session：短 JWT（HS256）+ opaque refresh（rotate + familyId 复用检测整族吊销）。
- * 上游（oauth2-dingtalk）不支持 refresh token，生命周期完全自管。
+ * 上游（oidc-dingtalk）不签发 refresh token，生命周期完全自管。
  */
 export class SessionManager {
   private readonly key: Uint8Array
