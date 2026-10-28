@@ -406,3 +406,32 @@
   exports/entry 收敛后 check-package-exports 门禁同步生效。历史教训保留（exports 漏发、原子抢占语义等）。
 - **何时重新审视**：若再出现「只有 443 出网 + 无自定义 env」的托管形态，重新评估——但应先做平台侧
   能力补齐（env 注入、DDL、健康检查路径），而不是再让框架倒灌。
+
+## ADR-026：外部身份目录（identity_directory）与准入骨架下沉 auth
+- **日期**：2026-10-28
+- **状态**：已采纳（本次提交执行完毕）
+- **背景**：ADR-7（@guga-onduty）定调钉钉身份三层——IdP 封协议 / homura 承机制 / App 留策略。
+  通讯录白名单 JIT 建户在 guga-onduty 与 guga-onduty-w 已各复制一份「contacts 表 + 同步 + 准入判定」，
+  且补充决议已明确：contacts 实为「外部身份目录」——oauth2_identity_links 的伴生表，归属 auth
+  （泛型化 provider+sub+name），3p 保持无状态（依赖方向 auth ⇏ 3p、3p ⇏ auth）。
+  ADR-025 砍掉 rest/qw-pages 后框架形态收敛，下沉时机成熟。
+- **决策**：
+  - `identity_directory` 表（auth/tables 第六张，pg/sqlite 双方言，UNIQUE(provider, sub)）：
+    `provider`+`sub`+`name`+`raw`（上游扩展快照 JSON，homura 不解释）。App 把上游身份来源
+    （如钉钉通讯录）快照 upsert 进来；快照怎么拉、目录怎么过期是 App/接线层的策略。
+  - `DirectoryStore`（createDrizzleDirectoryStore）：upsert（last-write-wins 快照语义）、
+    findByProviderAndSub、listByProvider（对账）、remove。
+  - `createDirectoryProvisioningResolver`：准入骨架——查 link → 目录白名单判定 →
+    调 App `provision({ provider, sub, entry, profile })` 回调拿决策（`{ userId }` 或
+    `{ declined }`）→ 建 link。孤儿 link 清理、profile 回填、并发首登竞态处理与
+    createDefaultIdentityResolver 同源。**建户策略（默认角色/校区/允许性）留在 App 回调，永不下沉。**
+  - `ProvisionBlockedError`（reason 封闭枚举：not_in_directory / declined / unknown_user）；
+    hono callback 路由映射为 403 `{ error: 'provision_blocked', reason, ... }`，App 据此渲染友好错误页。
+- **理由**：两仓库复制同一套目录表 + 准入流程，坑修不了一次；表结构与准入流程是纯机制
+  （不含任何钉钉知识），符合「机制下沉、策略留 App」的刀口；auth/tables 按包分发双方言 schema
+  有先例，不是开创先例。
+- **后果**：新 App 接「目录白名单 JIT 登录」只需：spread 第六张表进 schema → 同步任务 upsert 目录 →
+  写一个 provision 回调 → 传给 createAuthRoutes。无目录时的兜底建户（default resolver 的 jit:true）
+  与目录准入是两条正交路径，App 按需选型。
+- **何时重新审视**：若出现目录条目量级大（>10⁵）需要分页同步/增量拉取、或多目录来源交叉准入时，
+  再评估 DirectoryStore 是否需要查询能力升级。

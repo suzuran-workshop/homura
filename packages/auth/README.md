@@ -12,6 +12,8 @@
 
 **session.sub = local user ID**（Breaking：不再是 IdP subject）。Identity Resolver 在 OAuth2 callback 时桥接 IdP sub → local user，JIT 默认开启（首次登录自动建户），可配 false 拒绝未知身份。
 
+**目录白名单 JIT（ADR-026）**：`identity_directory` 是泛型的外部身份目录（provider+sub+name，App 把上游来源如钉钉通讯录快照进来）。`createDirectoryProvisioningResolver` 提供准入骨架——查 link → 查目录（白名单）→ 调 App 的 `provision(sub, entry)` 回调拿建户决策 → 建 link；目录外身份一律 `ProvisionBlockedError` 拒绝。**建户策略（默认角色、校区、允许性）留在 App 回调，永不下沉。**
+
 **SDK 不渲染 HTML**：所有路由只返回 JSON + cookies，登录 UI 由 App 自行实现。
 
 ## 存储实现
@@ -21,15 +23,11 @@
 | 实现                                | 用于               | 说明                                                                                                            |
 | ----------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `createDrizzleSessionStore(db)`     | `sqlite` / `pg`    | 原生 SQL，`UPDATE...WHERE used_at IS NULL RETURNING` 做原子抢占                                                 |
-| `createRestSessionStore(rest)`      | `rest`（qw-pages） | PostgREST：`PATCH ?token_hash=eq&expires_at=gt&used_at=is.null` + `return=representation`，返回空数组即抢占失败 |
 | `createDrizzleUserStore(db)`        | `sqlite` / `pg`    | users 表 CRUD                                                                                                   |
-| `createRestUserStore(rest)`         | `rest`             | PostgREST                                                                                                       |
 | `createDrizzleOAuth2LinkStore(db)`  | `sqlite` / `pg`    | oauth2_identity_links 表 CRUD                                                                                   |
-| `createRestOAuth2LinkStore(rest)`   | `rest`             | PostgREST                                                                                                       |
 | `createDrizzlePasswordStore(db)`    | `sqlite` / `pg`    | passwords 表 CRUD                                                                                               |
-| `createRestPasswordStore(rest)`     | `rest`             | PostgREST                                                                                                       |
 | `createDrizzleWebauthnCredentialStore(db)` | `sqlite` / `pg` | webauthn_credentials 表 CRUD                                                                                |
-| `createRestWebauthnCredentialStore(rest)`  | `rest`          | PostgREST                                                                                                       |
+| `createDrizzleDirectoryStore(db)`   | `sqlite` / `pg`    | identity_directory 表 CRUD（upsert 快照语义）                                                                   |
 
 ## 使用示例
 
@@ -68,6 +66,34 @@ app.route('/', createAuthRoutes({
   sessions,
   oauth2: { client, identityResolver, provider: 'dingtalk' },
 }))
+```
+
+### 目录白名单 JIT（Directory Provisioning）
+
+```ts
+import {
+  createDrizzleDirectoryStore,
+  createDirectoryProvisioningResolver,
+  ProvisionBlockedError,
+} from '@homurajs/auth'
+
+const directory = createDrizzleDirectoryStore(db) // App 定期把钉钉通讯录 upsert 进来
+const identityResolver = createDirectoryProvisioningResolver({
+  userStore,
+  linkStore,
+  directory,
+  // 建户策略是 App 的信任边界：谁允许进来、默认角色/校区，都在这里决定
+  async provision({ sub, entry }) {
+    const existing = await appUsers.findByUsername(sub)
+    if (existing) return { userId: existing.id }
+    if (!entry.name) return { declined: '通讯录条目缺少姓名' }
+    const created = await appUsers.create({ username: sub, nickname: entry.name })
+    return { userId: created.id }
+  },
+})
+
+// hono callback 路由会把 ProvisionBlockedError 映射为 403 JSON：
+// { error: 'provision_blocked', reason: 'not_in_directory' | 'declined' | 'unknown_user', ... }
 ```
 
 ### TextPassword
@@ -117,18 +143,16 @@ app.route('/', createWebAuthnRoutes({ webauthn, sessions }))
 
 - `@homurajs/auth`：核心（OAuth2Client, SessionManager, PasswordProvider, IdentityResolver, 各 store 工厂）
 - `@homurajs/auth/hono`：Hono 路由（createAuthRoutes, createPasswordRoutes, sessionMiddleware, requireAuth）
-- `@homurajs/auth/tables`：表定义（pgAuthTables, sqliteAuthTables，含 5 张表）
+- `@homurajs/auth/tables`：表定义（pgAuthTables, sqliteAuthTables，含 6 张表）
 - `@homurajs/auth/webauthn`：WebAuthn（WebAuthProvider, createWebAuthnRoutes, credential store 工厂）
 
 ## 注意事项
 
-**`secure` 必须按形态传**：qw-pages 在平台网关后、对外是 https，`secure` 应为 `true`，否则 cookie 不带 `Secure`。模板里由 `adapter.trustProxy()` 接线。
-
-**qw-pages 前置条件**：所有 auth 表（users / passwords / oauth2_identity_links / webauthn_credentials / refresh_tokens）与 anon RLS policy 必须在部署期用平台受控迁移建好（App 无 DDL 权限）。缺 policy 时 PostgREST 是静默失败。
+**`secure` 必须按部署传**：平台网关后对外是 https 时 `secure` 应为 `true`，否则 cookie 不带 `Secure`。
 
 **Breaking（2026-10-14）**：
 - session.sub 从 IdP subject 改为 local user ID（现有 refresh token 全部失效，重登即恢复）
 - OAuth2 路径从 `/auth/login` + `/auth/callback` 迁移到 `/auth/oauth2/authorize` + `/auth/oauth2/callback`
 - `createAuthRoutes` 签名变更：`client` → `oauth2: { client, identityResolver, provider }`
 
-`consume` 的原子抢占语义已在真实 PostgREST 上验证。详见 `docs/specs/module-oauth2`、`module-session`、`module-password`、`module-webauthn`、ADR-022、ADR-023。使用示范见模板 `src/server/app.ts`（buildAuth）。
+`consume` 的原子抢占语义已在真实数据库上验证。详见 `docs/specs/module-oauth2`、`module-session`、`module-password`、`module-webauthn`、ADR-022、ADR-023、ADR-026。使用示范见模板 `src/server/app.ts`（buildAuth）。

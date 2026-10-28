@@ -35,23 +35,15 @@ src/server/schema/
 ```
 
 第三方包的表从子路径 spread 进两侧 schema 参与迁移：
-`@homurajs/auth/tables`（refresh_tokens）、`@homurajs/license/tables`（license_state）。
+`@homurajs/auth/tables`（六张：users / passwords / oauth2_identity_links / webauthn_credentials / refresh_tokens / identity_directory）、`@homurajs/license/tables`（license_state）。
 
-**第三份（REST）不手写，而是派生**：`schema/rest.ts` 只做一件事——
-手写第三份必然漂移（本文「列名规则」那条教训的同类坑）。派生让单一事实源留在 `pg.ts`。
-
-⚠ 派生结果里的列名可能是 camelCase：`pgCol` 配方不传 name 时用 JS 属性名做列名，
-故 `todos` 的真实列是 `ownerSub`/`createdAt`（而 `refresh_tokens`/`license_state` 走原生 SQL，
-
-## 迁移三轨
+## 迁移轨道
 
 - 生成：`drizzle-kit generate --config=drizzle.pg.config.ts`（PG 方言，自托管 supabase/pgsql 共用 → drizzle/pg/）与 `drizzle.sqlite.config.ts`（→ drizzle/sqlite/）
 - rc.4 产物格式：每迁移一个子目录 `<yyyyMMddHHmmss_name>/migration.sql`，语句以 `--> statement-breakpoint` 分隔（无 meta/_journal.json）
-- 运行（轨一/轨二）：`runMigrations(db, folder)` 按实例分发 migrator（幂等，drizzle 自动记录已应用）
-  - 需要建的表 = 模板缺省四张（`todos` 业务、`refresh_tokens` auth、`license_state` license、`homura_ttlkv` OAuth state 的 TTL-KV）**加上派生 App 新增的每张业务表**。哪些表真的必需由模板 `app.ts` 的 `requiredTables` 决定（业务表来自 `schema/rest.ts` 的 `restBusinessTables`，能力表按 `OAUTH_DINGTALK_ORG_ID` / `GENUINE_SERVER` 是否配置追加）——新增业务表登记进 `restBusinessTables` 即自动纳入探活与健康检查
-  - 每张表都要 `ENABLE ROW LEVEL SECURITY` + `FOR ALL TO anon USING (true) WITH CHECK (true)`，否则是静默失败（SELECT 返回 `200 []`、INSERT 返回 401+42501）
+- 运行：`runMigrations(db, folder)` 按方言分发 migrator（幂等，drizzle 自动记录已应用）
+  - 需要建的表 = 模板缺省表（`todos` 业务、auth 六张、`license_state`、`homura_ttlkv` OAuth state 的 TTL-KV）**加上 App 新增的每张业务表**
   - ⚠ 首次部署要按目录时间序应用 `drizzle/pg/` 下**全部**迁移，不是只应用最新那份（最新那份只含新增表，基础表在更早的目录里）
-  - `GRANT ... ON ALL SEQUENCES IN SCHEMA current_schema()` 是语法错误（该位置不接受函数调用）；模板缺省那四张表都没有 serial 序列，若有则要在 DO 块里 `EXECUTE format(...)` 逐条授权
 - supabase 侧执行通道（自托管）：drizzle-kit migrate 直连（Supavisor session 模式）或 supabase CLI
 
 ## 验收标准
