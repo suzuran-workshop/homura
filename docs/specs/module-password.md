@@ -3,7 +3,7 @@
 ## 要构建什么
 
 - 目标：基于用户名密码的本地认证，零外部依赖，作为 OAuth2 的补充/替代
-- 依赖：`node:crypto` 内置 `scrypt`（零原生依赖，qw-pages 兼容）
+- 依赖：`node:crypto` 内置 `scrypt`（零原生依赖）
 - 模板配置：`AUTH_PASSWORD_ENABLED`（**默认 false，opt-in**）+ `AUTH_PASSWORD_ALLOW_SELF_REGISTER`（默认 true）。
   与 OAuth2（靠 `OAUTH_DINGTALK_ORG_ID`）、WebAuthn（`AUTH_WEBAUTHN_ENABLED` 默认 false）一致——三类认证
   均「配了啥才启用啥」，各能力独立开关，不配则不挂载对应路由（SDK 层 `createAuthRoutes` 也是按传入的
@@ -45,7 +45,7 @@
 
 - `passwords` 表（PK = user_id，1:1 users）
 - 列名显式 snake_case：user_id / password_hash / created_at / updated_at
-- 双方言 Drizzle store（createDrizzlePasswordStore）+ PostgREST store（createRestPasswordStore）
+- 双方言 Drizzle store（createDrizzlePasswordStore）
 - 接口一致（findByUserId / create / updateHash / delete），Provider 不感知差异
 
 ## 哈希算法
@@ -73,4 +73,4 @@
 - [x] 删密码 → 密码登录不可用，OAuth2/WebAuthn 不受影响
 - [x] 注册时 password 写入失败 → 清理孤儿 user，username 不被占用
 - [ ] 1:1 约束：同 user_id 不能建第二条 password 记录（由 PK 保证，未单测）
-- [x] 双 store 接口一致（Drizzle SQL 双方言 + PostgREST）
+- [x] 双 store 接口一致（Drizzle SQL 双方言）

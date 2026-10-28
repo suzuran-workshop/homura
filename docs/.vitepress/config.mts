@@ -5,7 +5,7 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'homura',
   description:
-    'Hono+React 全栈 Node 应用的 template/SDK monorepo：渐进式能力包 × 起步模板，双形态部署（standalone / qw-pages）',
+    'Hono+React 全栈 Node 应用的 template/SDK monorepo：渐进式能力包 × 起步模板，standalone 部署',
   base: '/homura/',
   themeConfig: {
     nav: [
@@ -25,7 +25,6 @@ export default defineConfig({
             { text: 'session 自管', link: '/specs/module-session' },
             { text: '3p 平台能力分片', link: '/specs/module-3p' },
             { text: 'license 激活心跳', link: '/specs/module-license' },
-            { text: 'qw-pages 托管形态', link: '/specs/module-qw-pages' },
           ],
         },
       ],

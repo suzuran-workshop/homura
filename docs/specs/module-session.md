@@ -23,7 +23,7 @@
 
 - store.consume(tokenHash)：**原子抢占**（仅 used_at IS NULL 且未过期才标记已用）
   - SQL 版：`UPDATE...WHERE used_at IS NULL RETURNING`
-  - REST 版（qw-pages）：`PATCH ?token_hash=eq.X&expires_at=gt.ts&used_at=is.null` + `Prefer: return=representation`，**返回空数组即抢占失败**——PostgREST 会生成同一条带 WHERE 的 UPDATE...RETURNING，语义等价（已线上实测：三路并发抢占恰好一个赢家）
+  - drizzle 版原子抢占：单条 `UPDATE ... WHERE token_hash=? AND expires_at>? AND used_at IS NULL`，返回行数即胜负（已实测：三路并发抢占恰好一个赢家）
 - 抢占成功 → 签发新对（同 familyId 延续链条，profile 回填）
 - **复用检出**：抢占失败且行已 used → 返回 revoked:true → manager revokeFamily 整族吊销 + 返回 null（盗用信号）
   （不能用「UPDATE 后读 used_at 判复用」——RETURNING 返回的是更新后的值，恒等于本次 ts，会漏检）
@@ -38,13 +38,12 @@
 - sessionMiddleware：cookie 优先、Bearer 兼容；access 过期且 refresh 有效 → 透明 rotate
 - requireAuth：无身份 → /api 或 Accept:json 401 JSON；页面 302 到 `loginPath`（缺省 `/auth/oauth2/authorize`，旧 `/auth/login` 已废弃见 ADR-022）。⚠ SDK 不渲染登录页，纯密码认证或自带登录 UI 的 App 必须显式传 `loginPath` 指向自己的登录页，否则页面请求会 302 到不存在的路径（被 SPA fallback 判 404 JSON）
 - createAuthRoutes：GET /auth/oauth2/authorize、GET /auth/oauth2/callback、POST /auth/refresh、POST /auth/logout（路径可配）；密码路由见 module-password.md，WebAuthn 路由见 module-webauthn.md
-- cookie：HttpOnly + SameSite=Lax；qw-pages（trust proxy）下 Secure
+- cookie：HttpOnly + SameSite=Lax；反代后（TRUST_PROXY=1）下 Secure
 
 ## 存储
 
 - refresh_tokens 表（pgAuthTables/sqliteAuthTables 从 `@homurajs/auth/tables` spread 进 App schema 参与迁移）
 - createDrizzleSessionStore 双方言实现（原生 SQL，**列名 snake_case 须与 tables.ts 严格对齐**——见 module-schema 教训）；now 时钟可注入（对齐 manager 测试时钟）
-- createRestSessionStore（PostgREST 版，qw-pages 形态）：同一张表、同一套 snake_case 列名；**不建表**（App 无 DDL 权限，表与 anon policy 须部署期用受控迁移建，缺 policy 时是静默失败）；now 时钟同样可注入
 - 两版接口完全一致（create/consume/revokeFamily/revokeUser），SessionManager 与 hono 层不感知差异——模板 app.ts 按 `DbBundle.kind` 选实现
 
 ## 验收标准
@@ -56,6 +55,6 @@
       透明 rotate（access 过期 + refresh 有效自动续期）；cookie jar 吸收回吐
 - [x] REST 版 store 单测：列名与 tables.ts 对齐、抢占成功时不发第二条查询、三种失败分支
       （不存在 / 已消费→revoked:true / 未消费但过期→null）、bigint 以字符串返回时仍判为已消费、族与用户吊销的过滤条件
-- [x] consume 依赖的 PostgREST 语义线上实测：三路并发抢占恰好一个赢家、过期 token 不误报为复用、
-      族吊销只命中未消费行（见 module-qw-pages「consume 原子抢占语义」）
+- [x] consume 语义实测：三路并发抢占恰好一个赢家、过期 token 不误报为复用、
+      族吊销只命中未消费行（见本文件「consume 原子抢占语义」）
 - [ ] REST 版 store 的函数体在部署态执行（需真实钉钉 IdP 走完 /auth/callback）

@@ -102,6 +102,3 @@ jobs:
 
       - name: Build template (standalone)
         run: pnpm --filter template-hono-react build
-
-      - name: Build template (qw-pages)
-        run: pnpm --filter template-hono-react build:qw-pages

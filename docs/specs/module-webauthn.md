@@ -44,7 +44,6 @@
 
 - `webauthn_credentials` 表（PK = credentialId base64url，1:N users）
 - 列名显式 snake_case：id / user_id / public_key / counter / device_type / backed_up / transports / display_name / created_at
-- 双方言 Drizzle store（createDrizzleWebauthnCredentialStore）+ PostgREST store（createRestWebauthnCredentialStore）
 
 ## 配置
 
@@ -70,5 +69,4 @@
 - [x] challenge 一次性消费：同 key 二次 verify 失败（provider.test.ts）
 - [ ] 多凭证：同一用户可注册多个 passkey（store 支持，未单测）
 - [ ] 凭证隔离：用户只能删除自己的凭证（routes 有校验，未单测）
-- [ ] 双 store 接口一致（Drizzle SQL 双方言 + PostgREST）
 - [ ] 不装 @simplewebauthn/server 时 `./webauthn` 子路径动态 import 报错，不影响主包

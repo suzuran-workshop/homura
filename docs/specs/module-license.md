@@ -97,7 +97,7 @@ GET  {server}/healthz       → { status: 'ok' }
 `active` 状态下若中心显式写了 `notice`（到期前预警等运营通知）也照常展示，但不影响任何功能。
 
 **豁免清单**（`createDefaultBypass`，与 app-kit 同源）：健康检查路径（`healthzPathFor(target)`，
-qw-pages 是 `/_healthz`）、`/auth/*`（停服时仍须能走登录链）、`/_license`
+core HEALTHZ_PATH）、`/auth/*`（停服时仍须能走登录链）、`/_license`
 （`enforcement=all` 时它必须仍可读，否则前端无法解释为什么全站 503）。
 
 **fail-open（ADR-011，含启动期）**：`grace` / `unknown` 不拦（`strict:true` 时 unknown 才 503）；
@@ -118,7 +118,7 @@ qw-pages 是 `/_healthz`）、`/auth/*`（停服时仍须能走登录链）、`/
 
 公钥是多行 PEM，写进 `config/homura.config.env` 时用双引号包裹并把换行写成 `\n`
 （`applyEnvFile` 会还原）。state store 按方言选：SQL → `createDrizzleStateStore`，
-REST（qw-pages）→ `createRestStateStore`。
+（store 实现为 drizzle 版 createDrizzleStateStore）
 
 模板暴露 `GET /_license`：`{ status, enforcement, notice, expiresAt, features, signature }`，
 供前端渲染强提醒。
@@ -163,14 +163,14 @@ REST（qw-pages）→ `createRestStateStore`。
 - [x] fake genuine 全流程测试 + 签名授权的特性测试（篡改四类字段各自失败、四态签名状态、
       本地到期与时钟回拨、四档处置、中文提醒头编解码、requireFeature 三态）
 - [x] homura-genuine 实现并与消费侧真进程联调（八阶段生命周期）
-- [x] **qw-pages 形态已实测**（2026-10-14）：本地起真 genuine + cloudflared 快速隧道，
+- [x] **历史：qw-pages 形态曾实测**（2026-10-14，后随 qw-pages 支持移除而退役）：本地起真 genuine + cloudflared 快速隧道，
       模板以 `dist/` 发布到 `puwkg4ac.qwenwork.host`，跑通五场景：
       ① 自注册 + 10s 心跳 + Ed25519 验签 verified；② 四档 enforcement 逐个翻转
       （`core` 档 `/api/*` 503、`/` 200；`all` 档全站 503、`/_license` 仍可读）；
       ③ `expiresAt` 到过去 → 本地判定 `expired` 压过中心 `active`；④ `status:suspended`
       → 下一次心跳全站 503；⑤ `POST /admin/keys/rotate` → App 侧 `signature.kind:invalid`
       + `enforcement` 自动最严 `all` + features 全拒 + 安全告警文案；换 pubkey 重发布 V2
-      后跨发布从 PostgREST 读回同一 `licenseId+instanceKey`，未触发 `instance_mismatch`。
+      后跨发布读回同一 `licenseId+instanceKey`，未触发 `instance_mismatch`。
       `X-Homura-License-Notice` 用 UTF-8 URL 编码回中文正确。
       前置：genuine 必须以 https 公网可达（Pages 出网只放行 443）；隧道 URL 会随
       cloudflared 重启漂移，漂了必须重发 App。

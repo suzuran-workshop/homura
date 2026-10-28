@@ -379,3 +379,30 @@
   - 手工编辑子包 version 会在 CI 被拦下（这正是目的）
 - 何时重新审视：需要各包独立语义化版本（semver）时——届时应改用 changesets 一类工具，
   而非退回手工多文件维护
+
+## ADR-025：移除 PostgREST（rest 方言）与 qw-pages 部署形态，收敛为 standalone
+- **日期**：2026-10-28
+- **状态**：已采纳（本次提交执行完毕）
+- **背景**：框架早期同时支持「standalone（node:sqlite / pg）」与「qw-pages 托管（PostgREST）」双形态。
+  qw-pages 形态把大量平台特异性（只读根目录、12 个固定 env 无注入口、/healthz 归网关、
+  body 上限、DDL 权限缺失、桶建不出）倒灌进了所有能力包：db 的 PostgREST 层与 rest-schema 派生、
+  storage 的 DB 分块后端（homura_files/homura_file_chunks）+ chunk-client、auth 的 5 个 rest store、
+  license 的 rest state store、app-kit 的 qw-pages adapter 与 healthzPathFor 形态探测、
+  core 的 detectRuntime/QWENWORK_WRITABLE_DIR、模板的双形态构建与建表 runbook。
+  实际消费方（guga-onduty 等）全部走 standalone + OIDC IdP 拓扑；qw-pages 形态无真实长期消费方。
+- **决策**：整刀切掉 rest/qw-pages 全链：
+  - `db`：删 postgrest.ts / rest-schema / rest-ttlkv（createRestDb/RestDb/restSchemaFromPg/createRestTtlKv）
+  - `storage`：删 db 后端（./db ./tables ./chunk-client 子路径）、ChunkedFileStorage/FileManifest、downloadStream
+  - `auth`：删 5 个 rest store（session/user/oauth2-link/password/webauthn-credential）
+  - `license`：删 rest state store
+  - `app-kit`：删 qw-pages adapter（./qw-pages 子路径）、createApp 的 runtime 选项与 detectRuntime 透传；healthz 固定 core HEALTHZ_PATH
+  - `core`：删 runtime.ts（detectRuntime/RuntimeTarget/healthzPathFor），新增 healthz.ts（HEALTHZ_PATH 常量）；env-file 剥离 QWENWORK_WRITABLE_DIR 候选
+  - 模板：单形态构建（build.mjs）、schema 只剩 pg/sqlite 两份、db.ts/env.ts/app.ts 去分支、删 qw-pages.ts 与 schema/rest.ts
+  - 文档：删 specs/module-qw-pages.md，AGENTS/README/ARCHITECTURE/PRD 各 spec 同步改写
+- **理由**：① 形态探测/分块/探活/派生 schema 等复杂度的存在理由是平台限制，平台没了复杂度就是纯负债；
+  ② 真实部署全在自有服务器，PostgREST 一次都没在生产跑过业务数据；
+  ③ 登录的钉钉细节已收敛到独立 IdP（oauth2-dingtalk，见 ADR-7 @guga-onduty），框架不再需要为受限环境做对冲。
+- **后果**： breaking change——依赖 rest 轨的旧 App（如 guga-onduty-w）须钉在 26.10.x 旧版；
+  exports/entry 收敛后 check-package-exports 门禁同步生效。历史教训保留（exports 漏发、原子抢占语义等）。
+- **何时重新审视**：若再出现「只有 443 出网 + 无自定义 env」的托管形态，重新评估——但应先做平台侧
+  能力补齐（env 注入、DDL、健康检查路径），而不是再让框架倒灌。

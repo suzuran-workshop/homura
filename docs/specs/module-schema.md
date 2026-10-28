@@ -38,20 +38,16 @@ src/server/schema/
 `@homurajs/auth/tables`（refresh_tokens）、`@homurajs/license/tables`（license_state）。
 
 **第三份（REST）不手写，而是派生**：`schema/rest.ts` 只做一件事——
-`export const restSchema = restSchemaFromPg(pgSchema)`。PostgREST 用的就是 PG 真实列名，
 手写第三份必然漂移（本文「列名规则」那条教训的同类坑）。派生让单一事实源留在 `pg.ts`。
 
 ⚠ 派生结果里的列名可能是 camelCase：`pgCol` 配方不传 name 时用 JS 属性名做列名，
 故 `todos` 的真实列是 `ownerSub`/`createdAt`（而 `refresh_tokens`/`license_state` 走原生 SQL，
-是显式 snake_case）。camelCase 列名在 PostgREST 上已实测可用（`eq` / `is.null` /
-`order=<col>.desc` / PATCH 全通过），**不需要**为 qw-pages 改列名策略。
 
 ## 迁移三轨
 
 - 生成：`drizzle-kit generate --config=drizzle.pg.config.ts`（PG 方言，自托管 supabase/pgsql 共用 → drizzle/pg/）与 `drizzle.sqlite.config.ts`（→ drizzle/sqlite/）
 - rc.4 产物格式：每迁移一个子目录 `<yyyyMMddHHmmss_name>/migration.sql`，语句以 `--> statement-breakpoint` 分隔（无 meta/_journal.json）
 - 运行（轨一/轨二）：`runMigrations(db, folder)` 按实例分发 migrator（幂等，drizzle 自动记录已应用）
-- **轨三：qw-pages 的平台受控迁移**。App 侧无 DDL 权限（PostgREST 只能读写数据），建表与 RLS policy 必须在部署期用 `qwenwork_pages_apply_migration` 执行 `drizzle/pg` 的 SQL（改成幂等：`CREATE TABLE IF NOT EXISTS` / `DROP POLICY IF EXISTS` + `CREATE POLICY`）。模板 `migrate()` 在 rest 形态改为**探活校验**（`rest.ping(table)`），失败时把 `RestError` 的 hint 一并抛出
   - 需要建的表 = 模板缺省四张（`todos` 业务、`refresh_tokens` auth、`license_state` license、`homura_ttlkv` OAuth state 的 TTL-KV）**加上派生 App 新增的每张业务表**。哪些表真的必需由模板 `app.ts` 的 `requiredTables` 决定（业务表来自 `schema/rest.ts` 的 `restBusinessTables`，能力表按 `OAUTH_DINGTALK_ORG_ID` / `GENUINE_SERVER` 是否配置追加）——新增业务表登记进 `restBusinessTables` 即自动纳入探活与健康检查
   - 每张表都要 `ENABLE ROW LEVEL SECURITY` + `FOR ALL TO anon USING (true) WITH CHECK (true)`，否则是静默失败（SELECT 返回 `200 []`、INSERT 返回 401+42501）
   - ⚠ 首次部署要按目录时间序应用 `drizzle/pg/` 下**全部**迁移，不是只应用最新那份（最新那份只含新增表，基础表在更早的目录里）

@@ -113,9 +113,8 @@ jobs:
       # 产物校验（build 之后、publish 之前的最后一道防线）。
       # 与上面的静态校验互补：那里比 exports ↔ entry 声明，这里额外验证 dist/ 里**真的有文件**。
       # 之所以必须有这一步：exports 声明了但 entry 漏了，构建会"成功"、只是少产出文件，
-      # 于是 build 步骤照样绿，直到下游 npm install 才炸（26.10.14/15 storage ./db ./tables
-      # ./chunk-client 就是这样漏发的，db 后端是 qw-pages 唯一可用的 storage，等于 Pages
-      # 文件存储整个不可用，且静默潜伏了两个版本）。
+      # 于是 build 步骤照样绿，直到下游 npm install 才炸（26.10.14/15 storage 曾漏发
+      # ./tables ./chunk-client 等子路径，文件存储整个不可用，且静默潜伏了两个版本）。
       - name: 校验发包产物完整性
         if: steps.check.outputs.skip == 'false'
         run: node scripts/check-package-exports.mjs --verbose
