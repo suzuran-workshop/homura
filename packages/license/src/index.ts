@@ -25,9 +25,3 @@ export type { LicenseClientConfig, SignatureState } from './client.js'
 export type { LicenseStateStore } from './state-store.js'
 export { createDrizzleStateStore } from './state-store.js'
 export type { LicenseState } from './state-store.js'
-export {
-  createRestStateStore,
-  LICENSE_STATE_TABLE,
-  LICENSE_STATE_ROW_ID,
-} from './rest-state-store.js'
-export type { RestStateStoreOptions } from './rest-state-store.js'

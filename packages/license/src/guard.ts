@@ -10,14 +10,13 @@
  * 前端 `decodeURI` 还原）——"每次使用强提醒、无差别提示所有用户"是硬要求，故提醒不依赖
  * enforcement 档位（`none` 档除外，那档的语义就是不提醒）。
  *
- * 健康检查路径与 app-kit 注册的路径**同源**（core healthzPathFor）：qw-pages 上 '/healthz'
- * 被 Page Gateway 保留（实测网关自答 `ok`，请求不下发到 App 进程），App 实际注册在 '/_healthz'。
- * 若此处仍硬编码 '/healthz'，停服时健康检查会一起被 503，正好毁掉 ADR-011 想要的语义。
+ * 健康检查路径与 app-kit 注册的路径**同源**（core HEALTHZ_PATH）：推荐显式传 createApp
+ * 返回的 healthzPath；缺省用 core 的 HEALTHZ_PATH 常量，保证与注册路径不漂移。
  *
  * fail-open（ADR-011）：grace 与 unknown 不拦，只加警告头；strict 下 unknown 才 503。
  */
 import type { Context, MiddlewareHandler } from 'hono'
-import { detectRuntime, healthzPathFor, type RuntimeTarget } from '@homurajs/core'
+import { HEALTHZ_PATH } from '@homurajs/core'
 import type { Enforcement, LicenseEntitlement, LicenseStatus } from './contract.js'
 
 /** 守卫需要的最小客户端形状（LicenseClient 天然满足；测试可只给 getStatus） */
@@ -36,8 +35,6 @@ export interface LicenseGuardClient {
 export interface DefaultBypassOptions {
   /** 显式健康检查路径（推荐传 createApp 返回的 healthzPath，保证与注册路径完全一致） */
   healthzPath?: string
-  /** 显式形态；缺省按 env 探测 */
-  target?: RuntimeTarget
 }
 
 /**
@@ -48,8 +45,7 @@ export const LICENSE_STATUS_PATH = '/_license'
 
 /** 默认豁免清单工厂：健康检查 + /auth/*（停服时仍须能走登录链）+ /_license（前端要读提醒文案） */
 export function createDefaultBypass(opts: DefaultBypassOptions = {}): (c: Context) => boolean {
-  const healthzPath =
-    opts.healthzPath ?? healthzPathFor(opts.target ?? detectRuntime(process.env).target)
+  const healthzPath = opts.healthzPath ?? HEALTHZ_PATH
   return (c: Context): boolean => {
     const path = c.req.path
     return path === healthzPath || path.startsWith('/auth/') || path === LICENSE_STATUS_PATH
