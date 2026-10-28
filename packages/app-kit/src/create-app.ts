@@ -6,13 +6,7 @@
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import { randomUUID } from 'node:crypto'
-import {
-  detectRuntime,
-  healthzPathFor,
-  type Logger,
-  type RuntimeInfo,
-  type RuntimeTarget,
-} from '@homurajs/core'
+import { HEALTHZ_PATH, type Logger } from '@homurajs/core'
 import { createSpaFallback, createStaticMiddleware } from './static.js'
 
 /** 能力实例的结构化契约（鸭子类型，避免包依赖；运行时由 App 传入） */
@@ -58,8 +52,7 @@ export interface HealthCheck {
 }
 
 export interface CreateAppOptions {
-  runtime?: RuntimeTarget | 'auto'
-  /** qw-pages 子路径挂载时，全中间件感知（默认 '/'） */
+  /** 反向代理子路径挂载时，全中间件感知（默认 '/'） */
   basePath?: string
   routes?: Hono | ((deps: AppDeps) => Hono)
   /** 注入即启用认证链（sessionMiddleware + authRoutes） */
@@ -72,8 +65,7 @@ export interface CreateAppOptions {
   db?: Record<string, unknown>
   storage?: StorageLike
   /**
-   * 健康检查：路径缺省按形态取 core healthzPathFor(target)——
-   * qw-pages 上 '/healthz' 被 Page Gateway 保留（网关自答，请求不下发到 App），故用 '/_healthz'。
+   * 健康检查：路径缺省 core HEALTHZ_PATH（'/healthz'）。
    * 显式传 path 时，license guard 的豁免清单必须用同一个值（见 license createDefaultBypass）。
    */
   healthz?: { path?: string; checks?: HealthCheck[] }
@@ -85,26 +77,16 @@ export interface CreateAppOptions {
 
 export interface HomuraApp {
   app: Hono
-  runtime: RuntimeInfo
   /** 实际注册的健康检查路径（供 license guard 豁免清单等同源消费） */
   healthzPath: string
 }
 
 /**
  * 固定中间件链（模板文档逐环解释）：
- * basePath → requestId+访问日志 → healthz（注册于 guard 前，天然豁免；路径按形态取）→ licenseGuard
+ * basePath → requestId+访问日志 → healthz（注册于 guard 前，天然豁免）→ licenseGuard
  * → sessionMiddleware → authRoutes → App routes → 静态资源 → SPA fallback → onError
  */
 export function createApp(options: CreateAppOptions = {}): HomuraApp {
-  const runtime =
-    options.runtime && options.runtime !== 'auto'
-      ? {
-          target: options.runtime,
-          explicit: true,
-          reasons: [`createApp runtime=${options.runtime}`],
-        }
-      : detectRuntime(process.env)
-
   const basePath = options.basePath && options.basePath !== '/' ? options.basePath : undefined
   const app = basePath ? new Hono().basePath(basePath) : new Hono()
 
@@ -132,11 +114,10 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
   })
 
   // ② healthz（注册于 licenseGuard 之前 → 天然豁免守卫）
-  //    路径按形态取：qw-pages 让开被网关保留的 '/healthz'（实测网关自答 ok，App 路由不可达）
-  const healthzPath = options.healthz?.path ?? healthzPathFor(runtime.target)
+  const healthzPath = options.healthz?.path ?? HEALTHZ_PATH
   const checks = options.healthz?.checks ?? []
   app.get(healthzPath, async (c) => {
-    if (checks.length === 0) return c.json({ status: 'ok', runtime: runtime.target })
+    if (checks.length === 0) return c.json({ status: 'ok' })
     const results: Record<string, 'ok' | 'fail'> = {}
     let allOk = true
     for (const { name, check } of checks) {
@@ -150,7 +131,7 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
       }
     }
     return c.json(
-      { status: allOk ? 'ok' : 'degraded', runtime: runtime.target, checks: results },
+      { status: allOk ? 'ok' : 'degraded', checks: results },
       allOk ? 200 : 503,
     )
   })
@@ -190,7 +171,7 @@ export function createApp(options: CreateAppOptions = {}): HomuraApp {
     return c.json({ error: 'internal_error', message: err.message }, 500)
   })
 
-  return { app, runtime, healthzPath }
+  return { app, healthzPath }
 }
 
 declare module 'hono' {

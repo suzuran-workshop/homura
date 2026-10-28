@@ -1,5 +1,5 @@
 /**
- * fs 静态资源处理 + SPA fallback（node / qw-pages 共享，均跑在 Node 上）。
+ * fs 静态资源处理 + SPA fallback（standalone）。
  * 只做「按 path 找文件」，不监听端口——端口/导出差异归 adapter。
  */
 import { createReadStream, existsSync, statSync } from 'node:fs'
@@ -126,16 +126,10 @@ export function createStaticMiddleware(root: string): MiddlewareHandler {
  * - API/鉴权/文件/健康检查路径 → 404 JSON
  * - 其余 GET（页面请求）→ index.html（前端路由接管）
  *
- * 保留前缀含两形态的健康检查路径（core HEALTHZ_PATH 同源）：qw-pages 用 '/_healthz'，
- * standalone 用 '/healthz'，两个都列入，避免路径改名后 fallback 把健康检查当页面请求。
+ * 保留前缀含健康检查路径（core HEALTHZ_PATH 同源），避免路径改名后 fallback
+ * 把健康检查当页面请求。
  */
-const RESERVED_PREFIXES: readonly string[] = [
-  '/api',
-  '/auth',
-  '/files',
-  HEALTHZ_PATH.standalone,
-  HEALTHZ_PATH['qw-pages'],
-]
+const RESERVED_PREFIXES: readonly string[] = ['/api', '/auth', '/files', HEALTHZ_PATH]
 
 export function createSpaFallback(root: string): (c: Context) => Response | Promise<Response> {
   return async (c) => {

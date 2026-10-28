@@ -2,7 +2,7 @@
   "name": "@homurajs/app-kit",
   "version": "26.10.27",
   "type": "module",
-  "description": "homura 组装入口：createApp 中间件链装配 + 双形态 RuntimeAdapter（standalone / qw-pages）",
+  "description": "homura 组装入口：createApp 中间件链装配 + standalone RuntimeAdapter",
   "engines": {
     "node": ">=22.5"
   },
@@ -11,8 +11,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./serve": "./src/runtime/node.ts",
-    "./qw-pages": "./src/runtime/qw-pages.ts"
+    "./serve": "./src/runtime/node.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -25,10 +24,6 @@
       "./serve": {
         "types": "./dist/serve.d.ts",
         "import": "./dist/serve.js"
-      },
-      "./qw-pages": {
-        "types": "./dist/qw-pages.d.ts",
-        "import": "./dist/qw-pages.js"
       }
     }
   },

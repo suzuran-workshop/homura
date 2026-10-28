@@ -342,71 +342,22 @@ describe('createApp — 预压缩侧车文件（br / gzip）', () => {
   })
 })
 
-describe('runtime 探测透传', () => {
-  it('显式 runtime=qw-pages → runtime.target', () => {
-    const { runtime } = createApp({ runtime: 'qw-pages' })
-    expect(runtime.target).toBe('qw-pages')
-    expect(runtime.explicit).toBe(true)
-  })
-
-  it('auto → detectRuntime(process.env)', () => {
-    const { runtime } = createApp({ runtime: 'auto' })
-    expect(['standalone', 'qw-pages']).toContain(runtime.target)
-  })
-})
-
-describe('qw-pages 形态（2026-10-13 线上实测校准）', () => {
-  it('不再导出 exportHandlers：平台从不调用导出函数（探针 handler 命中 0 次）', async () => {
-    const mod = await import('./runtime/qw-pages.js')
-    expect('exportHandlers' in mod).toBe(false)
-  })
-
-  it('start() 真的监听端口（与 standalone 共用实现），不再抛「不监听端口」', async () => {
-    const { QW_PAGES_DEFAULT_PORT, createQwPagesAdapter } = await import('./runtime/qw-pages.js')
-    const adapter = createQwPagesAdapter()
-    expect(QW_PAGES_DEFAULT_PORT).toBe(8081)
-    expect(adapter.trustProxy()).toBe(true)
-    const { app } = createApp({ routes: new Hono().get('/ping', (c) => c.text('pong')) })
-    const ac = new AbortController()
-    await expect(adapter.start(app, { port: 0, signal: ac.signal })).resolves.toBeUndefined()
-    ac.abort()
-  })
-
-  it('assetsDir 默认 client（发布根即产物根），不再落到 node_modules 内', async () => {
-    const { createQwPagesAdapter } = await import('./runtime/qw-pages.js')
-    const adapter = createQwPagesAdapter()
-    expect(adapter.assetsDir({})).toBe(join(process.cwd(), 'client'))
-    expect(adapter.assetsDir({})).not.toContain('node_modules')
-    expect(adapter.assetsDir({ HOMURA_ASSETS_DIR: '/tmp/xyz' })).toBe('/tmp/xyz')
-  })
-})
-
-describe('healthz 路径按形态取（qw-pages 让开被网关保留的 /healthz）', () => {
-  it('standalone → /healthz', async () => {
-    const { app, healthzPath } = createApp({ runtime: 'standalone' })
+describe('healthz 路径（core HEALTHZ_PATH 单点）', () => {
+  it('缺省 → /healthz', async () => {
+    const { app, healthzPath } = createApp()
     expect(healthzPath).toBe('/healthz')
     expect((await app.request('/healthz')).status).toBe(200)
   })
 
-  it('qw-pages → /_healthz，且 App 不再注册 /healthz', async () => {
-    const { app, healthzPath } = createApp({ runtime: 'qw-pages' })
-    expect(healthzPath).toBe('/_healthz')
-    const res = await app.request('/_healthz')
-    expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toMatchObject({ status: 'ok', runtime: 'qw-pages' })
-    expect((await app.request('/healthz')).status).toBe(404)
-  })
-
-  it('显式 healthz.path 覆盖形态缺省', async () => {
-    const { app, healthzPath } = createApp({ runtime: 'qw-pages', healthz: { path: '/ready' } })
+  it('显式 healthz.path 覆盖缺省', async () => {
+    const { app, healthzPath } = createApp({ healthz: { path: '/ready' } })
     expect(healthzPath).toBe('/ready')
     expect((await app.request('/ready')).status).toBe(200)
   })
 
-  it('healthzPath 与 license guard 豁免清单同源（core healthzPathFor）', async () => {
-    const { healthzPathFor } = await import('@homurajs/core')
-    expect(createApp({ runtime: 'qw-pages' }).healthzPath).toBe(healthzPathFor('qw-pages'))
-    expect(createApp({ runtime: 'standalone' }).healthzPath).toBe(healthzPathFor('standalone'))
+  it('healthzPath 与 license guard 豁免清单同源（core HEALTHZ_PATH）', async () => {
+    const { HEALTHZ_PATH } = await import('@homurajs/core')
+    expect(createApp().healthzPath).toBe(HEALTHZ_PATH)
   })
 
   it('畸形百分号编码路径不再 500（decodeURIComponent 抛错被吞 → 交 fallback）', async () => {
@@ -422,7 +373,6 @@ describe('node adapter', () => {
   it('trustProxy 由 TRUST_PROXY 控制；assetsDir 默认 dist/client', async () => {
     const { createNodeAdapter } = await import('./runtime/node.js')
     const adapter = createNodeAdapter()
-    expect(adapter.target).toBe('standalone')
     const orig = process.env.TRUST_PROXY
     delete process.env.TRUST_PROXY
     expect(adapter.trustProxy()).toBe(false)
@@ -430,6 +380,6 @@ describe('node adapter', () => {
     expect(adapter.trustProxy()).toBe(true)
     if (orig === undefined) delete process.env.TRUST_PROXY
     else process.env.TRUST_PROXY = orig
-    expect(adapter.assetsDir({})).toMatch(/dist\/client$/)
+    expect(adapter.assetsDir({})).toMatch(/dist[\\/]client$/)
   })
 })
