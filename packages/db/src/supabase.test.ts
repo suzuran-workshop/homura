@@ -53,17 +53,17 @@ describe('loadSupabaseEnv — 仅 PG 直连（REST 侧 env 归 @homurajs/storage
     expect(Object.keys(loaded)).toEqual(['dbConfig'])
   })
 
-  it('缺必需项抛错，并指路 PostgREST（qw-pages 场景）', () => {
+  it('缺必需项抛错并指明缺什么', () => {
     expect(() => loadSupabaseEnv({ SUPABASE_PROJECT_REF: 'x' })).toThrow(
       /SUPABASE_PROJECT_REF.*SUPABASE_DB_PASSWORD/,
     )
-    // 只有 qw-pages 实测注入的那三项 → 仍然抛，且错误信息指向 rest
+    // 只有平台注入的 URL/anon key 三项（无 PG 凭据）→ 仍然抛
     expect(() =>
       loadSupabaseEnv({
         SUPABASE_URL: 'https://supabase.example',
         SUPABASE_ANON_KEY: 'anon',
         SUPABASE_INSTANCE_ID: 'i',
       }),
-    ).toThrow(/PostgREST/)
+    ).toThrow(/SUPABASE_PROJECT_REF.*SUPABASE_DB_PASSWORD/)
   })
 })

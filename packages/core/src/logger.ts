@@ -1,5 +1,5 @@
 /**
- * 结构化日志（轻量零依赖实现）：JSON lines 输出，便于 qw-pages 等平台收集。
+ * 结构化日志（轻量零依赖实现）：JSON lines 输出，便于平台/网关收集。
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 

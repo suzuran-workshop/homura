@@ -80,11 +80,11 @@ describe('resolveConfigFilePath — 优先级', () => {
     expect(resolveConfigFilePath({}, { cwd: dir })).toBe(join(dir, CONFIG_FILE_NAME))
   })
 
-  it('最后是 QWENWORK_WRITABLE_DIR（平台可写区，可在不改产物时投放/轮换）', () => {
+  it('extraDirs 兜底（不改产物即可投放/轮换配置）', () => {
     const cwdDir = tmpWith({})
-    const writable = tmpWith({ [CONFIG_FILE_NAME]: 'A=from-writable' })
-    expect(resolveConfigFilePath({ QWENWORK_WRITABLE_DIR: writable }, { cwd: cwdDir })).toBe(
-      join(writable, CONFIG_FILE_NAME),
+    const extra = tmpWith({ [CONFIG_FILE_NAME]: 'A=from-extra' })
+    expect(resolveConfigFilePath({}, { cwd: cwdDir, extraDirs: [extra] })).toBe(
+      join(extra, CONFIG_FILE_NAME),
     )
   })
 

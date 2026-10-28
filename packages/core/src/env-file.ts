@@ -1,18 +1,16 @@
 /**
  * 部署期配置文件加载（KEY=VALUE 行格式，dotenv 语义子集，零依赖）。
  *
- * 为什么需要它：qw-pages 平台只注入固定 12 个 env，且**没有自定义 env/secret 注入口**
- * （实测），故 SESSION_SECRET / OAUTH_CLIENT_SECRET 这类值无法用环境变量投递。
- * 而部署产物本身不可被公网读取（实测：请求 /server/*.mjs、/homura.manifest.json 一律被
- * SPA fallback 兜成 index.html，%2e%2e 变体被网关 400，而真实 /assets/*.js 正常返回），
- * 所以「随产物携带一个配置文件」是可行的投递通道，其信任边界与代码本身相同。
+ * 用途：容器/托管部署常没有顺手的自定义 env 注入口，SESSION_SECRET /
+ * OAUTH_CLIENT_SECRET 这类值用「随产物携带一个配置文件」投递最省事，
+ * 其信任边界与代码本身相同。standalone 用环境变量、文件作缺省兜底，两便。
  *
  * 为什么是 env 行格式而不是 yaml/json：整个配置面已经是 env 形状（configSpecs +
  * defineConfig），把文件内容并进 process.env 后能力包零改动，也不需要引解析器。
  * 需要 yaml 时再加一个 source 适配即可，属加法而非改造。
  *
- * 优先级：**真实 env > 文件**（override=false，缺省）。standalone 仍可用环境变量覆盖，
- * 与 12-factor 习惯一致；也便于本地调试时临时改一个值而不编辑文件。
+ * 优先级：**真实 env > 文件**（override=false，缺省），与 12-factor 习惯一致；
+ * 也便于本地调试时临时改一个值而不编辑文件。
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
@@ -71,7 +69,7 @@ export interface ResolveConfigFileOptions {
   /** 显式路径（绝对或相对 cwd）；缺省读 env.HOMURA_CONFIG_FILE */
   path?: string
   cwd?: string
-  /** 额外候选目录（缺省会追加 QWENWORK_WRITABLE_DIR，即平台唯一可写区） */
+  /** 额外候选目录 */
   extraDirs?: string[]
 }
 
@@ -79,8 +77,7 @@ export interface ResolveConfigFileOptions {
  * 定位配置文件，按优先级返回第一个存在的：
  * 1. 显式 path / `HOMURA_CONFIG_FILE`
  * 2. `<cwd>/homura.config.env`（= 部署产物根，随产物携带的那份）
- * 3. `<QWENWORK_WRITABLE_DIR>/homura.config.env`（平台可写区：可在不改产物的情况下投放/轮换）
- * 4. extraDirs 下的同名文件
+ * 3. extraDirs 下的同名文件
  * 都不存在返回 null（零配置也能跑——渐进式）。
  */
 export function resolveConfigFilePath(
@@ -92,8 +89,6 @@ export function resolveConfigFilePath(
   const candidates: string[] = []
   if (explicit) candidates.push(isAbsolute(explicit) ? explicit : resolve(cwd, explicit))
   candidates.push(resolve(cwd, CONFIG_FILE_NAME))
-  const writable = env['QWENWORK_WRITABLE_DIR']
-  if (writable) candidates.push(resolve(writable, CONFIG_FILE_NAME))
   for (const dir of opts.extraDirs ?? []) candidates.push(resolve(dir, CONFIG_FILE_NAME))
   return candidates.find((p) => existsSync(p)) ?? null
 }
