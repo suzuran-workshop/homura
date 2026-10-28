@@ -435,3 +435,27 @@
   与目录准入是两条正交路径，App 按需选型。
 - **何时重新审视**：若出现目录条目量级大（>10⁵）需要分页同步/增量拉取、或多目录来源交叉准入时，
   再评估 DirectoryStore 是否需要查询能力升级。
+
+## ADR-027：全链 OAuth2 → OIDC（id_token 验签为信任锚）
+- **日期**：2026-10-28
+- **状态**：已采纳（本次提交执行完毕，无向下兼容负担——项目仅自用）
+- **背景**：裸 OAuth2 客户端把「上游 userinfo 说了算」当信任锚，无法密码学证明身份。
+  IdP 已升级为标准 OIDC Provider（oidc-dingtalk v2.0.0，ADR-005：id_token HS256 + discovery），
+  客户端侧跟进全链 OIDC 化。
+- **决策**：
+  - `auth`：`OAuth2Client` → `OidcClient`——token 响应必须含 `id_token`，jose jwtVerify
+    强制验签（HS256，密钥=clientSecret；iss=issuer、aud=clientId、exp±60s leeway），
+    再将 userinfo.sub 与 id_token.sub 交叉核对，不一致即 `sub_mismatch` 拒绝。
+    协议失败统一 `OidcError`（code 封闭枚举）。路径 `/auth/oauth2/*` → `/auth/oidc/*`；
+    `createAuthRoutes` 选项 `oauth2` → `oidc`；`requireAuth` 缺省 loginPath 同步。
+  - `3p`：`dingtalkOAuth` → `dingtalkOidc`（预设新增 issuer；默认域名修正如
+    dingtalk.auth.ahkdxx.cn）；`OAuthPreset` → `OidcPreset`。
+  - 模板：app.ts/env.ts/client 同步（回调地址 /auth/oidc/callback）。
+  - identity link 表名 `oauth2_identity_links` **不改**：链接的语义仍是「OAuth2/OIDC 系列
+    协议的身份关联」，改名只会打破既有库表无收益。
+- **理由**：登录场景的本质是认证，OIDC 的 id_token（签名 + 受众 + 过期 + issuer）把信任锚
+  从「上游返回什么」升级为「签名说了算」；userinfo.sub 交叉核对堵住 token 替换类攻击。
+  IdP 与客户端同仓库群同步升级，一次性切换零过渡成本。
+- **后果**：breaking——已部署 App（guga-onduty 等）须升级 homura 依赖、改回调路径与
+  IdP redirectUri 配置后重登（旧 session 不受影响，但登录入口路径变了）。
+- **何时重新审视**：出现第三方消费方需要标准发现/JWKS 轮换时，IdP 升级 RS256（ADR-005 已预留）。

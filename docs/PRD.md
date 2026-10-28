@@ -26,7 +26,7 @@
 | @homurajs/core       | 环境探测/形态常量/配置/配置文件投递/日志/TTL-KV | 一切包的公共基座，环境差异单点收口                                                                       |
 | @homurajs/db         | 双方言持久层（sqlite / pg）                     | 独立部署按 DIALECT 切换，App 零改动 |
 | @homurajs/storage    | 图床/对象存储三后端                             | 图床刚需；后端由部署环境决定（local/s3/supabase）                                                       |
-| @homurajs/auth       | 钉钉登录（OAuth2 客户端）+ session              | 所有 App 都要对接登录；oauth2-dingtalk 已有服务端                                                        |
+| @homurajs/auth       | 钉钉登录（OIDC 客户端）+ session              | 所有 App 都要对接登录；oidc-dingtalk 已有服务端                                                        |
 | @homurajs/3p         | 平台消息/审批/通讯录封装                        | 推送与流程是企业场景核心；平台可插拔                                                                     |
 | @homurajs/license    | 激活心跳 + 远程停服                             | 制作人对散布 App 的运行控制权                                                                            |
 | @homurajs/app-kit    | createApp 渐进式装配                            | AI 开发的统一组装范式                                                                                    |
@@ -39,4 +39,4 @@
 ## 范围与非目标
 
 - 范围内：上述 8 项、双方言迁移工具
-- 范围外：OAuth 服务端（../oauth2-dingtalk）、中央授权服务（../homura-genuine）、多租户/组织模型、低代码、可视化编辑器、npm 发包（v1 派生式消费）
+- 范围外：OIDC Provider（../oidc-dingtalk）、中央授权服务（../homura-genuine）、多租户/组织模型、低代码、可视化编辑器、npm 发包（v1 派生式消费）

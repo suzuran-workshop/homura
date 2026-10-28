@@ -28,7 +28,7 @@ features:
     details: Drizzle pg / sqlite 双 driver + pgCol/sqliteCol 配方与 parity 门禁，迁移 SQL 由 drizzle-kit 生成。
   - icon: 🔐
     title: 认证与授权开箱即用
-    details: 通用 OAuth2 客户端、自管 session（HS256 短 JWT + opaque refresh rotate）、license 激活心跳与停服守卫。
+    details: 通用 OIDC 客户端（id_token 验签）、自管 session（HS256 短 JWT + opaque refresh rotate）、license 激活心跳与停服守卫。
   - icon: 🤖
     title: AI 开发友好
     details: 模板即活文档，契约先行（types.ts / contract.ts 快照锁），测试与实现同文件 colocate；AGENTS.md 提供「能力 × 形态支持矩阵」，模板 README 提供部署 runbook 与排错速查。
