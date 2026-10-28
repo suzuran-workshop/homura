@@ -1,6 +1,6 @@
 {
   "name": "@homurajs/auth",
-  "version": "26.10.27",
+  "version": "26.10.28",
   "type": "module",
   "description": "homura 认证：标准 OIDC (Authorization Code Flow) 客户端（id_token 验签 + sub 交叉核对）+ 自管 session（HS256 短 JWT + opaque refresh rotate）",
   "engines": {
