@@ -1,6 +1,5 @@
 /**
- * standalone 入口：createApp + createNodeAdapter().start（端口监听 + 磁盘静态）。
- * qw-pages 入口见 ./qw-pages.ts（差异仅在 adapter）。
+ * 入口：createApp + createNodeAdapter().start（端口监听 + 磁盘静态）。
  */
 import { loadConfig } from './env.js'
 import { buildApp } from './app.js'
@@ -35,7 +34,7 @@ async function main(): Promise<void> {
 
   await adapter.start(built.app, { port, signal: ac.signal })
   await built.onStart?.()
-  logger.info('listening', { port, runtime: built.runtime.target, healthz: built.healthzPath })
+  logger.info('listening', { port, healthz: built.healthzPath })
 }
 
 void main().catch((err: Error) => {

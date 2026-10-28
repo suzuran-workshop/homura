@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "homura 全栈模板：Hono + React + Vite，双形态构建（standalone / qw-pages），AI 开发的起点与活文档",
+  "description": "homura 全栈模板：Hono + React + Vite（standalone），AI 开发的起点与活文档",
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx watch src/server/index.ts",
     "typecheck": "tsc -b --noEmit",
     "build": "node scripts/build.mjs",
-    "build:qw-pages": "HOMURA_BUILD_TARGET=qw-pages node scripts/build.mjs",
     "test": "vitest run --config vitest.config.ts",
     "gen:env": "tsx scripts/gen-env-example.mjs",
     "db:generate": "drizzle-kit generate --config=drizzle.pg.config.ts && drizzle-kit generate --config=drizzle.sqlite.config.ts"

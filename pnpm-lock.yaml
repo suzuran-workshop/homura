@@ -289,9 +289,6 @@ importers:
       '@homurajs/core':
         specifier: workspace:*
         version: link:../core
-      '@homurajs/db':
-        specifier: workspace:*
-        version: link:../db
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.700.0

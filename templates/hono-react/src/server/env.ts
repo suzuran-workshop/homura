@@ -3,9 +3,9 @@
  * 渐进式：每能力一组独立 env，缺省则不启用该能力。
  * .env.example 由 `node scripts/gen-env-example.mjs` 生成（见 package.json gen:env）。
  */
-import { applyEnvFile, defineConfig, detectRuntime, parses } from '@homurajs/core'
+import { applyEnvFile, defineConfig, parses } from '@homurajs/core'
 
-export type Dialect = 'sqlite' | 'pg' | 'rest'
+export type Dialect = 'sqlite' | 'pg'
 
 export const configSpecs = {
   // ── 基础 ──
@@ -13,15 +13,14 @@ export const configSpecs = {
     env: 'PORT',
     default: 3000,
     parse: parses.int,
-    description: '监听端口（standalone；qw-pages 由平台注入 PORT）',
+    description: '监听端口',
   },
   dialect: {
     env: 'DIALECT',
-    // 刻意不给 default：缺省值按运行形态解析（见 resolveDialect），
-    // 因为「sqlite 单机」与「rest 云托管」是两个形态各自的正确答案。
-    parse: (raw: string): Dialect => (raw === 'pg' ? 'pg' : raw === 'rest' ? 'rest' : 'sqlite'),
+    default: 'sqlite' as Dialect,
+    parse: (raw: string): Dialect => (raw === 'pg' ? 'pg' : 'sqlite'),
     description:
-      "数据方言：'sqlite'（node:sqlite 本地文件）| 'pg'（自建 pgsql / 自托管 supabase 直连）| 'rest'（PostgREST，qw-pages 唯一可用）。缺省：standalone→sqlite，qw-pages→rest",
+      "数据方言：'sqlite'（node:sqlite 本地文件，缺省）| 'pg'（自建 pgsql / 自托管 supabase 直连）",
   },
   sessionSecret: {
     env: 'SESSION_SECRET',
@@ -31,7 +30,7 @@ export const configSpecs = {
     description: 'session HS256 密钥（>=32B，生产必须改）',
   },
 
-  // ── db: pg 直连（自建 pgsql / 自托管 supabase；qw-pages 不适用）──
+  // ── db: pg 直连（自建 pgsql / 自托管 supabase）──
   databaseUrl: {
     env: 'DATABASE_URL',
     parse: parses.string,
@@ -40,13 +39,13 @@ export const configSpecs = {
   supabaseProjectRef: {
     env: 'SUPABASE_PROJECT_REF',
     parse: parses.string,
-    description: 'supabase project ref（仅自托管 supabase 的 PG 直连；qw-pages 不下发）',
+    description: 'supabase project ref（仅自托管 supabase 的 PG 直连）',
   },
   supabaseDbPassword: {
     env: 'SUPABASE_DB_PASSWORD',
     parse: parses.string,
     secret: true,
-    description: 'supabase DB 密码（仅自托管；qw-pages 不下发）',
+    description: 'supabase DB 密码（仅自托管）',
   },
   supabaseRegion: {
     env: 'SUPABASE_REGION',
@@ -54,29 +53,18 @@ export const configSpecs = {
     description: 'supabase region（Supavisor host 拼装）',
   },
 
-  // ── supabase REST（qw-pages 自动注入这两项：数据层 PostgREST + 对象存储共用）──
-  supabaseUrl: {
-    env: 'SUPABASE_URL',
-    parse: parses.string,
-    description: 'supabase 平台 URL（qw-pages 自动注入）',
-  },
-  supabaseAnonKey: {
-    env: 'SUPABASE_ANON_KEY',
-    parse: parses.string,
-    secret: true,
-    description: 'supabase anon key（PostgREST 与 storage 用；qw-pages 自动注入）',
-  },
+  // ── supabase storage（后端读 SUPABASE_URL / SUPABASE_ANON_KEY，独立部署自行设置）──
   supabaseBucket: {
     env: 'STORAGE_SUPABASE_BUCKET',
     default: 'files',
     parse: parses.string,
-    description: 'supabase 存储桶名（必须预先存在：qw-pages 上 anon 与迁移角色都无建桶权）',
+    description: 'supabase 存储桶名（必须预先存在：anon 无建桶权）',
   },
   sqlitePath: {
     env: 'SQLITE_PATH',
     default: './data/app.db',
     parse: parses.string,
-    description: 'sqlite 文件路径（:memory: 支持；仅 standalone）',
+    description: 'sqlite 文件路径（:memory: 支持）',
   },
 
   // ── auth: oauth2-dingtalk ──
@@ -170,37 +158,15 @@ export const configSpecs = {
   // ── storage ──
   storageBackend: {
     env: 'STORAGE_BACKEND',
-    default: 'none' as 'none' | 'local' | 's3' | 'supabase' | 'db',
-    parse: (raw: string) => raw as 'none' | 'local' | 's3' | 'supabase' | 'db',
-    description:
-      '存储后端：none（不启用）| local | s3 | supabase | db（二进制写进数据库，qw-pages 唯一可用，有大小上限）',
+    default: 'none' as 'none' | 'local' | 's3' | 'supabase',
+    parse: (raw: string) => raw as 'none' | 'local' | 's3' | 'supabase',
+    description: '存储后端：none（不启用）| local | s3 | supabase',
   },
   localStorageDir: {
     env: 'STORAGE_LOCAL_DIR',
     default: './data/files',
     parse: parses.string,
     description: 'local 存储根目录',
-  },
-  storageDbMaxBytes: {
-    env: 'STORAGE_DB_MAX_BYTES',
-    default: 50 * 1024 * 1024,
-    parse: (raw: string) => {
-      const n = Number(raw)
-      if (!Number.isFinite(n) || n <= 0) throw new Error('STORAGE_DB_MAX_BYTES 必须是正整数（字节）')
-      return n
-    },
-    description: 'db 后端单文件总上限（字节），超限即拒；缺省 50MB。大文件请改用 s3 预签名直传',
-  },
-  storageDbChunkSize: {
-    env: 'STORAGE_DB_CHUNK_SIZE',
-    default: 384 * 1024,
-    parse: (raw: string) => {
-      const n = Number(raw)
-      if (!Number.isFinite(n) || n <= 0) throw new Error('STORAGE_DB_CHUNK_SIZE 必须是正整数（字节）')
-      return n
-    },
-    description:
-      'db 后端每块原始字节数；缺省 384KB（base64 入库后 512KB，安全避开 qw-pages 网关与 PostgREST 的 ~1MB 限制）',
   },
   s3Endpoint: { env: 'S3_ENDPOINT', parse: parses.string, description: 's3 兼容端点' },
   s3Region: {
@@ -273,7 +239,7 @@ export const configSpecs = {
 
 export type AppConfig = ReturnType<typeof loadConfig>
 
-/** 仓库里公开的缺省密钥：生产 / qw-pages 形态禁止沿用（HS256 密钥公开 = 会话可伪造） */
+/** 仓库里公开的缺省密钥：生产禁止沿用（HS256 密钥公开 = 会话可伪造） */
 export const INSECURE_SESSION_SECRET = 'dev-only-insecure-secret-change-me-32bytes!'
 
 export interface LoadConfigOptions {
@@ -284,12 +250,7 @@ export interface LoadConfigOptions {
 /**
  * 载入配置：先把部署期配置文件并入 env，再走 defineConfig，最后校验密钥。
  *
- * 为什么必须有配置文件这条路：qw-pages 只注入固定 12 个 env 且**无自定义注入口**（实测），
- * SESSION_SECRET / OAUTH_CLIENT_SECRET 这类值无法用环境变量投递；而部署产物不可被公网读取
- * （实测：/server/*.mjs 与 /homura.manifest.json 一律被 SPA fallback 兜成 index.html，
- * %2e%2e 变体被网关 400，真实 /assets/*.js 正常返回），故随产物携带 homura.config.env
- * 是可行通道，其信任边界与代码本身相同。
- *
+ * 配置文件让密钥类值可以随部署产物携带（或放运维可写区轮换），其信任边界与代码本身相同。
  * 优先级：真实 env > 文件。文件位置优先级见 core 的 resolveConfigFilePath
  * （HOMURA_CONFIG_FILE → <cwd>/homura.config.env → QWENWORK_WRITABLE_DIR/homura.config.env）。
  */
@@ -303,11 +264,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
 }
 
 /**
- * 生产 / qw-pages 形态禁止沿用仓库里公开的缺省 SESSION_SECRET。
+ * 生产禁止沿用仓库里公开的缺省 SESSION_SECRET。
  *
  * 这不是洁癖：session 用 HS256 自签自验，签名密钥一旦公开，任何人都能伪造
  * access/refresh token 冒充任意用户（含绕过 license 停服后的用户态）。
- * 而 Pages 上无法用 env 投递密钥，很容易顺手拿缺省值上线，故在启动期直接拒绝。
+ * 很容易顺手拿缺省值上线，故在启动期直接拒绝。
  *
  * ⚠ 只在**真的会签 session** 时拦：OAuth2 / TextPassword / WebAuthn 任一启用都会签 JWT，
  *   三者全关的纯匿名 App 根本不用这个密钥，无条件拦会误伤——冷启动验收发现过这个 bug
@@ -321,7 +282,7 @@ export function assertSecretsOverridden(
   config: AppConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): void {
-  const production = detectRuntime(env).target === 'qw-pages' || env['NODE_ENV'] === 'production'
+  const production = env['NODE_ENV'] === 'production'
   if (!production) return
   // 未启用任何会签 session 的认证 → 不签 JWT → 缺省密钥无害，放行
   const signsSession =
@@ -332,26 +293,8 @@ export function assertSecretsOverridden(
   if (config.get('sessionSecret') === INSECURE_SESSION_SECRET) {
     throw new Error(
       'SESSION_SECRET 仍是仓库里公开的缺省值，而本 App 启用了登录（OAuth2 / 密码 / WebAuthn 至少其一）：' +
-        '生产 / qw-pages 形态拒绝启动（HS256 密钥公开等于任何人可伪造会话）。' +
-        '请通过 homura.config.env（随部署产物携带，或放平台的 QWENWORK_WRITABLE_DIR）' +
-        '或真实环境变量提供 >=32B 随机值。',
+        '生产拒绝启动（HS256 密钥公开等于任何人可伪造会话）。' +
+        '请通过 homura.config.env（随部署产物携带）或真实环境变量提供 >=32B 随机值。',
     )
   }
-}
-
-/**
- * 方言解析：显式 DIALECT 优先；未显式设置时按运行形态取缺省
- * （standalone → sqlite，qw-pages → rest）。
- *
- * 为什么 qw-pages 的缺省必须是 rest（2026-10-13 线上实测，逐项见 docs/specs/module-qw-pages.md）：
- * - sqlite 不可用：应用根目录对进程只读（实测 `mkdir ./data` → EACCES），
- *   唯一可写的 QWENWORK_WRITABLE_DIR 跨发布清空（实测重发布后历史文件消失）→ 数据必丢；
- * - pg 直连不可用：平台不下发 SUPABASE_PROJECT_REF / SUPABASE_DB_PASSWORD / DATABASE_URL，
- *   且对 supabase 主机 5432 的 TCP 连接 timeout（443 可连）；
- * - rest 可用且持久：PostgREST 全套算子实测通过，跨发布回读旧行成功。
- */
-export function resolveDialect(config: AppConfig, env: NodeJS.ProcessEnv = process.env): Dialect {
-  const explicit = config.get('dialect')
-  if (explicit) return explicit
-  return detectRuntime(env).target === 'qw-pages' ? 'rest' : 'sqlite'
 }
