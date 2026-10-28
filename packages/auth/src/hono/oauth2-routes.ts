@@ -11,7 +11,7 @@ import { setCookie } from 'hono/cookie'
 import type { OAuth2Client } from '../oauth2/client.js'
 import type { SessionManager } from '../session/manager.js'
 import type { IdentityResolver } from '../identity/resolver.js'
-import { IdentityNotLinkedError } from '../identity/resolver.js'
+import { IdentityNotLinkedError, ProvisionBlockedError } from '../identity/resolver.js'
 import type { AuthUser } from '../types.js'
 
 export interface OAuth2Paths {
@@ -86,6 +86,13 @@ export function createOAuth2Routes(opts: OAuth2RoutesOptions): Hono {
     } catch (e) {
       if (e instanceof IdentityNotLinkedError) {
         return c.json({ error: 'identity_not_linked', message: e.message }, 403)
+      }
+      if (e instanceof ProvisionBlockedError) {
+        // 目录白名单准入被拒：reason 供 App 映射友好错误页
+        return c.json(
+          { error: 'provision_blocked', reason: e.reason, message: e.message },
+          403,
+        )
       }
       return c.json({ error: 'oauth_failed', message: (e as Error).message }, 401)
     }

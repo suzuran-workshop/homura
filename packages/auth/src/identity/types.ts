@@ -87,3 +87,33 @@ export interface OAuth2LinkStore {
   /** 删除关联 */
   delete(id: string): Promise<void>
 }
+
+/** 外部身份目录条目（identity_directory 表行） */
+export interface DirectoryEntry {
+  id: string
+  provider: string
+  sub: string
+  name: string | null
+  /** 上游快照的扩展信息（JSON 文本，形状由来源决定，homura 不解释） */
+  raw: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+/**
+ * 外部身份目录仓储：App 把上游身份来源（如钉钉通讯录）快照 upsert 进来，
+ * resolver 以它为白名单做 JIT 准入。homura 只管通用形状，不关心来源。
+ */
+export interface DirectoryStore {
+  /**
+   * upsert 一条目录条目（同步快照用）：
+   * (provider, sub) 已存在则更新 name/raw，否则新建。
+   */
+  upsert(input: { provider: string; sub: string; name?: string | null; raw?: string | null }): Promise<DirectoryEntry>
+  /** 按 (provider, sub) 查条目；不存在返回 null */
+  findByProviderAndSub(provider: string, sub: string): Promise<DirectoryEntry | null>
+  /** 按 provider 列出全部条目（快照对账用） */
+  listByProvider(provider: string): Promise<DirectoryEntry[]>
+  /** 删除一条目录条目 */
+  remove(provider: string, sub: string): Promise<void>
+}

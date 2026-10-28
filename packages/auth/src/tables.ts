@@ -2,12 +2,13 @@
  * 双方言 auth 表定义：App 把 pgAuthTables/sqliteAuthTables spread 进
  * 自己的 schema 参与迁移。
  *
- * 包含五张表：
+ * 包含六张表：
  * - `refresh_tokens`：session refresh token（rotate + family 吊销）
  * - `users`：本地身份锚点（密码/WebAuthn/OAuth2 共享）
  * - `passwords`：密码凭证（1:1 users）
  * - `oauth2_identity_links`：OAuth2 身份关联（1:N users）
  * - `webauthn_credentials`：WebAuthn 凭证（1:N users）
+ * - `identity_directory`：外部身份目录（provider+sub+name 白名单快照，JIT 准入依据）
  *
  * ⚠ 列名显式 snake_case，必须与各 store 的原生 SQL 列名严格对齐。
  *   parity 测试只比对 pg↔sqlite 两侧一致，测不出与原生 SQL 的偏差——
@@ -21,6 +22,7 @@ export const USERS_TABLE = 'users'
 export const PASSWORDS_TABLE = 'passwords'
 export const OAUTH2_IDENTITY_LINKS_TABLE = 'oauth2_identity_links'
 export const WEBAUTHN_CREDENTIALS_TABLE = 'webauthn_credentials'
+export const IDENTITY_DIRECTORY_TABLE = 'identity_directory'
 
 // ── refresh_tokens（原有）──────────────────────────────
 
@@ -175,6 +177,40 @@ const sqliteWebauthnCredentials = sqliteTable(
   (t) => [sqliteIndex('webauthn_creds_user_idx').on(t.userId)],
 )
 
+// ── identity_directory（外部身份目录，UNIQUE provider+sub）──
+//
+// 泛型化的「外部身份目录」：App 定期把上游来源（如钉钉通讯录）快照进来，
+// identity resolver 以它为白名单依据做 JIT 准入。homura 只管 provider+sub+name
+// 的通用形状与 upsert；快照怎么拉、目录怎么过期，是 App/接线层的策略。
+
+const pgIdentityDirectory = pgTable(
+  IDENTITY_DIRECTORY_TABLE,
+  {
+    id: pgCol.id('id'),
+    provider: pgCol.text('provider').notNull(),
+    sub: pgCol.text('sub').notNull(),
+    name: pgCol.text('name'),
+    raw: pgCol.text('raw'),
+    createdAt: pgCol.epochMs('created_at').notNull(),
+    updatedAt: pgCol.epochMs('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('identity_directory_provider_sub_uidx').on(t.provider, t.sub)],
+)
+
+const sqliteIdentityDirectory = sqliteTable(
+  IDENTITY_DIRECTORY_TABLE,
+  {
+    id: sqliteCol.id('id'),
+    provider: sqliteCol.text('provider').notNull(),
+    sub: sqliteCol.text('sub').notNull(),
+    name: sqliteCol.text('name'),
+    raw: sqliteCol.text('raw'),
+    createdAt: sqliteCol.epochMs('created_at').notNull(),
+    updatedAt: sqliteCol.epochMs('updated_at').notNull(),
+  },
+  (t) => [sqliteUniqueIndex('identity_directory_provider_sub_uidx').on(t.provider, t.sub)],
+)
+
 // ── 导出 ──────────────────────────────────────────────
 
 export const pgAuthTables = {
@@ -183,6 +219,7 @@ export const pgAuthTables = {
   passwords: pgPasswords,
   oauth2IdentityLinks: pgOAuth2IdentityLinks,
   webauthnCredentials: pgWebauthnCredentials,
+  identityDirectory: pgIdentityDirectory,
 }
 
 export const sqliteAuthTables = {
@@ -191,4 +228,5 @@ export const sqliteAuthTables = {
   passwords: sqlitePasswords,
   oauth2IdentityLinks: sqliteOAuth2IdentityLinks,
   webauthnCredentials: sqliteWebauthnCredentials,
+  identityDirectory: sqliteIdentityDirectory,
 }
