@@ -9,7 +9,7 @@
  * - `oauth2_identity_links`：OAuth2 身份关联（1:N users）
  * - `webauthn_credentials`：WebAuthn 凭证（1:N users）
  *
- * ⚠ 列名显式 snake_case，必须与各 store 的原生 SQL / PostgREST 列名严格对齐。
+ * ⚠ 列名显式 snake_case，必须与各 store 的原生 SQL 列名严格对齐。
  *   parity 测试只比对 pg↔sqlite 两侧一致，测不出与原生 SQL 的偏差——
  *   改列名务必同步 store 实现，并以 drizzle-kit generate 的产物为准复核。
  */

@@ -5,7 +5,7 @@ import type { SessionClaims, SessionManager } from '../session/manager.js'
 export interface SessionMiddlewareOptions {
   /** 允许 Authorization: Bearer（默认 true） */
   bearer?: boolean
-  /** cookie Secure 属性（qw-pages/https 传 true；本地 http dev 传 false） */
+  /** cookie Secure 属性（https 部署传 true；本地 http dev 传 false） */
   secure?: boolean
 }
 

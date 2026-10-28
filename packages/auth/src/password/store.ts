@@ -1,6 +1,6 @@
 /**
  * 密码凭证仓储接口。
- * Drizzle 双方言与 PostgREST 两版实现共享此接口。
+ * Drizzle 双方言（pg/sqlite）实现共享此接口。
  * PasswordProvider 通过此接口操作 passwords 表，不直接依赖 DrizzleDb。
  */
 

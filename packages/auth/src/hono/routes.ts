@@ -35,7 +35,7 @@ export interface AuthRoutesOptions {
   password?: PasswordProvider
   /** 是否允许自助注册（默认 true） */
   allowRegister?: boolean
-  /** cookie Secure（qw-pages/https 传 true） */
+  /** cookie Secure（https 部署传 true） */
   secure?: boolean
   /** 登录成功后的缺省跳转 */
   defaultReturnTo?: string

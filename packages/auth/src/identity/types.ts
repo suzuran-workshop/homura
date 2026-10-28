@@ -49,7 +49,7 @@ export interface WebauthnCredentialRecord {
 
 /**
  * 用户仓储：三类凭证 + identity resolver 共用。
- * Drizzle 双方言与 PostgREST 两版实现共享此接口。
+ * Drizzle 双方言（pg/sqlite）实现共享此接口。
  */
 export interface UserStore {
   /** 按 id 查用户；不存在返回 null */

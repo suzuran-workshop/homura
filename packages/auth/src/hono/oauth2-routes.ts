@@ -27,7 +27,7 @@ export interface OAuth2RoutesOptions {
   /** OAuth2 provider 标识（如 'dingtalk'），用于 identity link */
   provider: string
   paths?: OAuth2Paths
-  /** cookie Secure（qw-pages/https 传 true） */
+  /** cookie Secure（https 部署传 true） */
   secure?: boolean
   /** 登录成功后的缺省跳转（returnTo 优先） */
   defaultReturnTo?: string
