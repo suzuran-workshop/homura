@@ -14,9 +14,6 @@
     "./local": "./src/local.ts",
     "./s3": "./src/s3.ts",
     "./supabase": "./src/supabase.ts",
-    "./db": "./src/db.ts",
-    "./tables": "./src/tables.ts",
-    "./chunk-client": "./src/chunk-client.ts",
     "./proxy": "./src/proxy.ts"
   },
   "publishConfig": {
@@ -39,18 +36,6 @@
         "types": "./dist/supabase.d.ts",
         "import": "./dist/supabase.js"
       },
-      "./db": {
-        "types": "./dist/db.d.ts",
-        "import": "./dist/db.js"
-      },
-      "./tables": {
-        "types": "./dist/tables.d.ts",
-        "import": "./dist/tables.js"
-      },
-      "./chunk-client": {
-        "types": "./dist/chunk-client.d.ts",
-        "import": "./dist/chunk-client.js"
-      },
       "./proxy": {
         "types": "./dist/proxy.d.ts",
         "import": "./dist/proxy.js"
@@ -63,8 +48,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@homurajs/core": "workspace:*",
-    "@homurajs/db": "workspace:*"
+    "@homurajs/core": "workspace:*"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3.0.0",
@@ -73,10 +57,18 @@
     "hono": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "@aws-sdk/client-s3": { "optional": true },
-    "@aws-sdk/s3-request-presigner": { "optional": true },
-    "drizzle-orm": { "optional": true },
-    "hono": { "optional": true }
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/s3-request-presigner": {
+      "optional": true
+    },
+    "drizzle-orm": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.700.0",

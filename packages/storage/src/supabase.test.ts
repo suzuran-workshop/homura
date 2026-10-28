@@ -89,7 +89,7 @@ describe('createSupabaseStorage（REST 契约快照）', () => {
 })
 
 describe('loadSupabaseStorageEnv — 只需 URL + anon key（不牵连 PG 凭据）', () => {
-  it('qw-pages 实测注入集即可解析（无 PROJECT_REF / DB_PASSWORD）', () => {
+  it('平台实测注入集即可解析（无 PROJECT_REF / DB_PASSWORD）', () => {
     const env = loadSupabaseStorageEnv({
       SUPABASE_URL: 'https://supabase.example/',
       SUPABASE_ANON_KEY: 'anon-key',

@@ -38,61 +38,9 @@ export interface FileStorage {
     contentType: string,
     expirySeconds: number,
   ): Promise<string>
-  /**
-   * 流式下载（可选）：逐块 yield，避免整文件进内存。代理路由优先用它，缺失时退回 downloadFile。
-   * 分块后端（ChunkedFileStorage）必须实现。
-   */
-  downloadStream?(
-    objectKey: string,
-  ): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; size: number }>
   deleteFile(objectKey: string): Promise<void>
   /** 强制 ns 前缀，无法越权列举 */
   listFiles(ns: string, prefix: string, limit: number): Promise<FileInfo[]>
-}
-
-/** 清单状态：uploading（分块上传中）| complete（块齐、可下载） */
-export type FileStatus = 'uploading' | 'complete'
-
-/** 分块文件的清单（manifest）——不含数据本身 */
-export interface FileManifest {
-  objectKey: string
-  contentType: string
-  /** 原始总字节数 */
-  totalSize: number
-  /** 每块原始字节数（最后一块可能更小） */
-  chunkSize: number
-  chunkCount: number
-  status: FileStatus
-  createdAt: Date
-}
-
-/**
- * 分块文件存储：在 FileStorage 之上加分块上传协议（init/putChunk/complete）。
- *
- * 为什么需要：qw-pages 网关对单请求 body 有上限（实测 ≥1MB 413），PostgREST 单值也 ~1MB。
- * 把文件切成 ≤chunkSize 的块、每块一个小请求，即可绕开限制支持大文件。前端用
- * `@homurajs/storage/chunk-client` 切片上传；下载由 `downloadStream` 逐块流式重组。
- *
- * 整文件 API（uploadFile/downloadFile）仍可用：内部自动分块/重组（服务端一次性场景）。
- */
-export interface ChunkedFileStorage extends FileStorage {
-  /** 初始化分块上传：建清单（status=uploading），返回实际块数与块大小 */
-  initUpload(input: {
-    objectKey: string
-    contentType: string
-    totalSize: number
-    chunkSize?: number
-  }): Promise<{ objectKey: string; chunkCount: number; chunkSize: number }>
-  /** 写入单块（幂等 upsert，可重试/并行）；data 为该块原始字节 */
-  putChunk(objectKey: string, index: number, data: Uint8Array): Promise<void>
-  /** 完成上传：校验块齐 → status=complete；缺块抛错（残块由 GC 清） */
-  completeUpload(objectKey: string): Promise<FileManifest>
-  /** 读清单（不存在返回 null） */
-  getManifest(objectKey: string): Promise<FileManifest | null>
-  /** 流式下载（分块后端必须实现） */
-  downloadStream(
-    objectKey: string,
-  ): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; size: number }>
 }
 
 /** 上传载荷（Node 侧 Uint8Array；浏览器 File/Blob 由调用方先转） */
